@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es" data-nz-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planifica — Presupuestos y planificación de proyectos</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="nz">
+<div id="pa-error"></div>
+
+<header class="pa-cab">
+  <div class="pa-cab__fila">
+    <div class="pa-marca">
+      <span class="pa-marca__nombre" id="pa-marca-nombre">Planifica</span>
+      <span class="pa-marca__sub" id="pa-marca-sub">Presupuestos y planificación de proyectos</span>
+    </div>
+    <div class="pa-cab__espacio"></div>
+    <div class="pa-proyecto-picker">
+      <select class="pa-select" id="pa-sel-proyecto" aria-label="Proyecto activo" style="width:auto"></select>
+      <button class="pa-btn pa-btn--icono" data-acc="nuevo-proyecto" title="Nuevo proyecto">＋</button>
+      <button class="pa-btn pa-btn--icono" data-acc="dup-proyecto" title="Duplicar proyecto">⧉</button>
+      <button class="pa-btn pa-btn--icono pa-btn--peligro" data-acc="elim-proyecto" title="Eliminar proyecto">✕</button>
+    </div>
+    <button class="pa-btn" data-acc="toggle-importes" id="pa-boton-importes" title="Mostrar u ocultar los importes (modo solo tiempo)">👁 €</button>
+    <button class="pa-btn" data-acc="imp-json" title="Importar datos (JSON)">⬆ Importar</button>
+    <span class="pa-chip pa-chip--gris" id="pa-guardado" aria-live="polite"></span>
+  </div>
+  <nav class="pa-tabs" aria-label="Secciones">
+    <button class="pa-tab is-activa" data-tab="estructura">Estructura</button>
+    <button class="pa-tab" data-tab="resumen">Resumen</button>
+    <button class="pa-tab" data-tab="cronograma">Cronograma</button>
+    <button class="pa-tab" data-tab="gastos">Gastos</button>
+    <button class="pa-tab" data-tab="informe">Informe</button>
+    <button class="pa-tab" data-tab="ajustes">Ajustes</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ============ ESTRUCTURA ============ -->
+  <section id="sec-estructura">
+    <div class="pa-card">
+      <div class="pa-card__titulo">
+        <h3>Estructura del proyecto</h3>
+        <span class="pa-espacio"></span>
+        <button class="pa-btn pa-btn--primario" data-acc="nueva-tarea">＋ Añadir tarea</button>
+        <button class="pa-btn" data-acc="abrir-todo">Desplegar todo</button>
+        <button class="pa-btn" data-acc="cerrar-todo">Plegar todo</button>
+      </div>
+      <p class="pa-linea__horas">Tareas → subtareas → perfiles con horas por mes. Todo recalcula al instante: horas, importes, mensualidades y anualidades.</p>
+    </div>
+    <div id="pa-estructura" style="margin-top:14px"></div>
+  </section>
+
+  <!-- ============ RESUMEN ============ -->
+  <section id="sec-resumen" hidden>
+    <p class="pa-linea__horas" id="pa-meta-proyecto" style="margin:0 0 10px"></p>
+    <div class="pa-kpis">
+      <div class="pa-kpi"><div class="pa-kpi__label">Total proyecto (con gastos)</div><div class="pa-kpi__valor" id="kpi-total">—</div></div>
+      <div class="pa-kpi"><div class="pa-kpi__label">Horas totales</div><div class="pa-kpi__valor" id="kpi-horas">—</div></div>
+      <div class="pa-kpi"><div class="pa-kpi__label">Media mensual</div><div class="pa-kpi__valor" id="kpi-media">—</div></div>
+      <div class="pa-kpi"><div class="pa-kpi__label">Estructura</div><div class="pa-kpi__valor" id="kpi-estructura">—</div></div>
+    </div>
+    <div class="pa-grid pa-grid--2" style="margin-top:14px">
+      <div class="pa-card"><div class="pa-card__titulo"><h3>Resumen por perfil</h3></div><div id="res-perfiles"></div></div>
+      <div class="pa-card"><div class="pa-card__titulo"><h3>Resumen por tarea</h3></div><div id="res-tareas"></div></div>
+    </div>
+  </section>
+
+  <!-- ============ CRONOGRAMA ============ -->
+  <section id="sec-cronograma" hidden>
+    <div class="pa-card">
+      <div class="pa-card__titulo"><h3>Importe por mes</h3></div>
+      <div class="pa-barras" id="cro-barras"></div>
+    </div>
+    <div class="pa-card">
+      <div class="pa-card__titulo"><h3>Horas por tarea y mes</h3></div>
+      <div id="cro-tabla"></div>
+    </div>
+  </section>
+
+  <!-- ============ GASTOS ============ -->
+  <section id="sec-gastos" hidden>
+    <div class="pa-card">
+      <div class="pa-card__titulo">
+        <h3>Gastos generales</h3>
+        <span class="pa-espacio"></span>
+        <span class="pa-chip pa-importe" id="gas-total">—</span>
+        <button class="pa-btn pa-btn--primario" data-acc="nueva-gasto">＋ Añadir gasto</button>
+      </div>
+      <div id="gas-lista"></div>
+      <div class="pa-aviso pa-aviso--info">Estos gastos se suman al total del proyecto además de las horas de los perfiles (viajes, licencias, material…).</div>
+    </div>
+  </section>
+
+  <!-- ============ INFORME ============ -->
+  <section id="sec-informe" hidden>
+    <div class="pa-card pa-no-imprimir">
+      <div class="pa-card__titulo">
+        <h3>Informe del proyecto</h3>
+        <span class="pa-espacio"></span>
+        <button class="pa-btn pa-btn--primario" data-acc="imprimir">🖨 Imprimir / Guardar PDF</button>
+        <button class="pa-btn" data-acc="exp-csv">⬇ CSV</button>
+        <button class="pa-btn" data-acc="exp-json-proy">⬇ JSON del proyecto</button>
+      </div>
+      <p class="pa-linea__horas">Para guardar en PDF: pulsa «Imprimir / Guardar PDF» y elige «Guardar como PDF» como destino.</p>
+    </div>
+    <div class="pa-card" style="margin-top:14px">
+      <div class="pa-informe" id="informe-cuerpo"></div>
+    </div>
+  </section>
+
+  <!-- ============ AJUSTES ============ -->
+  <section id="sec-ajustes" hidden>
+    <div class="pa-grid pa-grid--2">
+      <div class="pa-card">
+        <div class="pa-card__titulo"><h3>Marca blanca</h3></div>
+        <div class="pa-grid" style="gap:10px">
+          <div><label class="pa-etiqueta" for="aj-marca">Nombre de la marca</label><input class="pa-input" id="aj-marca" placeholder="Planifica"></div>
+          <div><label class="pa-etiqueta" for="aj-sub">Lema</label><input class="pa-input" id="aj-sub" placeholder="Presupuestos y planificación de proyectos"></div>
+          <div><label class="pa-etiqueta" for="aj-moneda">Símbolo de moneda</label><input class="pa-input" id="aj-moneda" placeholder="€" maxlength="4"></div>
+          <label class="pa-fila" style="gap:8px"><input type="checkbox" id="aj-importes" style="width:18px;height:18px"> Mostrar importes económicos (desactívalo para usarla como planificador de tiempos)</label>
+        </div>
+        <div class="pa-aviso pa-aviso--info" style="margin-top:10px">La configuración se guarda en este navegador. Cada persona o empresa puede poner su propia marca.</div>
+      </div>
+      <div class="pa-card">
+        <div class="pa-card__titulo">
+          <h3>Perfiles y tarifas</h3>
+          <span class="pa-espacio"></span>
+          <button class="pa-btn pa-btn--primario" data-acc="nuevo-perfil">＋ Añadir perfil</button>
+        </div>
+        <div id="aj-perfiles"></div>
+        <div id="aj-inactivos" style="margin-top:8px"></div>
+        <p class="pa-linea__horas">La tarifa es € por hora (o por la unidad que pongas). Al cambiarla, todos los importes recalculan al instante.</p>
+      </div>
+      <div class="pa-card">
+        <div class="pa-card__titulo"><h3>Proyecto activo</h3></div>
+        <div class="pa-grid" style="gap:10px">
+          <div><label class="pa-etiqueta" for="aj-nombre">Nombre</label><input class="pa-input" id="aj-nombre" data-campo="proyecto-nombre"></div>
+          <div><label class="pa-etiqueta" for="aj-cliente">Cliente</label><input class="pa-input" id="aj-cliente" data-campo="proyecto-cliente"></div>
+          <div class="pa-grid pa-grid--2" style="gap:10px">
+            <div><label class="pa-etiqueta" for="aj-inicio">Mes de inicio</label><input class="pa-input" id="aj-inicio" type="month"></div>
+            <div><label class="pa-etiqueta" for="aj-meses">Duración (meses)</label><input class="pa-input" id="aj-meses" type="number" min="1" max="60"></div>
+          </div>
+          <div><label class="pa-etiqueta" for="aj-desc">Descripción</label><textarea class="pa-textarea" id="aj-desc" data-campo="proyecto-desc" rows="2"></textarea></div>
+        </div>
+      </div>
+      <div class="pa-card">
+        <div class="pa-card__titulo"><h3>Datos</h3></div>
+        <div class="pa-fila">
+          <button class="pa-btn" data-acc="exp-json-todo">⬇ Copia de seguridad (todo)</button>
+          <button class="pa-btn" data-acc="exp-json-proy">⬇ Exportar proyecto activo</button>
+          <button class="pa-btn" data-acc="imp-json">⬆ Importar JSON</button>
+        </div>
+        <div class="pa-fila" style="margin-top:10px">
+          <button class="pa-btn" data-acc="restaurar-demo">Restaurar datos de ejemplo</button>
+          <button class="pa-btn pa-btn--peligro" data-acc="borrar-todo">Borrar todos los datos</button>
+        </div>
+        <div class="pa-aviso pa-aviso--aviso" style="margin-top:10px">Los datos viven en <strong>este navegador</strong> (localStorage). Antes de borrar o restaurar se descarga automáticamente una copia de seguridad.</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer style="max-width:1280px;margin:0 auto;padding:20px 14px 34px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;color:var(--pa-texto-suave);font-size:.8rem">
+  <span>Hecho con ❤️ por David Antizar</span>
+  <span>App autocontenida · tus datos nunca salen de tu navegador</span>
+</footer>
+
+<input type="file" id="pa-fichero" accept=".json,application/json" hidden>
+<div id="pa-toast" role="status"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
