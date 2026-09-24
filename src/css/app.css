@@ -239,7 +239,7 @@ body.pa-sin-importes .pa-importe { display: none; }
   .pa-tabla-horas td[data-etiqueta] > * { flex: 1 1 auto; min-width: 0; }
   .pa-tabla-horas td[data-etiqueta="Perfil"]::before { display: none; }
   .pa-tabla-horas td[data-etiqueta="Perfil"] { display: block; }
-  .pa-tabla-horas input[type="number"], .pa-tabla-horas select { min-height: 44px; font-size: var(--nz-text-md); width: 100%; min-width: 0; }
+  .pa-tabla-horas input[type="number"], .pa-tabla-horas select { min-height: 44px; font-size: var(--nz-text-sm); width: 100%; min-width: 0; }
   .pa-tabla-horas .pa-celda__eq { flex: 0 0 5rem; text-align: right; }
   .pa-tabla-horas td .nz-btn { min-height: 44px; min-width: 44px; }
 }
@@ -404,7 +404,7 @@ span.pa-carga {
   .pa-hito { flex-wrap: wrap; row-gap: var(--nz-space-1); }
   .pa-hito .nz-input, .pa-hito .nz-btn { min-height: 44px; }
   .pa-hito__nombre { flex: 1 1 100%; }
-  .pa-select-pct, .pa-input-horas, .pa-input-num { min-height: 44px; font-size: var(--nz-text-md); }
+  .pa-select-pct, .pa-input-horas, .pa-input-num { min-height: 44px; font-size: var(--nz-text-sm); }
   .pa-select-pct { width: 100%; }
   .pa-select-perfil { min-width: 0; }
   .pa-calendario .pa-ancho-medio { width: 100%; }
