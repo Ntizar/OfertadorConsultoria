@@ -30,43 +30,6 @@
       '<span class="nz-switch__label">Mostrar los importes (€)</span></label>');
   }
 
-  function perfiles(a) {
-    const V2 = V(), o = a.pr();
-    const activos = N().lista(a.ESTADO.perfiles);
-    const inactivos = N().lista(a.ESTADO.perfilesInactivos);
-    const filas = activos.map(p => {
-      const usos = C().usosPerfil(a.ESTADO.ofertas, p.id);
-      return '<div class="pa-dato" data-id="' + p.id + '">' +
-        '<input class="nz-input pa-crece2" data-campo="perfil-nombre" data-id="' + p.id + '" value="' + N().esc(p.nombre) + '">' +
-        '<select class="nz-input nz-input--sm" data-campo="perfil-categoria" data-id="' + p.id + '" style="min-width:145px">' +
-          PL.modelo.CATEGORIAS_PERFIL.map(c => "<option" + (p.categoria === c ? " selected" : "") + ">" + c + "</option>").join("") +
-        "</select>" +
-        '<label class="pa-mini pa-ahora">tarifa <input class="nz-input nz-input--sm pa-input-num" type="number" min="0" step="0.01" data-campo="perfil-tarifa" data-id="' + p.id + '" value="' + (N().num(p.tarifa) || "") + '"></label>' +
-        '<label class="pa-mini pa-ahora">ud <input class="nz-input nz-input--sm pa-input-corto" data-campo="perfil-unidad" data-id="' + p.id + '" value="' + N().esc(p.unidad) + '"></label>' +
-        (p.esDefecto ? '<span class="nz-badge nz-badge--neutral">fábrica</span><button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-perfil" data-id="' + p.id + '" title="Restaurar valores de fábrica">↺</button>' : "") +
-        '<span class="pa-mini pa-ahora">' + usos + " uso(s)</span>" +
-        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-perfil" data-id="' + p.id + '" title="Eliminar o desactivar">✕</button>' +
-      "</div>";
-    }).join("");
-
-    return V2.articulo("Perfiles del equipo",
-      '<p class="pa-mini">Tu catálogo de puestos con su precio por hora. Se usa en todas las ofertas: guárdalo en un fichero para llevártelo a otro equipo o navegador, y cárgalo cuando quieras.</p>' +
-      '<div class="pa-fila" style="margin:var(--nz-space-2) 0">' +
-        '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="nuevo-perfil">＋ Añadir perfil</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-perfiles">⬇ Guardar mis perfiles</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="imp-perfiles">⬆ Cargar perfiles</button>' +
-        '<span class="pa-espacio"></span>' +
-        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-perfiles-defecto">↺ Los de fábrica</button>' +
-      "</div>" +
-      (filas || '<p class="pa-mini">Sin perfiles: añade los de tu equipo con sus tarifas.</p>') +
-      (inactivos.length
-        ? '<h4 class="nz-h4" style="margin-top:var(--nz-space-3)">Desactivados</h4>' + inactivos.map(p =>
-          '<div class="pa-dato"><span class="pa-crece">' + N().esc(p.nombre) + ' <span class="pa-mini">(' + N().esc(p.categoria) + ")</span></span>" +
-          '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="reactivar-perfil" data-id="' + p.id + '">Reactivar</button></div>').join("")
-        : ""));
-    void o;
-  }
-
   function datos(a) {
     const V2 = V();
     const heredados = A().datosHeredados();
@@ -105,7 +68,7 @@
   function render() {
     const V2 = V(), a = APP();
     if (!a.pr()) { V2.vaciar("ajustes-cuerpo"); return; }
-    V2.escribir("ajustes-cuerpo", marca(a) + perfiles(a) + datos(a));
+    V2.escribir("ajustes-cuerpo", marca(a) + datos(a));
   }
 
   PL.vistas.ajustes = { render: render };

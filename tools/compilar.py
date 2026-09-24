@@ -44,6 +44,7 @@ MODULOS_JS = [
     "vistas.js",
     "vista-trabajo.js",
     "vista-oferta.js",
+    "vista-perfiles.js",
     "vista-resumen.js",
     "vista-informe.js",
     "vista-ajustes.js",
@@ -52,7 +53,7 @@ MODULOS_JS = [
     "main.js",
 ]
 
-SECCIONES = ["sec-trabajo", "sec-oferta", "sec-resumen", "sec-informe", "sec-ajustes"]
+SECCIONES = ["sec-trabajo", "sec-oferta", "sec-perfiles", "sec-resumen", "sec-informe", "sec-ajustes"]
 
 PROHIBIDO = [
     (r'\$\$\("main>section"\)', 'ha vuelto el selector roto $$("main>section")'),

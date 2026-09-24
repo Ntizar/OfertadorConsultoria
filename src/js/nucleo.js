@@ -72,6 +72,36 @@
   /* Plurales irregulares del castellano: 6 "mes" no es «6 mess». */
   const IRREGULARES = { mes: "meses", vez: "veces", año: "años", día: "días", persona: "personas" };
 
+  /** Lee lo que se teclea en un campo de esfuerzo y deduce la unidad:
+        "50"   → 50 en la unidad del modo
+        "50%"  → 50 % (dedicación)
+        "88h"  → 88 horas
+        "12,5" → 12,5
+      Devuelve null si no hay número (entonces no se toca nada). */
+  function parseaCantidad(texto_) {
+    let t = String(texto_ === undefined || texto_ === null ? "" : texto_).trim().toLowerCase().replace(/\s+/g, "");
+    if (!t) return { valor: 0, unidad: "" };
+    let unidad = "";
+    if (t.charAt(t.length - 1) === "%") { unidad = "%"; t = t.slice(0, -1); }
+    else if (t.charAt(t.length - 1) === "h") { unidad = "h"; t = t.slice(0, -1); }
+    t = t.replace(/[^0-9,.\-]/g, "");
+    /* Un solo separador decimal: «12,5» vale, «1.234,5» se rechaza en vez de
+       inventarse un número. */
+    if ((t.match(/[.,]/g) || []).length > 1) return null;
+    t = t.replace(",", ".");
+    if (!t || isNaN(Number(t))) return null;
+    return { valor: Math.max(0, Number(t)), unidad: unidad };
+  }
+
+  /** Número para un CAMPO editable: coma decimal y sin separador de miles
+      («88,5», no «88,5» con puntos que luego no se pueden volver a leer). */
+  function fmtCampo(v, dec) {
+    const n = num(v);
+    if (!isFinite(n) || n === 0) return "";
+    const d = dec === undefined ? 2 : dec;
+    return String(Number(n.toFixed(d))).replace(".", ",");
+  }
+
   function plural(n, singular, plural_) {
     return num(n) === 1 ? singular : (plural_ || IRREGULARES[singular] || singular + "s");
   }
@@ -157,7 +187,8 @@
   PL.nucleo = {
     num: num, r2: r2, suma: suma, sumaR2: sumaR2, acota: acota, entre: entre,
     esc: esc, texto: texto, lista: lista, uid: uid, slug: slug, capitaliza: capitaliza, plural: plural,
-    hoyISO: hoyISO, mesISO: mesISO, diaISO: diaISO, fechaCorta: fechaCorta, fechaISO: fechaISO, fechaLarga: fechaLarga,
+    hoyISO: hoyISO, mesISO: mesISO, diaISO: diaISO, fechaCorta: fechaCorta,
+    parseaCantidad: parseaCantidad, fmtCampo: fmtCampo, fechaISO: fechaISO, fechaLarga: fechaLarga,
     fechaDeValidez: fechaDeValidez, normalizarMesISO: normalizarMesISO,
     fmtImporte: fmtImporte, fmtHoras: fmtHoras, fmtNum: fmtNum, fmtPct: fmtPct,
     clonar: clonar

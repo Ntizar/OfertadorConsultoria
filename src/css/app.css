@@ -264,3 +264,36 @@ body.pa-sin-importes .pa-importe { display: none; }
   .pa-gantt--informe .pa-gantt__concepto { min-width: 9rem; }
 }
 
+/* ---------- Color por tarea ----------
+   Cada tarea lleva un tono del sistema; sus subtareas y sus entregables lo heredan.
+   El hilo se sigue igual en el árbol, en el diagrama y en el informe. */
+.pa-tono-1 { --pa-tono: var(--nz-brand);   --pa-tono-fluido: var(--nz-brand-soft); }
+.pa-tono-2 { --pa-tono: var(--nz-accent);  --pa-tono-fluido: var(--nz-accent-soft); }
+.pa-tono-3 { --pa-tono: var(--nz-success); --pa-tono-fluido: var(--nz-success-soft); }
+.pa-tono-4 { --pa-tono: var(--nz-warning); --pa-tono-fluido: var(--nz-warning-soft); }
+.pa-tono-5 { --pa-tono: var(--nz-danger);  --pa-tono-fluido: var(--nz-danger-soft); }
+
+.pa-tarea { border-left: 4px solid var(--pa-tono, var(--nz-border)); }
+.pa-tarea .pa-sub { border-left: 3px solid var(--pa-tono-fluido, var(--nz-border)); }
+.pa-tarea .pa-hito { border-left: 3px solid var(--pa-tono, var(--nz-border)); }
+
+.pa-gantt__fila--tarea .pa-barra { background: var(--pa-tono, var(--nz-brand)); }
+.pa-gantt__fila--subtarea .pa-barra { background: var(--pa-tono-fluido, var(--nz-brand)); }
+.pa-gantt__fila--entregable .pa-barra--hito { color: var(--pa-tono, var(--nz-accent)); }
+
+/* ---------- Calendario en móvil: rejilla, campos grandes y sin scroll lateral ---------- */
+.pa-calendario { flex-wrap: wrap; }
+@media (max-width: 720px) {
+  .pa-calendario { display: grid; grid-template-columns: 1fr 1fr; gap: var(--nz-space-2); align-items: stretch; }
+  .pa-calendario > * { min-width: 0; }
+  .pa-calendario .pa-calendario__dato { display: flex; flex-direction: column; align-items: stretch; gap: 0.2rem; }
+  .pa-calendario input, .pa-calendario .nz-btn { min-height: 44px; width: 100%; }
+  .pa-calendario .pa-espacio { display: none; }
+  .pa-calendario__duracion, .pa-calendario > .pa-mini { grid-column: 1 / -1; }
+
+  .pa-gantt__concepto { min-width: 7.5rem; max-width: 9rem; font-size: var(--nz-text-xs); }
+  .pa-gantt__total { min-width: 3.4rem; font-size: var(--nz-text-xs); }
+  .pa-gantt__rotulo { font-size: var(--nz-text-xs); }
+  .pa-gantt__celda { min-width: 2.6rem; }
+}
+

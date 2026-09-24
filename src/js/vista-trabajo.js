@@ -70,7 +70,7 @@
       return '<p class="pa-mini">Sin entregables en esta tarea: añade el primero con «＋ Entregable».</p>';
     }
     const horas = N().suma(hitos, e => N().num(e.horas));
-    return '<p class="pa-mini pa-mini--fuerte">Entregables de esta tarea · ' + hitos.length +
+    return '<p class="pa-mini pa-mini--fuerte">Entregables de la TAREA completa · ' + hitos.length +
       (horas ? " · " + V2.hor(horas) + " estimadas" : "") + "</p>" +
       E().deTarea(o, t).map(e => V2.htmlEntregable(o, pf, e, "tarea", t.id)).join("");
   }
@@ -78,6 +78,20 @@
   /** Horas de cada perfil y mes. Se teclean en % de jornada o en horas (según el
       modo), el equivalente va siempre debajo y se marca en rojo quien pasa del
       100 % —nadie puede estar más de una jornada completa a la vez. */
+  /** Entregables de una subtarea: aquí es lo habitual, se entrega al cerrar ese trabajo. */
+  function hitsDeSubtarea(o, pf, s) {
+    const V2 = V();
+    const lista = E().deSubtarea(o, s);
+    const hHoras = N().suma(lista, e => N().num(e.horas));
+    return '<div class="pa-hitos pa-hitos--sub">' +
+      (lista.length
+        ? '<p class="pa-mini pa-mini--fuerte">Se entrega aquí · ' + lista.length + (hHoras ? " · " + V2.hor(hHoras) + " estimadas" : "") + "</p>" +
+          lista.map(e => V2.htmlEntregable(o, pf, e, "subtarea", "", s.id)).join("")
+        : "") +
+      '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="nuevo-entregable-sub" data-id="' + s.id + '">＋ Entregable de esta subtarea</button>' +
+      "</div>";
+  }
+
   function tablaLineas(o, pf, s) {
     const V2 = V();
     const cols = P().columnas(o.periodos);
@@ -111,8 +125,8 @@
         const eti = ' data-etiqueta="' + N().esc(c.etiqueta) + '" title="' + N().esc(ayuda) + '"';
         if (c.periodos.length === 1) {
           return "<td class=\"" + clase + "\"" + eti + ">" +
-            '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0" step="' + (enPct ? "5" : "0.5") + '" ' +
-            'value="' + (h > 0 ? N().fmtNum(enPct ? pct : h) : "") + '" placeholder="0" data-campo="horas" ' +
+            '<input class="nz-input nz-input--sm pa-input-horas" type="text" inputmode="decimal" autocomplete="off" ' +
+            'value="' + N().fmtCampo(enPct ? pct : h) + '" placeholder="' + (enPct ? "%" : "0") + '" data-campo="horas" ' +
             'data-modo="' + (enPct ? "pct" : "h") + '" data-id="' + l.id + '" data-mes="' + idx + '" ' +
             'aria-label="' + N().esc("Horas en " + c.etiqueta) + '">' +
             '<span class="pa-celda__eq">' + eq + "</span></td>";
@@ -154,7 +168,10 @@
           '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="bajar-sub" data-id="' + s.id + '" title="Bajar"' + (si === subs.length - 1 ? " disabled" : "") + ">↓</button>" +
           '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-sub" data-id="' + s.id + '" title="Eliminar subtarea">✕</button>' +
         "</summary>" +
-        '<div class="pa-sub__cuerpo">' + tablaLineas(o, pf, s) + "</div>" +
+        '<div class="pa-sub__cuerpo">' +
+          hitsDeSubtarea(o, pf, s) +
+          tablaLineas(o, pf, s) +
+        "</div>" +
       "</details>").join("");
   }
 
@@ -169,7 +186,7 @@
     }
     /* La tarjeta de cada tarea lleva la clase pa-tarea: la usan el CSS y los arneses. */
     return tareas.map((t, i) =>
-      '<article class="nz-article pa-tarea">' + cabeceraTarea(o, pf, t, i) +
+      '<article class="nz-article pa-tarea' + V2.claseTono(o, t.id) + '">' + cabeceraTarea(o, pf, t, i) +
       bloqueHitos(o, pf, t) + subtareas(o, pf, t) + "</article>"
     ).join("");
   }

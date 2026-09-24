@@ -158,8 +158,19 @@ check("normalizar rechaza basura y cae al mes actual", P.normalizar({ inicio: "l
 /* ---------- 5. Entregables ---------- */
 t.grupo("\n5. Entregables (compromisos de entrega)");
 const ents = E.todos(OF);
-check("5 entregables en el ejemplo", ents.length === 5, ents.length);
-check("4 son de tarea y 1 de la oferta", E.porContexto(OF).deTarea === 4 && E.porContexto(OF).deOferta === 1, JSON.stringify(E.porContexto(OF)));
+check("6 entregables en el ejemplo", ents.length === 6, ents.length);
+check("4 cuelgan de subtareas, 1 de la tarea completa y 1 de la oferta",
+  E.porContexto(OF).deSubtarea === 4 && E.porContexto(OF).deTarea === 1 && E.porContexto(OF).deOferta === 1,
+  JSON.stringify(E.porContexto(OF)));
+check("los entregables de subtarea saben de qué subtarea son",
+  ents.filter(e => e._contexto === "subtarea").every(e => !!e._subtareaId && !!e._subtareaNombre),
+  JSON.stringify(ents.filter(e => e._contexto === "subtarea").map(e => e._subtareaNombre)));
+check("deSubtarea devuelve los de esa subtarea", (() => {
+  const t = OF.tareas[0], s0 = t.subtareas[0];
+  return E.deSubtarea(OF, s0).length >= 1 && E.deSubtarea(OF, s0).every(e => e._subtareaId === s0.id);
+})());
+check("deTareaCompleta suma la tarea y sus subtareas",
+  E.deTareaCompleta(OF, OF.tareas[0]).length === E.deTarea(OF, OF.tareas[0]).length + OF.tareas[0].subtareas.reduce((n, s2) => n + E.deSubtarea(OF, s2).length, 0));
 check("todos traen periodo dentro del calendario", ents.every(e => e.periodo >= 0 && e.periodo < P.meses(OF.periodos)));
 check("todos traen criterio de aceptación", ents.every(e => !!e.criterio));
 check("todos traen responsable", ents.every(e => !!E.responsable(PF, e)), ents.filter(e => !E.responsable(PF, e)).length);
@@ -182,16 +193,16 @@ check("las horas de los entregables NO tocan el importe de la oferta", (() => {
 check("etiqueta de entrega legible", /^\S+ \d{4}/.test(E.etiquetaEntrega(OF, ents[0])), E.etiquetaEntrega(OF, ents[0]));
 check("moverAPeriodo cambia el mes del entregable", (() => {
   const e = E.todos(OF)[0];
-  E.moverAPeriodo(OF, e.id, e._tareaId, 4);
-  const ok = M.buscarEntregable(OF, e.id, e._tareaId).entregable.periodo === 4;
-  E.moverAPeriodo(OF, e.id, e._tareaId, 0);
+  E.moverAPeriodo(OF, e.id, e._tareaId, e._subtareaId, 4);
+  const ok = M.buscarEntregable(OF, e.id, e._tareaId, e._subtareaId).entregable.periodo === 4;
+  E.moverAPeriodo(OF, e.id, e._tareaId, e._subtareaId, 0);
   return ok;
 })());
 check("moverAPeriodo acota al calendario", (() => {
   const e = E.todos(OF)[0];
-  E.moverAPeriodo(OF, e.id, e._tareaId, 99);
-  const v = M.buscarEntregable(OF, e.id, e._tareaId).entregable.periodo;
-  E.moverAPeriodo(OF, e.id, e._tareaId, 0);
+  E.moverAPeriodo(OF, e.id, e._tareaId, e._subtareaId, 99);
+  const v = M.buscarEntregable(OF, e.id, e._tareaId, e._subtareaId).entregable.periodo;
+  E.moverAPeriodo(OF, e.id, e._tareaId, e._subtareaId, 0);
   return v === P.meses(OF.periodos) - 1;
 })());
 check("sin estados de seguimiento en el modelo", ents.every(e => e.estado === undefined));
@@ -225,7 +236,9 @@ check("sin rastro de facturación en la comparación", JSON.stringify(cmp).index
 /* Cambios de estructura y de calendario */
 const antesFx = X.foto(oF);
 oF.tareas.push(M.nuevaTarea("3. Formación"));
-oF.tareas[0].entregables[0].periodo = 3;
+/* Se mueve la entrega de un entregable a otro mes (el que tiene ahora no vale:
+   hay que cambiarlo de verdad para que el comparador lo note). */
+oF.tareas[0].subtareas[0].entregables[0].periodo = 4;
 oF.periodos = P.conN(oF.periodos, 9);
 const cmp2 = X.comparar(oF, PF, antesFx, X.foto(oF), "Antes", "Ahora");
 check("detecta tarea nueva", cmp2.cambios.some(c => c.tipo === "alta" && /Formación/.test(c.texto)));
@@ -341,6 +354,27 @@ check("el 100 % justo no se considera exceso", (() => {
   of2.tareas[0].subtareas[0].lineas[0].horas.p0 = 176;
   return C.excesosPerfil(of2).length === 0;
 })());
+
+/* ---------- 13. Entregables en los tres niveles ---------- */
+t.grupo("13. Entregables: oferta, tarea y subtarea");
+check("se puede colgar un entregable en una subtarea concreta", (() => {
+  const of2 = EJ.ofertaEjemplo(PF);
+  const s0 = of2.tareas[0].subtareas[0];
+  const antes = E.deSubtarea(of2, s0).length;
+  const e = M.colgarEntregable(of2, "Prueba", "subtarea", 1, of2.tareas[0].id, s0.id);
+  const r = M.buscarEntregable(of2, e.id, "", s0.id);
+  return E.deSubtarea(of2, s0).length === antes + 1 && r && r.contexto === "subtarea" && r.sub.id === s0.id;
+})());
+check("y en la tarea completa", (() => {
+  const of2 = EJ.ofertaEjemplo(PF);
+  const t0 = of2.tareas[0];
+  const antes = E.deTarea(of2, t0).length;
+  const e = M.colgarEntregable(of2, "Prueba", "tarea", 1, t0.id);
+  const r = M.buscarEntregable(of2, e.id, t0.id);
+  return E.deTarea(of2, t0).length === antes + 1 && r && r.contexto === "tarea";
+})());
+check("la migración de datos antiguos deja los entregables en la tarea",
+  N.lista(M.migrar({ version: 1, perfiles: [], proyectos: [{ id: "p", nombre: "P", tareas: [{ id: "t", nombre: "T", entregables: [{ id: "e", nombre: "E" }] }] }] }).estado.ofertas[0].tareas[0].entregables).length === 1);
 
 t.resumen();
 process.exit(t.ko ? 1 : 0);

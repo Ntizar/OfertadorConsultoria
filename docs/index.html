@@ -2679,6 +2679,39 @@ body.pa-sin-importes .pa-importe { display: none; }
   .pa-gantt--informe .pa-gantt__concepto { min-width: 9rem; }
 }
 
+/* ---------- Color por tarea ----------
+   Cada tarea lleva un tono del sistema; sus subtareas y sus entregables lo heredan.
+   El hilo se sigue igual en el árbol, en el diagrama y en el informe. */
+.pa-tono-1 { --pa-tono: var(--nz-brand);   --pa-tono-fluido: var(--nz-brand-soft); }
+.pa-tono-2 { --pa-tono: var(--nz-accent);  --pa-tono-fluido: var(--nz-accent-soft); }
+.pa-tono-3 { --pa-tono: var(--nz-success); --pa-tono-fluido: var(--nz-success-soft); }
+.pa-tono-4 { --pa-tono: var(--nz-warning); --pa-tono-fluido: var(--nz-warning-soft); }
+.pa-tono-5 { --pa-tono: var(--nz-danger);  --pa-tono-fluido: var(--nz-danger-soft); }
+
+.pa-tarea { border-left: 4px solid var(--pa-tono, var(--nz-border)); }
+.pa-tarea .pa-sub { border-left: 3px solid var(--pa-tono-fluido, var(--nz-border)); }
+.pa-tarea .pa-hito { border-left: 3px solid var(--pa-tono, var(--nz-border)); }
+
+.pa-gantt__fila--tarea .pa-barra { background: var(--pa-tono, var(--nz-brand)); }
+.pa-gantt__fila--subtarea .pa-barra { background: var(--pa-tono-fluido, var(--nz-brand)); }
+.pa-gantt__fila--entregable .pa-barra--hito { color: var(--pa-tono, var(--nz-accent)); }
+
+/* ---------- Calendario en móvil: rejilla, campos grandes y sin scroll lateral ---------- */
+.pa-calendario { flex-wrap: wrap; }
+@media (max-width: 720px) {
+  .pa-calendario { display: grid; grid-template-columns: 1fr 1fr; gap: var(--nz-space-2); align-items: stretch; }
+  .pa-calendario > * { min-width: 0; }
+  .pa-calendario .pa-calendario__dato { display: flex; flex-direction: column; align-items: stretch; gap: 0.2rem; }
+  .pa-calendario input, .pa-calendario .nz-btn { min-height: 44px; width: 100%; }
+  .pa-calendario .pa-espacio { display: none; }
+  .pa-calendario__duracion, .pa-calendario > .pa-mini { grid-column: 1 / -1; }
+
+  .pa-gantt__concepto { min-width: 7.5rem; max-width: 9rem; font-size: var(--nz-text-xs); }
+  .pa-gantt__total { min-width: 3.4rem; font-size: var(--nz-text-xs); }
+  .pa-gantt__rotulo { font-size: var(--nz-text-xs); }
+  .pa-gantt__celda { min-width: 2.6rem; }
+}
+
 
 </style>
 
@@ -2717,6 +2750,7 @@ body.pa-sin-importes .pa-importe { display: none; }
   <nav class="nz-tabs" id="pa-tabs">
     <button class="nz-tabs__tab" data-tab="trabajo" aria-selected="true">Trabajo</button>
     <button class="nz-tabs__tab" data-tab="oferta">Oferta</button>
+    <button class="nz-tabs__tab" data-tab="perfiles">Perfiles</button>
     <button class="nz-tabs__tab" data-tab="resumen">Resumen</button>
     <button class="nz-tabs__tab" data-tab="informe">Informe</button>
     <button class="nz-tabs__tab" data-tab="ajustes">Ajustes</button>
@@ -2739,6 +2773,10 @@ body.pa-sin-importes .pa-importe { display: none; }
     </section>
 
     <!-- ===== RESUMEN ===== -->
+    <section id="sec-perfiles" hidden>
+      <div id="perfiles-cuerpo"></div>
+    </section>
+
     <section id="sec-resumen" hidden>
       <div id="res-totales"></div>
       <div class="nz-dash-grid nz-dash-grid--2" style="margin-top:var(--nz-space-3)">
@@ -2854,6 +2892,36 @@ body.pa-sin-importes .pa-importe { display: none; }
   /* Plurales irregulares del castellano: 6 "mes" no es «6 mess». */
   const IRREGULARES = { mes: "meses", vez: "veces", año: "años", día: "días", persona: "personas" };
 
+  /** Lee lo que se teclea en un campo de esfuerzo y deduce la unidad:
+        "50"   → 50 en la unidad del modo
+        "50%"  → 50 % (dedicación)
+        "88h"  → 88 horas
+        "12,5" → 12,5
+      Devuelve null si no hay número (entonces no se toca nada). */
+  function parseaCantidad(texto_) {
+    let t = String(texto_ === undefined || texto_ === null ? "" : texto_).trim().toLowerCase().replace(/\s+/g, "");
+    if (!t) return { valor: 0, unidad: "" };
+    let unidad = "";
+    if (t.charAt(t.length - 1) === "%") { unidad = "%"; t = t.slice(0, -1); }
+    else if (t.charAt(t.length - 1) === "h") { unidad = "h"; t = t.slice(0, -1); }
+    t = t.replace(/[^0-9,.\-]/g, "");
+    /* Un solo separador decimal: «12,5» vale, «1.234,5» se rechaza en vez de
+       inventarse un número. */
+    if ((t.match(/[.,]/g) || []).length > 1) return null;
+    t = t.replace(",", ".");
+    if (!t || isNaN(Number(t))) return null;
+    return { valor: Math.max(0, Number(t)), unidad: unidad };
+  }
+
+  /** Número para un CAMPO editable: coma decimal y sin separador de miles
+      («88,5», no «88,5» con puntos que luego no se pueden volver a leer). */
+  function fmtCampo(v, dec) {
+    const n = num(v);
+    if (!isFinite(n) || n === 0) return "";
+    const d = dec === undefined ? 2 : dec;
+    return String(Number(n.toFixed(d))).replace(".", ",");
+  }
+
   function plural(n, singular, plural_) {
     return num(n) === 1 ? singular : (plural_ || IRREGULARES[singular] || singular + "s");
   }
@@ -2939,7 +3007,8 @@ body.pa-sin-importes .pa-importe { display: none; }
   PL.nucleo = {
     num: num, r2: r2, suma: suma, sumaR2: sumaR2, acota: acota, entre: entre,
     esc: esc, texto: texto, lista: lista, uid: uid, slug: slug, capitaliza: capitaliza, plural: plural,
-    hoyISO: hoyISO, mesISO: mesISO, diaISO: diaISO, fechaCorta: fechaCorta, fechaISO: fechaISO, fechaLarga: fechaLarga,
+    hoyISO: hoyISO, mesISO: mesISO, diaISO: diaISO, fechaCorta: fechaCorta,
+    parseaCantidad: parseaCantidad, fmtCampo: fmtCampo, fechaISO: fechaISO, fechaLarga: fechaLarga,
     fechaDeValidez: fechaDeValidez, normalizarMesISO: normalizarMesISO,
     fmtImporte: fmtImporte, fmtHoras: fmtHoras, fmtNum: fmtNum, fmtPct: fmtPct,
     clonar: clonar
@@ -3308,7 +3377,7 @@ body.pa-sin-importes .pa-importe { display: none; }
   }
 
   function nuevaSubtarea(nombre) {
-    return { id: N().uid("sb_"), nombre: N().texto(nombre, "Nueva subtarea"), _abierta: true, lineas: [] };
+    return { id: N().uid("sb_"), nombre: N().texto(nombre, "Nueva subtarea"), _abierta: true, entregables: [], lineas: [] };
   }
 
   function nuevaLinea(perfilId, nPeriodos) {
@@ -3342,6 +3411,7 @@ body.pa-sin-importes .pa-importe { display: none; }
     q.unidad = N().texto(q.unidad || q.unidades, "h");
     q.tarifa = N().acota(q.tarifa, 0, 1e9);
     q.categoria = CATEGORIAS_PERFIL.indexOf(q.categoria) >= 0 ? q.categoria : "Otro";
+    q.notas = N().texto(q.notas, "");
     q.esDefecto = !!q.esDefecto;
     return q;
   }
@@ -3373,6 +3443,7 @@ body.pa-sin-importes .pa-importe { display: none; }
       sb.id = sb.id || N().uid("sb_");
       sb.nombre = N().texto(sb.nombre, "Subtarea");
       if (typeof sb._abierta !== "boolean") sb._abierta = true;
+      sb.entregables = N().lista(sb.entregables).map(e => normalizarEntregable(e, nPeriodos));
       sb.lineas = N().lista(sb.lineas).map(l => {
         const ln = (l && typeof l === "object") ? l : {};
         ln.id = ln.id || N().uid("ln_");
@@ -3587,21 +3658,47 @@ body.pa-sin-importes .pa-importe { display: none; }
     return null;
   }
 
-  /** Entregable por id, con su contenedor. tareaId vacío = entregables de la oferta. */
-  function buscarEntregable(o, id, tareaId) {
+  /** Entregable por id, con su contenedor, en los TRES niveles donde puede vivir:
+      la oferta (gestión, reuniones), una tarea completa o una subtarea concreta. */
+  function buscarEntregable(o, id, tareaId, subtareaId) {
+    /* En la subtarea concreta */
+    if (subtareaId) {
+      const r = buscarSubtarea(o, subtareaId);
+      if (!r) return null;
+      const l = N().lista(r.sub.entregables);
+      for (let i = 0; i < l.length; i++) {
+        if (l[i].id === id) return { entregable: l[i], tarea: r.tarea, sub: r.sub, contexto: "subtarea", contenedor: r.sub.entregables };
+      }
+      return null;
+    }
+    /* En la tarea completa */
     if (tareaId) {
       const t = buscarTarea(o, tareaId);
       if (!t) return null;
       const l = N().lista(t.entregables);
-      for (let i = 0; i < l.length; i++) if (l[i].id === id) return { entregable: l[i], tarea: t, contenedor: t.entregables };
+      for (let i = 0; i < l.length; i++) {
+        if (l[i].id === id) return { entregable: l[i], tarea: t, sub: null, contexto: "tarea", contenedor: t.entregables };
+      }
       return null;
     }
+    /* Sin pistas: se busca en los tres niveles */
     const deOferta = N().lista(o && o.entregables);
-    for (let i = 0; i < deOferta.length; i++) if (deOferta[i].id === id) return { entregable: deOferta[i], tarea: null, contenedor: o.entregables };
+    for (let i = 0; i < deOferta.length; i++) {
+      if (deOferta[i].id === id) return { entregable: deOferta[i], tarea: null, sub: null, contexto: "oferta", contenedor: o.entregables };
+    }
     const tareas = N().lista(o && o.tareas);
     for (let i = 0; i < tareas.length; i++) {
       const l = N().lista(tareas[i].entregables);
-      for (let j = 0; j < l.length; j++) if (l[j].id === id) return { entregable: l[j], tarea: tareas[i], contenedor: tareas[i].entregables };
+      for (let j = 0; j < l.length; j++) {
+        if (l[j].id === id) return { entregable: l[j], tarea: tareas[i], sub: null, contexto: "tarea", contenedor: tareas[i].entregables };
+      }
+      const subs = N().lista(tareas[i].subtareas);
+      for (let k = 0; k < subs.length; k++) {
+        const ls = N().lista(subs[k].entregables);
+        for (let j = 0; j < ls.length; j++) {
+          if (ls[j].id === id) return { entregable: ls[j], tarea: tareas[i], sub: subs[k], contexto: "subtarea", contenedor: subs[k].entregables };
+        }
+      }
     }
     return null;
   }
@@ -3612,11 +3709,17 @@ body.pa-sin-importes .pa-importe { display: none; }
     return null;
   }
 
-  function colgarEntregable(o, nombre, contexto, periodo, tareaId) {
+  /** Cuelga un entregable nuevo en la oferta, en una tarea o en una subtarea. */
+  function colgarEntregable(o, nombre, contexto, periodo, tareaId, subtareaId) {
     const e = nuevoEntregable(nombre, contexto, periodo);
+    if (subtareaId) {
+      const r = buscarSubtarea(o, subtareaId);
+      if (r) { r.sub.entregables = N().lista(r.sub.entregables); r.sub.entregables.push(e); return e; }
+    }
     if (contexto === "oferta" || !tareaId) { o.entregables.push(e); return e; }
     const t = buscarTarea(o, tareaId);
     if (!t) { o.entregables.push(e); return e; }
+    t.entregables = N().lista(t.entregables);
     t.entregables.push(e);
     return e;
   }
@@ -3740,16 +3843,27 @@ body.pa-sin-importes .pa-importe { display: none; }
       M2.conHoras(M2.nuevaLinea(tec.id, 6), { p1: 8, p2: 8 })
     ];
     t1.subtareas = [s1, s2];
-    t1.entregables = [
-      Object.assign(M2.nuevoEntregable("1.1 Informe de requisitos", "tarea", 0), {
+    /* Los entregables cuelgan de la subtarea que los produce. */
+    s1.entregables = [
+      Object.assign(M2.nuevoEntregable("1.1 Informe de requisitos", "subtarea", 0), {
         descripcion: "Análisis de la web actual, usuarios y contenidos.",
         criterio: "Validado por el cliente en la reunión de alcance",
         responsablePerfilId: jp.id, horas: 32
-      }),
-      Object.assign(M2.nuevoEntregable("1.2 Prototipo UX navegable", "tarea", 2), {
+      })
+    ];
+    s2.entregables = [
+      Object.assign(M2.nuevoEntregable("1.2 Prototipo UX navegable", "subtarea", 2), {
         descripcion: "Prototipo de las 8 pantallas principales.",
         criterio: "Prototipo revisado y aprobado en Figma",
         responsablePerfilId: med.id, horas: 54
+      })
+    ];
+    /* Y uno a nivel de la TAREA COMPLETA, porque también se entregan cosas así. */
+    t1.entregables = [
+      Object.assign(M2.nuevoEntregable("1.3 Manual de estilo", "tarea", 3), {
+        descripcion: "Guía de estilo para que el cliente mantenga la web.",
+        criterio: "Manual entregado y explicado al equipo del cliente",
+        responsablePerfilId: med.id, horas: 12
       })
     ];
 
@@ -3766,13 +3880,15 @@ body.pa-sin-importes .pa-importe { display: none; }
       M2.conHoras(M2.nuevaLinea(jru.id, 6), { p4: 16, p5: 8 })
     ];
     t2.subtareas = [s3, s4];
-    t2.entregables = [
-      Object.assign(M2.nuevoEntregable("2.1 Web en preproducción", "tarea", 4), {
+    s3.entregables = [
+      Object.assign(M2.nuevoEntregable("2.1 Web en preproducción", "subtarea", 4), {
         descripcion: "Sitio completo funcionando en entorno de pruebas.",
         criterio: "Checklist de pruebas funcionales superado",
         responsablePerfilId: jru.id, horas: 76
-      }),
-      Object.assign(M2.nuevoEntregable("2.2 Puesta en producción", "tarea", 5), {
+      })
+    ];
+    s4.entregables = [
+      Object.assign(M2.nuevoEntregable("2.2 Puesta en producción", "subtarea", 5), {
         descripcion: "Publicación, dominios y formación al equipo.",
         criterio: "Acta de entrega y formación realizada",
         responsablePerfilId: sen.id, horas: 30
@@ -4100,26 +4216,54 @@ body.pa-sin-importes .pa-importe { display: none; }
 
   /* ---------- Recopilación ---------- */
 
-  /** Todos los entregables con su contexto resuelto, ordenados por periodo. */
+  /** Todos los entregables con su contexto resuelto, ordenados por periodo.
+      Un entregable puede colgar de la oferta, de una tarea completa o de una
+      subtarea concreta (que es lo habitual: se entrega al cerrar ese trabajo). */
   function todos(o) {
     const salida = [];
     lista(o && o.entregables).forEach(e => {
-      salida.push(Object.assign({}, e, { _contexto: "oferta", _tareaId: null, _tareaNombre: "" }));
+      salida.push(Object.assign({}, e, {
+        _contexto: "oferta", _tareaId: null, _tareaNombre: "", _subtareaId: null, _subtareaNombre: ""
+      }));
     });
     lista(o && o.tareas).forEach(t => {
       lista(t.entregables).forEach(e => {
-        salida.push(Object.assign({}, e, { _contexto: "tarea", _tareaId: t.id, _tareaNombre: t.nombre }));
+        salida.push(Object.assign({}, e, {
+          _contexto: "tarea", _tareaId: t.id, _tareaNombre: t.nombre, _subtareaId: null, _subtareaNombre: ""
+        }));
+      });
+      lista(t.subtareas).forEach(s => {
+        lista(s.entregables).forEach(e => {
+          salida.push(Object.assign({}, e, {
+            _contexto: "subtarea", _tareaId: t.id, _tareaNombre: t.nombre,
+            _subtareaId: s.id, _subtareaNombre: s.nombre
+          }));
+        });
       });
     });
     salida.sort((a, b) => (N().num(a.periodo) - N().num(b.periodo)) || a.nombre.localeCompare(b.nombre));
     return salida;
   }
 
-  /** Entregables de una tarea, ordenados por periodo. */
+  /** Entregables colgados de la TAREA COMPLETA (los que no son de una subtarea). */
   function deTarea(o, t) {
     return lista(t && t.entregables)
-      .map(e => Object.assign({}, e, { _contexto: "tarea", _tareaId: t.id, _tareaNombre: t.nombre }))
+      .map(e => Object.assign({}, e, {
+        _contexto: "tarea", _tareaId: t.id, _tareaNombre: t.nombre, _subtareaId: null, _subtareaNombre: ""
+      }))
       .sort((a, b) => N().num(a.periodo) - N().num(b.periodo));
+  }
+
+  /** Entregables de una SUBTAREA concreta. */
+  function deSubtarea(o, s) {
+    return lista(s && s.entregables)
+      .map(e => Object.assign({}, e, { _contexto: "subtarea", _subtareaId: s.id, _subtareaNombre: s.nombre }))
+      .sort((a, b) => N().num(a.periodo) - N().num(b.periodo));
+  }
+
+  /** Todo lo que se entrega dentro de una tarea: sus entregables y los de sus subtareas. */
+  function deTareaCompleta(o, t) {
+    return deTarea(o, t).concat(lista(t && t.subtareas).reduce((acc, s) => acc.concat(deSubtarea(o, s)), []));
   }
 
   /** Entregables agrupados por índice de periodo: { 0: [...], 1: [...] }. */
@@ -4162,6 +4306,7 @@ body.pa-sin-importes .pa-importe { display: none; }
     return {
       total: l.length,
       deTarea: l.filter(e => e._contexto === "tarea").length,
+      deSubtarea: l.filter(e => e._contexto === "subtarea").length,
       deOferta: l.filter(e => e._contexto === "oferta").length
     };
   }
@@ -4191,8 +4336,8 @@ body.pa-sin-importes .pa-importe { display: none; }
   /* ---------- Movimientos ---------- */
 
   /** Cambia el periodo de un entregable (con acotación al calendario). */
-  function moverAPeriodo(o, id, tareaId, periodo) {
-    const r = PL.modelo.buscarEntregable(o, id, tareaId || "");
+  function moverAPeriodo(o, id, tareaId, subtareaId, periodo) {
+    const r = PL.modelo.buscarEntregable(o, id, tareaId || "", subtareaId || "");
     if (!r) return null;
     r.entregable.periodo = Math.round(N().acota(periodo, 0, P().meses(o && o.periodos) - 1));
     return r.entregable;
@@ -4211,7 +4356,8 @@ body.pa-sin-importes .pa-importe { display: none; }
   function esfuerzoEnPeriodo(o, pf, i) { return C().importePeriodo(o, pf, i); }
 
   PL.entregables = {
-    todos: todos, deTarea: deTarea, porPeriodo: porPeriodo, dePeriodo: dePeriodo,
+    todos: todos, deTarea: deTarea, deSubtarea: deSubtarea, deTareaCompleta: deTareaCompleta,
+    porPeriodo: porPeriodo, dePeriodo: dePeriodo,
     cuentaPorPeriodo: cuentaPorPeriodo, proximo: proximo, ultimo: ultimo,
     horasEstimadas: horasEstimadas, conHorasEstimadas: conHorasEstimadas, porContexto: porContexto,
     responsable: responsable, etiquetaEntrega: etiquetaEntrega, posicion: posicion,
@@ -4796,26 +4942,27 @@ body.pa-sin-importes .pa-importe { display: none; }
   function filaTarea(o, pf, t) {
     const cols = P().columnas(o.periodos);
     const valores = valoresDeTarea(o, t);
-    return '<tr class="pa-gantt__fila pa-gantt__fila--tarea">' +
+    return '<tr class="pa-gantt__fila pa-gantt__fila--tarea' + PL.vistas.claseTono(o, t.id) + '">' +
       '<th class="pa-gantt__concepto pa-gantt__concepto-clic" data-ir="' + t.id + '" scope="row">' + N().esc(t.nombre) + "</th>" +
       celdasBarra(columnasActivas(valores, cols), "pa-barra--tarea") +
       '<td class="pa-gantt__total">' + C().tareaHoras(t).toLocaleString("es-ES") + " h</td></tr>";
   }
 
-  function filaSubtarea(o, pf, s) {
+  function filaSubtarea(o, pf, s, tareaId) {
     const cols = P().columnas(o.periodos);
     const valores = valoresDeSubtarea(o, s);
-    return '<tr class="pa-gantt__fila pa-gantt__fila--subtarea">' +
+    return '<tr class="pa-gantt__fila pa-gantt__fila--subtarea' + PL.vistas.claseTono(o, tareaId) + '">' +
       '<th class="pa-gantt__concepto pa-gantt__concepto-clic" data-ir="' + s.id + '" scope="row">' + N().esc(s.nombre) + "</th>" +
       celdasBarra(columnasActivas(valores, cols), "") +
       '<td class="pa-gantt__total">' + C().subtareaHoras(s).toLocaleString("es-ES") + " h</td></tr>";
   }
 
-  function filaEntregable(o, pf, e) {
+  function filaEntregable(o, pf, e, tareaId) {
     const cols = P().columnas(o.periodos);
     const r = E().responsable(pf, e);
-    const titulo = e.nombre + " · entrega " + P().mesCorto(o.periodos, e.periodo) + (r ? " · " + r.nombre : "");
-    return '<tr class="pa-gantt__fila pa-gantt__fila--entregable">' +
+    const nivel = e._contexto === "subtarea" ? " · de la subtarea" : (e._contexto === "tarea" ? " · de la tarea" : " · de la oferta");
+    const titulo = e.nombre + " · entrega " + P().mesCorto(o.periodos, e.periodo) + (r ? " · " + r.nombre : "") + nivel;
+    return '<tr class="pa-gantt__fila pa-gantt__fila--entregable' + PL.vistas.claseTono(o, tareaId) + '">' +
       '<th class="pa-gantt__concepto" scope="row" title="' + N().esc(titulo) + '">' + N().esc(e.nombre) + "</th>" +
       celdasHito(cols, e.periodo) +
       '<td class="pa-gantt__total">' + (N().num(e.horas) ? N().num(e.horas).toLocaleString("es-ES") + " h" : "—") + "</td></tr>";
@@ -4848,13 +4995,16 @@ body.pa-sin-importes .pa-importe { display: none; }
     const filas = [];
     N().lista(o.tareas).forEach(t => {
       filas.push(filaTarea(o, pf, t));
-      N().lista(t.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "tarea" }))));
-      N().lista(t.subtareas).forEach(s => filas.push(filaSubtarea(o, pf, s)));
+      N().lista(t.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "tarea" }), t.id)));
+      N().lista(t.subtareas).forEach(s => {
+        filas.push(filaSubtarea(o, pf, s, t.id));
+        N().lista(s.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "subtarea" }), t.id)));
+      });
     });
     const hitosOferta = N().lista(o.entregables);
     if (hitosOferta.length) {
       filas.push('<tr class="pa-gantt__fila"><th class="pa-gantt__concepto pa-mini pa-mini--fuerte" colspan="' + (cols.length + 2) + '" scope="row">Hitos de la oferta</th></tr>');
-      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }))));
+      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }), null)));
     }
 
     const totalHitos = E().todos(o).length;
@@ -4890,13 +5040,16 @@ body.pa-sin-importes .pa-importe { display: none; }
     const filas = [];
     N().lista(o.tareas).forEach(t => {
       filas.push(filaTarea(o, pf, t));
-      N().lista(t.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "tarea" }))));
-      N().lista(t.subtareas).forEach(s => filas.push(filaSubtarea(o, pf, s)));
+      N().lista(t.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "tarea" }), t.id)));
+      N().lista(t.subtareas).forEach(s => {
+        filas.push(filaSubtarea(o, pf, s, t.id));
+        N().lista(s.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "subtarea" }), t.id)));
+      });
     });
     const hitosOferta = N().lista(o.entregables);
     if (hitosOferta.length) {
       filas.push('<tr class="pa-gantt__fila"><th class="pa-gantt__concepto pa-mini pa-mini--fuerte" colspan="' + (cols.length + 2) + '" scope="row">Hitos de la oferta</th></tr>');
-      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }))));
+      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }), null)));
     }
     const colgroup = '<colgroup><col class="pa-gantt__col-concepto">' +
       cols.map(() => '<col style="width:2.6rem">').join("") + '<col class="pa-gantt__col-total"></colgroup>';
@@ -4966,9 +5119,10 @@ body.pa-sin-importes .pa-importe { display: none; }
   /* ---------- Controles ---------- */
 
   /** Selector de periodo de entrega (con el rótulo que el usuario ve). */
-  function selectPeriodo(o, actual, campo, id, tareaId) {
+  function selectPeriodo(o, actual, campo, id, tareaId, subtareaId) {
     const cols = P().columnas(o.periodos);
-    return '<select class="nz-input nz-input--sm" data-campo="' + campo + '" data-id="' + id + '" data-tarea="' + (tareaId || "") + '" ' +
+    return '<select class="nz-input nz-input--sm" data-campo="' + campo + '" data-id="' + id +
+      '" data-tarea="' + (tareaId || "") + '" data-subtarea="' + (subtareaId || "") + '" ' +
       'title="Mes de entrega" aria-label="Mes de entrega" style="min-width:7rem">' +
       cols.map(c => {
         const i = c.periodos[0];
@@ -4977,8 +5131,9 @@ body.pa-sin-importes .pa-importe { display: none; }
       }).join("") + "</select>";
   }
 
-  function selectPerfil(pf, actual, campo, id, tareaId, vacio) {
-    return '<select class="nz-input nz-input--sm" data-campo="' + campo + '" data-id="' + id + '" data-tarea="' + (tareaId || "") + '" ' +
+  function selectPerfil(pf, actual, campo, id, tareaId, vacio, subtareaId) {
+    return '<select class="nz-input nz-input--sm" data-campo="' + campo + '" data-id="' + id +
+      '" data-tarea="' + (tareaId || "") + '" data-subtarea="' + (subtareaId || "") + '" ' +
       'style="min-width:10rem" aria-label="Responsable">' +
       '<option value=""' + (!actual ? " selected" : "") + ">" + (vacio || "— Sin responsable —") + "</option>" +
       N().lista(pf).map(p => '<option value="' + p.id + '"' + (p.id === actual ? " selected" : "") + ">" + N().esc(p.nombre) + "</option>").join("") +
@@ -4986,26 +5141,54 @@ body.pa-sin-importes .pa-importe { display: none; }
   }
 
   /** Fila editable de un entregable. `e` puede venir de PL.entregables.todos(). */
-  function htmlEntregable(o, pf, e, contexto, tareaId) {
+  /* ---------- Color por tarea ----------
+     Cada tarea lleva un tono del sistema y sus subtareas y entregables lo heredan:
+     en el árbol, en el diagrama y en el informe se sigue el hilo de un vistazo.
+     Son cinco porque son los cinco que Aurora distingue de verdad. */
+  const TONOS = 5;
+
+  /** 1..5, estable mientras no cambie el orden de las tareas (0 = sin tono). */
+  function tonoDe(o, tareaId) {
+    if (!tareaId) return 0;
+    const tareas = N().lista(o && o.tareas);
+    for (let i = 0; i < tareas.length; i++) if (tareas[i].id === tareaId) return (i % TONOS) + 1;
+    return 0;
+  }
+
+  function claseTono(o, tareaId) {
+    const t = tonoDe(o, tareaId);
+    return t ? " pa-tono-" + t : "";
+  }
+
+  /** Un entregable, se cuelgue de la oferta, de una tarea o de una subtarea.
+      `data-tarea` y `data-subtarea` viajan en todos los campos para saber dónde
+      vive al editarlo. */
+  function htmlEntregable(o, pf, e, contexto, tareaId, subtareaId) {
     const id = e.id;
     const tId = (tareaId !== undefined) ? tareaId : (e._tareaId || "");
-    const esOferta = (contexto || e._contexto) === "oferta";
-    return '<div class="pa-hito" data-id="' + id + '">' +
-      '<span class="pa-hito__nombre"><input class="nz-input" data-campo="hito-nombre" data-id="' + id + '" data-tarea="' + tId + '" value="' + N().esc(e.nombre) + '" placeholder="Nombre del entregable"></span>' +
+    const sId = (subtareaId !== undefined) ? subtareaId : (e._subtareaId || "");
+    const ctx = contexto || e._contexto || "tarea";
+    const at = ' data-id="' + id + '" data-tarea="' + tId + '" data-subtarea="' + sId + '"';
+    const etiqueta = ctx === "oferta"
+      ? '<span class="nz-badge nz-badge--accent">de la oferta</span>'
+      : (ctx === "subtarea" ? "" : '<span class="nz-badge nz-badge--neutral">de la tarea</span>');
+    return '<div class="pa-hito pa-hito--' + ctx + '" data-id="' + id + '" data-subtarea="' + sId + '">' +
+      '<span class="pa-hito__nombre"><input class="nz-input" data-campo="hito-nombre"' + at + ' value="' + N().esc(e.nombre) + '" placeholder="Nombre del entregable"></span>' +
       '<span class="pa-ahora pa-mini">◆</span>' +
-      selectPeriodo(o, e.periodo, "hito-periodo", id, tId) +
-      (esOferta ? '<span class="nz-badge nz-badge--accent">de la oferta</span>' : "") +
-      selectPerfil(pf, e.responsablePerfilId, "hito-responsable", id, tId) +
-      '<label class="pa-mini pa-ahora">horas <input class="nz-input nz-input--sm pa-input-corto" type="number" min="0" step="1" data-campo="hito-horas" data-id="' + id + '" data-tarea="' + tId + '" value="' + (N().num(e.horas) || "") + '" title="Estimación orientativa: no suma al total"></label>' +
-      '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="dup-entregable" data-id="' + id + '" data-tarea="' + tId + '" title="Duplicar entregable">⧉</button>' +
-      '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-entregable" data-id="' + id + '" data-tarea="' + tId + '" title="Eliminar entregable">✕</button>' +
+      selectPeriodo(o, e.periodo, "hito-periodo", id, tId, sId) +
+      etiqueta +
+      selectPerfil(pf, e.responsablePerfilId, "hito-responsable", id, tId, "", sId) +
+      '<label class="pa-mini pa-ahora">horas <input class="nz-input nz-input--sm pa-input-corto" type="number" min="0" step="1" data-campo="hito-horas"' + at + ' value="' + (N().num(e.horas) || "") + '" title="Estimación orientativa: no suma al total"></label>' +
+      '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="dup-entregable"' + at + ' title="Duplicar entregable">⧉</button>' +
+      '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-entregable"' + at + ' title="Eliminar entregable">✕</button>' +
       '<span class="pa-hito__detalle">' +
-        '<input class="nz-input nz-input--sm pa-crece2" data-campo="hito-desc" data-id="' + id + '" data-tarea="' + tId + '" value="' + N().esc(e.descripcion || "") + '" placeholder="Qué incluye este entregable">' +
-        '<input class="nz-input nz-input--sm pa-crece" data-campo="hito-criterio" data-id="' + id + '" data-tarea="' + tId + '" value="' + N().esc(e.criterio || "") + '" placeholder="Criterio de aceptación">' +
-        '<input class="nz-input nz-input--sm pa-input-fecha" type="date" data-campo="hito-fecha" data-id="' + id + '" data-tarea="' + tId + '" value="' + N().esc(e.fecha || "") + '" title="Fecha exacta (opcional)">' +
+        '<input class="nz-input nz-input--sm pa-crece2" data-campo="hito-desc"' + at + ' value="' + N().esc(e.descripcion || "") + '" placeholder="Qué incluye este entregable">' +
+        '<input class="nz-input nz-input--sm pa-crece" data-campo="hito-criterio"' + at + ' value="' + N().esc(e.criterio || "") + '" placeholder="Criterio de aceptación">' +
+        '<input class="nz-input nz-input--sm pa-input-fecha" type="date" data-campo="hito-fecha"' + at + ' value="' + N().esc(e.fecha || "") + '" title="Fecha exacta (opcional)">' +
       "</span>" +
     "</div>";
   }
+
 
   /* ---------- Composición ---------- */
 
@@ -5053,7 +5236,8 @@ body.pa-sin-importes .pa-importe { display: none; }
     nodo: nodo, escribir: escribir, vaciar: vaciar, texto: texto,
     moneda: moneda, verImportes: verImportes, imp: imp, impSi: impSi, hor: hor,
     badgeOferta: badgeOferta, selectPeriodo: selectPeriodo, selectPerfil: selectPerfil, htmlEntregable: htmlEntregable,
-    articulo: articulo, tabla: tabla, fila: fila, filaDato: filaDato, aviso: aviso, vacio: vacio, delta: delta
+    articulo: articulo, tabla: tabla, fila: fila, filaDato: filaDato, aviso: aviso, vacio: vacio, delta: delta,
+    tonoDe: tonoDe, claseTono: claseTono, TONOS: TONOS
   };
 })(typeof window !== "undefined" ? window : globalThis);
 
@@ -5130,7 +5314,7 @@ body.pa-sin-importes .pa-importe { display: none; }
       return '<p class="pa-mini">Sin entregables en esta tarea: añade el primero con «＋ Entregable».</p>';
     }
     const horas = N().suma(hitos, e => N().num(e.horas));
-    return '<p class="pa-mini pa-mini--fuerte">Entregables de esta tarea · ' + hitos.length +
+    return '<p class="pa-mini pa-mini--fuerte">Entregables de la TAREA completa · ' + hitos.length +
       (horas ? " · " + V2.hor(horas) + " estimadas" : "") + "</p>" +
       E().deTarea(o, t).map(e => V2.htmlEntregable(o, pf, e, "tarea", t.id)).join("");
   }
@@ -5138,6 +5322,20 @@ body.pa-sin-importes .pa-importe { display: none; }
   /** Horas de cada perfil y mes. Se teclean en % de jornada o en horas (según el
       modo), el equivalente va siempre debajo y se marca en rojo quien pasa del
       100 % —nadie puede estar más de una jornada completa a la vez. */
+  /** Entregables de una subtarea: aquí es lo habitual, se entrega al cerrar ese trabajo. */
+  function hitsDeSubtarea(o, pf, s) {
+    const V2 = V();
+    const lista = E().deSubtarea(o, s);
+    const hHoras = N().suma(lista, e => N().num(e.horas));
+    return '<div class="pa-hitos pa-hitos--sub">' +
+      (lista.length
+        ? '<p class="pa-mini pa-mini--fuerte">Se entrega aquí · ' + lista.length + (hHoras ? " · " + V2.hor(hHoras) + " estimadas" : "") + "</p>" +
+          lista.map(e => V2.htmlEntregable(o, pf, e, "subtarea", "", s.id)).join("")
+        : "") +
+      '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="nuevo-entregable-sub" data-id="' + s.id + '">＋ Entregable de esta subtarea</button>' +
+      "</div>";
+  }
+
   function tablaLineas(o, pf, s) {
     const V2 = V();
     const cols = P().columnas(o.periodos);
@@ -5171,8 +5369,8 @@ body.pa-sin-importes .pa-importe { display: none; }
         const eti = ' data-etiqueta="' + N().esc(c.etiqueta) + '" title="' + N().esc(ayuda) + '"';
         if (c.periodos.length === 1) {
           return "<td class=\"" + clase + "\"" + eti + ">" +
-            '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0" step="' + (enPct ? "5" : "0.5") + '" ' +
-            'value="' + (h > 0 ? N().fmtNum(enPct ? pct : h) : "") + '" placeholder="0" data-campo="horas" ' +
+            '<input class="nz-input nz-input--sm pa-input-horas" type="text" inputmode="decimal" autocomplete="off" ' +
+            'value="' + N().fmtCampo(enPct ? pct : h) + '" placeholder="' + (enPct ? "%" : "0") + '" data-campo="horas" ' +
             'data-modo="' + (enPct ? "pct" : "h") + '" data-id="' + l.id + '" data-mes="' + idx + '" ' +
             'aria-label="' + N().esc("Horas en " + c.etiqueta) + '">' +
             '<span class="pa-celda__eq">' + eq + "</span></td>";
@@ -5214,7 +5412,10 @@ body.pa-sin-importes .pa-importe { display: none; }
           '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="bajar-sub" data-id="' + s.id + '" title="Bajar"' + (si === subs.length - 1 ? " disabled" : "") + ">↓</button>" +
           '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-sub" data-id="' + s.id + '" title="Eliminar subtarea">✕</button>' +
         "</summary>" +
-        '<div class="pa-sub__cuerpo">' + tablaLineas(o, pf, s) + "</div>" +
+        '<div class="pa-sub__cuerpo">' +
+          hitsDeSubtarea(o, pf, s) +
+          tablaLineas(o, pf, s) +
+        "</div>" +
       "</details>").join("");
   }
 
@@ -5229,7 +5430,7 @@ body.pa-sin-importes .pa-importe { display: none; }
     }
     /* La tarjeta de cada tarea lleva la clase pa-tarea: la usan el CSS y los arneses. */
     return tareas.map((t, i) =>
-      '<article class="nz-article pa-tarea">' + cabeceraTarea(o, pf, t, i) +
+      '<article class="nz-article pa-tarea' + V2.claseTono(o, t.id) + '">' + cabeceraTarea(o, pf, t, i) +
       bloqueHitos(o, pf, t) + subtareas(o, pf, t) + "</article>"
     ).join("");
   }
@@ -5548,6 +5749,84 @@ body.pa-sin-importes .pa-importe { display: none; }
   }
 
   PL.vistas.oferta = { render: render, bloqueJornada: bloqueJornada };
+})(typeof window !== "undefined" ? window : globalThis);
+
+/* ====== MÓDULO vista-perfiles.js ====== */
+"use strict";
+/* =====================================================================
+   Planifica v4 — VISTA: PERFILES
+   El catálogo de puestos del equipo, con su precio por hora. Es la fuente de
+   la que salen los perfiles que se asignan a cada subtarea.
+
+   Se guarda y se carga como fichero (no hay base de datos): así el catálogo
+   viaja entre equipos y navegadores cuando haga falta.
+   ===================================================================== */
+(function (raiz) {
+  const PL = (raiz.PL = raiz.PL || {});
+  const N = () => PL.nucleo;
+  const C = () => PL.calculo;
+  const V = () => PL.vistas;
+  const APP = () => PL.app;
+
+  /** Una fila del catálogo: la ficha del perfil. */
+  function ficha(p, ofertas) {
+    const V2 = V();
+    const usos = C().usosPerfil(ofertas, p.id);
+    return '<div class="pa-perfil" data-id="' + p.id + '">' +
+      '<div class="pa-perfil__cab">' +
+        '<input class="nz-input pa-crece2" data-campo="perfil-nombre" data-id="' + p.id + '"' +
+          ' value="' + N().esc(p.nombre) + '" placeholder="Puesto (p. ej. Consultor/a senior)" aria-label="Puesto">' +
+        (p.esDefecto ? '<span class="nz-badge nz-badge--neutral">de fábrica</span>' : "") +
+        (usos ? '<span class="nz-badge nz-badge--brand">' + usos + " uso(s)</span>" : '<span class="nz-badge nz-badge--neutral">sin usar</span>') +
+      "</div>" +
+      '<div class="pa-fila pa-perfil__datos">' +
+        '<select class="nz-input nz-input--sm" data-campo="perfil-categoria" data-id="' + p.id + '"' +
+          ' style="min-width:150px" aria-label="Categoría">' +
+          PL.modelo.CATEGORIAS_PERFIL.map(c => "<option" + (p.categoria === c ? " selected" : "") + ">" + c + "</option>").join("") +
+        "</select>" +
+        '<label class="pa-mini pa-ahora">precio <input class="nz-input nz-input--sm pa-input-num" type="number" min="0" step="0.5"' +
+          ' data-campo="perfil-tarifa" data-id="' + p.id + '" value="' + (N().num(p.tarifa) || "") + '" aria-label="Precio por hora"> €/</label>' +
+        '<label class="pa-mini pa-ahora"><input class="nz-input nz-input--sm pa-input-corto" data-campo="perfil-unidad" data-id="' + p.id + '"' +
+          ' value="' + N().esc(p.unidad) + '" aria-label="Unidad"></label>' +
+        '<input class="nz-input nz-input--sm pa-crece" data-campo="perfil-notas" data-id="' + p.id + '"' +
+          ' value="' + N().esc(p.notas || "") + '" placeholder="Notas (titulación, disponibilidad…)" aria-label="Notas">' +
+        (p.esDefecto ? '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-perfil" data-id="' + p.id + '" title="Restaurar los valores de fábrica">↺</button>' : "") +
+        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-perfil" data-id="' + p.id + '" title="Eliminar o desactivar">✕</button>' +
+      "</div>" +
+    "</div>";
+  }
+
+  function render() {
+    const V2 = V(), a = APP();
+    const cont = "perfiles-cuerpo";
+    if (!a.pr()) { V2.vaciar(cont); return; }
+    const activos = N().lista(a.ESTADO.perfiles);
+    const inactivos = N().lista(a.ESTADO.perfilesInactivos);
+    const ofertas = a.ESTADO.ofertas;
+
+    V2.escribir(cont,
+      V2.articulo("Perfiles del equipo",
+        '<p class="pa-mini">Tu catálogo de puestos con su precio por hora. Es global (se usa en todas las ofertas): ' +
+        "guárdalo en un fichero para llevártelo a otro equipo o navegador, y cárgalo cuando quieras.</p>" +
+        '<div class="pa-fila" style="margin:var(--nz-space-2) 0">' +
+          '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="nuevo-perfil">＋ Añadir perfil</button>' +
+          '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-perfiles">⬇ Guardar mis perfiles</button>' +
+          '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="imp-perfiles">⬆ Cargar perfiles</button>' +
+          '<span class="pa-espacio"></span>' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-perfiles-defecto">↺ Los de fábrica</button>' +
+        "</div>" +
+        (activos.map(p => ficha(p, ofertas)).join("") ||
+          '<p class="pa-mini">Sin perfiles: añade los de tu equipo con sus precios por hora.</p>') +
+        (inactivos.length
+          ? '<h4 class="nz-h4" style="margin-top:var(--nz-space-3)">Desactivados</h4>' +
+            inactivos.map(p => '<div class="pa-dato"><span class="pa-crece">' + N().esc(p.nombre) +
+              ' <span class="pa-mini">(' + N().esc(p.categoria) + " · " + N().fmtNum(p.tarifa) + " €/" + N().esc(p.unidad) + ")</span></span>" +
+              '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="reactivar-perfil" data-id="' + p.id + '">Reactivar</button></div>').join("")
+          : "")) +
+      '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Los perfiles que se están usando en alguna oferta no se borran: se desactivan, y puedes reactivarlos aquí.</p>');
+  }
+
+  PL.vistas.perfiles = { render: render };
 })(typeof window !== "undefined" ? window : globalThis);
 
 /* ====== MÓDULO vista-resumen.js ====== */
@@ -5981,43 +6260,6 @@ body.pa-sin-importes .pa-importe { display: none; }
       '<span class="nz-switch__label">Mostrar los importes (€)</span></label>');
   }
 
-  function perfiles(a) {
-    const V2 = V(), o = a.pr();
-    const activos = N().lista(a.ESTADO.perfiles);
-    const inactivos = N().lista(a.ESTADO.perfilesInactivos);
-    const filas = activos.map(p => {
-      const usos = C().usosPerfil(a.ESTADO.ofertas, p.id);
-      return '<div class="pa-dato" data-id="' + p.id + '">' +
-        '<input class="nz-input pa-crece2" data-campo="perfil-nombre" data-id="' + p.id + '" value="' + N().esc(p.nombre) + '">' +
-        '<select class="nz-input nz-input--sm" data-campo="perfil-categoria" data-id="' + p.id + '" style="min-width:145px">' +
-          PL.modelo.CATEGORIAS_PERFIL.map(c => "<option" + (p.categoria === c ? " selected" : "") + ">" + c + "</option>").join("") +
-        "</select>" +
-        '<label class="pa-mini pa-ahora">tarifa <input class="nz-input nz-input--sm pa-input-num" type="number" min="0" step="0.01" data-campo="perfil-tarifa" data-id="' + p.id + '" value="' + (N().num(p.tarifa) || "") + '"></label>' +
-        '<label class="pa-mini pa-ahora">ud <input class="nz-input nz-input--sm pa-input-corto" data-campo="perfil-unidad" data-id="' + p.id + '" value="' + N().esc(p.unidad) + '"></label>' +
-        (p.esDefecto ? '<span class="nz-badge nz-badge--neutral">fábrica</span><button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-perfil" data-id="' + p.id + '" title="Restaurar valores de fábrica">↺</button>' : "") +
-        '<span class="pa-mini pa-ahora">' + usos + " uso(s)</span>" +
-        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-perfil" data-id="' + p.id + '" title="Eliminar o desactivar">✕</button>' +
-      "</div>";
-    }).join("");
-
-    return V2.articulo("Perfiles del equipo",
-      '<p class="pa-mini">Tu catálogo de puestos con su precio por hora. Se usa en todas las ofertas: guárdalo en un fichero para llevártelo a otro equipo o navegador, y cárgalo cuando quieras.</p>' +
-      '<div class="pa-fila" style="margin:var(--nz-space-2) 0">' +
-        '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="nuevo-perfil">＋ Añadir perfil</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-perfiles">⬇ Guardar mis perfiles</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="imp-perfiles">⬆ Cargar perfiles</button>' +
-        '<span class="pa-espacio"></span>' +
-        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-perfiles-defecto">↺ Los de fábrica</button>' +
-      "</div>" +
-      (filas || '<p class="pa-mini">Sin perfiles: añade los de tu equipo con sus tarifas.</p>') +
-      (inactivos.length
-        ? '<h4 class="nz-h4" style="margin-top:var(--nz-space-3)">Desactivados</h4>' + inactivos.map(p =>
-          '<div class="pa-dato"><span class="pa-crece">' + N().esc(p.nombre) + ' <span class="pa-mini">(' + N().esc(p.categoria) + ")</span></span>" +
-          '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="reactivar-perfil" data-id="' + p.id + '">Reactivar</button></div>').join("")
-        : ""));
-    void o;
-  }
-
   function datos(a) {
     const V2 = V();
     const heredados = A().datosHeredados();
@@ -6056,7 +6298,7 @@ body.pa-sin-importes .pa-importe { display: none; }
   function render() {
     const V2 = V(), a = APP();
     if (!a.pr()) { V2.vaciar("ajustes-cuerpo"); return; }
-    V2.escribir("ajustes-cuerpo", marca(a) + perfiles(a) + datos(a));
+    V2.escribir("ajustes-cuerpo", marca(a) + datos(a));
   }
 
   PL.vistas.ajustes = { render: render };
@@ -6214,6 +6456,15 @@ body.pa-sin-importes .pa-importe { display: none; }
     "cerrar-todo": () => { N().lista(o().tareas).forEach(t => N().lista(t.subtareas).forEach(s => { s._abierta = false; })); R().todo(); },
 
     /* ---------- Entregables ---------- */
+    /* Entregable colgado de una SUBTAREA: lo habitual, se entrega al cerrar el trabajo. */
+    "nuevo-entregable-sub": b => {
+      const s = M().buscarSubtarea(o(), id(b));
+      if (!s) return;
+      M().colgarEntregable(o(), "Entregable " + (N().lista(s.sub.entregables).length + 1), "subtarea", 0, s.tarea.id, s.sub.id);
+      R().todo(); APP().guardar();
+      APP().toast("Entregable añadido a «" + s.sub.nombre + "»");
+    },
+
     "nuevo-entregable-tarea": b => {
       const t = M().buscarTarea(o(), id(b)); if (!t) return;
       M().colgarEntregable(o(), "Entregable " + (N().lista(t.entregables).length + 1), "tarea", 0, t.id);
@@ -6224,7 +6475,7 @@ body.pa-sin-importes .pa-importe { display: none; }
       R().todo(); APP().guardar(); APP().toast("Entregable de la oferta añadido");
     },
     "dup-entregable": b => {
-      const r = M().buscarEntregable(o(), id(b), tarea(b)); if (!r) return;
+      const r = M().buscarEntregable(o(), id(b), tarea(b), b.dataset.subtarea || ""); if (!r) return;
       const copia = N().clonar(r.entregable);
       copia.id = N().uid("en_");
       copia.nombre = r.entregable.nombre + " (copia)";
@@ -6232,7 +6483,7 @@ body.pa-sin-importes .pa-importe { display: none; }
       R().todo(); APP().guardar();
     },
     "elim-entregable": b => {
-      const r = M().buscarEntregable(o(), id(b), tarea(b)); if (!r) return;
+      const r = M().buscarEntregable(o(), id(b), tarea(b), b.dataset.subtarea || ""); if (!r) return;
       if (!confirm("¿Eliminar el entregable «" + r.entregable.nombre + "»?")) return;
       r.contenedor.splice(r.contenedor.indexOf(r.entregable), 1);
       R().todo(); APP().guardar();
@@ -6568,10 +6819,12 @@ body.pa-sin-importes .pa-importe { display: none; }
         const r = M().buscarLinea(of, el.dataset.id);
         if (!r) return;
         const i = N().num(el.dataset.mes);
-        const v = N().acota(el.value, 0, 1e6);
-        /* En modo % lo tecleado es dedicación: se convierte a horas con la jornada
-           del mes (horas/día × días laborables). Las horas siguen siendo el dato. */
-        const horas = el.dataset.modo === "pct" ? C().horasDePct(of, i, v) : v;
+        /* Se admite escribir la unidad: «50» (según el modo), «50 %» o «88 h».
+           Las horas son el dato que se guarda; el % se convierte con la jornada. */
+        const leido = N().parseaCantidad(el.value);
+        if (!leido) return;
+        const esPct = leido.unidad === "%" || (leido.unidad === "" && el.dataset.modo === "pct");
+        const horas = esPct ? C().horasDePct(of, i, leido.valor) : leido.valor;
         r.linea.horas = r.linea.horas || {};
         r.linea.horas["p" + i] = N().acota(horas, 0, 1e6);
         V().trabajo.actualizarFilaHoras(of, pf(), r.linea, el.closest("tr"));
@@ -6609,7 +6862,7 @@ body.pa-sin-importes .pa-importe { display: none; }
 
       /* Entregables */
       case "hito-nombre": case "hito-desc": case "hito-criterio": {
-        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "");
+        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "", el.dataset.subtarea || "");
         if (!r) return;
         const mapa = { "hito-nombre": "nombre", "hito-desc": "descripcion", "hito-criterio": "criterio" };
         r.entregable[mapa[campo]] = el.value;
@@ -6617,14 +6870,14 @@ body.pa-sin-importes .pa-importe { display: none; }
         return;
       }
       case "hito-horas": {
-        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "");
+        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "", el.dataset.subtarea || "");
         if (!r) return;
         r.entregable.horas = N().acota(el.value, 0, 1e6);
         R().datos(); APP().guardar();
         return;
       }
       case "hito-fecha": {
-        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "");
+        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "", el.dataset.subtarea || "");
         if (!r) return;
         r.entregable.fecha = el.value;
         R().datos(); APP().guardar();
@@ -6677,6 +6930,11 @@ body.pa-sin-importes .pa-importe { display: none; }
         if (p) { p.tarifa = N().acota(el.value, 0, 1e9); R().datos(); APP().guardar(); }
         return;
       }
+      case "perfil-notas": {
+        const p = C().perfilPorId(APP().ESTADO.perfiles, el.dataset.id);
+        if (p) { p.notas = el.value; APP().guardar(); }
+        return;
+      }
       case "perfil-unidad": {
         const p = C().perfilPorId(APP().ESTADO.perfiles, el.dataset.id);
         if (p) { p.unidad = N().texto(el.value, "h"); APP().guardar(); }
@@ -6725,20 +6983,29 @@ body.pa-sin-importes .pa-importe { display: none; }
         return;
       }
       case "periodo-rotulo": { R().todo(); return; }   /* al salir del campo, repintado completo */
+      case "horas": {
+        /* Al salir del campo se deja escrito el valor limpio en la unidad del modo. */
+        const r = M().buscarLinea(of, el.dataset.id);
+        if (!r) return;
+        const i = N().num(el.dataset.mes);
+        const h = N().num((r.linea.horas || {})["p" + i]);
+        el.value = N().fmtCampo(el.dataset.modo === "pct" ? C().pctDeHoras(of, i, h) : h);
+        return;
+      }
       case "linea-perfil": {
         const r = M().buscarLinea(of, el.dataset.id);
         if (r) { r.linea.perfilId = el.value; R().todo(); APP().guardar(); }
         return;
       }
       case "hito-periodo": {
-        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "");
+        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "", el.dataset.subtarea || "");
         if (!r) return;
         r.entregable.periodo = Math.round(N().acota(el.value, 0, P().meses(of.periodos) - 1));
         R().todo(); APP().guardar();
         return;
       }
       case "hito-responsable": {
-        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "");
+        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "", el.dataset.subtarea || "");
         if (!r) return;
         r.entregable.responsablePerfilId = el.value;
         R().todo(); APP().guardar();
@@ -6845,10 +7112,10 @@ body.pa-sin-importes .pa-importe { display: none; }
   const A = () => PL.almacen;
   const V = () => PL.vistas;
 
-  const VISTAS = ["trabajo", "oferta", "resumen", "informe", "ajustes"];
+  const VISTAS = ["trabajo", "oferta", "perfiles", "resumen", "informe", "ajustes"];
   const PANELES = {
-    trabajo: "pa-trabajo-panel", oferta: "pa-oferta-panel", resumen: "pa-resumen-panel",
-    informe: "pa-informe-panel", ajustes: "pa-ajustes-panel"
+    trabajo: "pa-trabajo-panel", oferta: "pa-oferta-panel", perfiles: "pa-perfiles-panel",
+    resumen: "pa-resumen-panel", informe: "pa-informe-panel", ajustes: "pa-ajustes-panel"
   };
 
   let tGuardar = null, tDatos = null;
@@ -6975,6 +7242,7 @@ body.pa-sin-importes .pa-importe { display: none; }
 
     trabajo: function () { pintarVista("trabajo"); },
     oferta: function () { pintarVista("oferta"); },
+    perfiles: function () { pintarVista("perfiles"); },
     resumen: function () { pintarVista("resumen"); },
     informe: function () { pintarVista("informe"); },
     ajustes: function () { pintarVista("ajustes"); },
@@ -6989,7 +7257,7 @@ body.pa-sin-importes .pa-importe { display: none; }
         PL.repintar.cabecera();
         pintarCalendario();
         pintarGantt();
-        ["oferta", "resumen", "informe", "ajustes"].forEach(pintarVista);
+        ["oferta", "perfiles", "resumen", "informe", "ajustes"].forEach(pintarVista);
       }, 150);
     },
 
@@ -7000,7 +7268,7 @@ body.pa-sin-importes .pa-importe { display: none; }
       tDatos = setTimeout(function () {
         pintarCalendario();
         PL.vistas.trabajo.renderEditor();
-        ["oferta", "resumen", "informe", "ajustes"].forEach(pintarVista);
+        ["oferta", "perfiles", "resumen", "informe", "ajustes"].forEach(pintarVista);
       }, 120);
     },
 

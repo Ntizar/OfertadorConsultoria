@@ -16,11 +16,26 @@ Es una herramienta de **ofertas**, no de seguimiento: no hay estados de ejecuci�
 
 | Pestaña | Para qué |
 |---|---|
-| **Trabajo** | Calendario + **Gantt** + editor de tareas, entregables, subtareas y horas por perfil |
-| **Oferta** | Datos comerciales (cliente, referencia, estado, validez), gastos generales y economía |
+| **Trabajo** | Calendario + **Gantt** + editor en **cuatro pasos**: tareas y subtareas → entregables → perfiles → horas por perfil y mes |
+| **Oferta** | Datos comerciales (cliente, referencia, estado, validez), **jornada**, gastos generales y economía |
+| **Perfiles** | El catálogo de puestos con su **precio por hora**: ficha por perfil, y **guardar/cargar** en un fichero |
 | **Resumen** | Totales, esfuerzo por perfil, por tarea y por periodo; **escenarios y versiones** comparadas |
-| **Informe** | El documento final, con marca blanca, para imprimir o exportar a PDF |
-| **Ajustes** | Marca, biblioteca de perfiles, plantillas de tareas y datos (copias, importar/exportar) |
+| **Informe** | El documento final (con el calendario dentro), con marca blanca, para imprimir o exportar a PDF |
+| **Ajustes** | Marca, plantillas de tareas y datos (copias, importar/exportar) |
+
+Los **entregables** cuelgan de cada **subtarea** (donde se entrega el trabajo de verdad), de la **tarea completa** o de la **oferta** (gestión, reuniones).
+
+### Horas por % de dedicación
+
+Las horas cambian de mes a mes y nadie sabe si «40 h» son mucho o poco. Por eso el esfuerzo se teclea en **dedicación**: escribes `50` y significa *media jornada ese mes*; la aplicación calcula las horas con la **jornada** (8 h/día de lunes a viernes, configurable en Oferta) y los días laborables reales de cada mes.
+
+- También puedes escribir `88h` o `50%` a mano: el campo entiende las dos unidades.
+- Si un perfil pasa del **100 %** en un mes, la celda se marca y sale un aviso: nadie trabaja dos jornadas a la vez.
+- Las horas siguen siendo el dato guardado, así que el contrato de exactitud no se toca.
+
+### Un color por tarea
+
+Cada tarea lleva un tono del sistema y sus **subtareas y entregables lo heredan**: se sigue el hilo de un vistazo en el árbol, en el diagrama y en el informe.
 
 ### El calendario y los meses
 
@@ -48,6 +63,15 @@ Rendimiento medido con el encargo real de 1.700 líneas: **10 ms por pulsación*
 - Ambas se **comparan** contra la oferta: economía, estructura, horas e importe por perfil y por periodo, más la lista de qué ha cambiado.
 
 ---
+
+## Cómo se trabaja una oferta (el orden de la pestaña Trabajo)
+
+```
+1 · Creo las tareas y sus subtareas
+2 · Añado los entregables de cada subtarea (o de la tarea completa)
+3 · Cargo los perfiles del catálogo (o los añado en su pestaña)
+4 · Reparto dedicación: % por perfil y mes
+```
 
 ## Uso
 
@@ -112,12 +136,12 @@ py -3.12 tools/compilar.py       # solo compilar
 node tools/smoke.js              # arranque en seco
 ```
 
-**250 comprobaciones** en total, todas en verde:
+**317 comprobaciones** en total, todas en verde:
 
 | Arnés | Qué cubre |
 |---|---|
-| `verificar-motor.js` (127) | cadena de totales, redondeo, periodos y rótulos, entregables, escenarios y versiones, migración y normalización defensiva |
-| `verificar-dom.js` (123) | arranque sin errores, las 5 pestañas, edición de rótulos desde el Gantt, inicio/duración/zoom, barras y rombos, alta y baja de todo, **que un cambio se vea en las 5 vistas**, exportaciones, migración con aviso y rendimiento |
+| `verificar-motor.js` (146) | cadena de totales, redondeo, periodos y rótulos, entregables en los tres niveles, **dedicación (% ↔ horas, jornada y tope del 100 %)**, escenarios y versiones, migración y normalización defensiva |
+| `verificar-dom.js` (171) | arranque sin errores, las **6 pestañas**, edición de rótulos desde el Gantt, inicio/duración/zoom, barras y rombos, **color por tarea**, el campo de esfuerzo con `%` y `h`, alta y baja de todo, **que un cambio se vea en todas las vistas**, responsive, catálogo de perfiles, exportaciones y rendimiento |
 | `auditar-wiring.py` | todo botón tiene acción, todo nodo existe, toda clase `nz-*` es de Aurora, ningún export sin declarar |
 
 ### Contrato de exactitud

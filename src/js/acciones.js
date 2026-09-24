@@ -149,6 +149,15 @@
     "cerrar-todo": () => { N().lista(o().tareas).forEach(t => N().lista(t.subtareas).forEach(s => { s._abierta = false; })); R().todo(); },
 
     /* ---------- Entregables ---------- */
+    /* Entregable colgado de una SUBTAREA: lo habitual, se entrega al cerrar el trabajo. */
+    "nuevo-entregable-sub": b => {
+      const s = M().buscarSubtarea(o(), id(b));
+      if (!s) return;
+      M().colgarEntregable(o(), "Entregable " + (N().lista(s.sub.entregables).length + 1), "subtarea", 0, s.tarea.id, s.sub.id);
+      R().todo(); APP().guardar();
+      APP().toast("Entregable añadido a «" + s.sub.nombre + "»");
+    },
+
     "nuevo-entregable-tarea": b => {
       const t = M().buscarTarea(o(), id(b)); if (!t) return;
       M().colgarEntregable(o(), "Entregable " + (N().lista(t.entregables).length + 1), "tarea", 0, t.id);
@@ -159,7 +168,7 @@
       R().todo(); APP().guardar(); APP().toast("Entregable de la oferta añadido");
     },
     "dup-entregable": b => {
-      const r = M().buscarEntregable(o(), id(b), tarea(b)); if (!r) return;
+      const r = M().buscarEntregable(o(), id(b), tarea(b), b.dataset.subtarea || ""); if (!r) return;
       const copia = N().clonar(r.entregable);
       copia.id = N().uid("en_");
       copia.nombre = r.entregable.nombre + " (copia)";
@@ -167,7 +176,7 @@
       R().todo(); APP().guardar();
     },
     "elim-entregable": b => {
-      const r = M().buscarEntregable(o(), id(b), tarea(b)); if (!r) return;
+      const r = M().buscarEntregable(o(), id(b), tarea(b), b.dataset.subtarea || ""); if (!r) return;
       if (!confirm("¿Eliminar el entregable «" + r.entregable.nombre + "»?")) return;
       r.contenedor.splice(r.contenedor.indexOf(r.entregable), 1);
       R().todo(); APP().guardar();

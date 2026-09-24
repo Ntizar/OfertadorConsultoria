@@ -21,26 +21,54 @@
 
   /* ---------- Recopilación ---------- */
 
-  /** Todos los entregables con su contexto resuelto, ordenados por periodo. */
+  /** Todos los entregables con su contexto resuelto, ordenados por periodo.
+      Un entregable puede colgar de la oferta, de una tarea completa o de una
+      subtarea concreta (que es lo habitual: se entrega al cerrar ese trabajo). */
   function todos(o) {
     const salida = [];
     lista(o && o.entregables).forEach(e => {
-      salida.push(Object.assign({}, e, { _contexto: "oferta", _tareaId: null, _tareaNombre: "" }));
+      salida.push(Object.assign({}, e, {
+        _contexto: "oferta", _tareaId: null, _tareaNombre: "", _subtareaId: null, _subtareaNombre: ""
+      }));
     });
     lista(o && o.tareas).forEach(t => {
       lista(t.entregables).forEach(e => {
-        salida.push(Object.assign({}, e, { _contexto: "tarea", _tareaId: t.id, _tareaNombre: t.nombre }));
+        salida.push(Object.assign({}, e, {
+          _contexto: "tarea", _tareaId: t.id, _tareaNombre: t.nombre, _subtareaId: null, _subtareaNombre: ""
+        }));
+      });
+      lista(t.subtareas).forEach(s => {
+        lista(s.entregables).forEach(e => {
+          salida.push(Object.assign({}, e, {
+            _contexto: "subtarea", _tareaId: t.id, _tareaNombre: t.nombre,
+            _subtareaId: s.id, _subtareaNombre: s.nombre
+          }));
+        });
       });
     });
     salida.sort((a, b) => (N().num(a.periodo) - N().num(b.periodo)) || a.nombre.localeCompare(b.nombre));
     return salida;
   }
 
-  /** Entregables de una tarea, ordenados por periodo. */
+  /** Entregables colgados de la TAREA COMPLETA (los que no son de una subtarea). */
   function deTarea(o, t) {
     return lista(t && t.entregables)
-      .map(e => Object.assign({}, e, { _contexto: "tarea", _tareaId: t.id, _tareaNombre: t.nombre }))
+      .map(e => Object.assign({}, e, {
+        _contexto: "tarea", _tareaId: t.id, _tareaNombre: t.nombre, _subtareaId: null, _subtareaNombre: ""
+      }))
       .sort((a, b) => N().num(a.periodo) - N().num(b.periodo));
+  }
+
+  /** Entregables de una SUBTAREA concreta. */
+  function deSubtarea(o, s) {
+    return lista(s && s.entregables)
+      .map(e => Object.assign({}, e, { _contexto: "subtarea", _subtareaId: s.id, _subtareaNombre: s.nombre }))
+      .sort((a, b) => N().num(a.periodo) - N().num(b.periodo));
+  }
+
+  /** Todo lo que se entrega dentro de una tarea: sus entregables y los de sus subtareas. */
+  function deTareaCompleta(o, t) {
+    return deTarea(o, t).concat(lista(t && t.subtareas).reduce((acc, s) => acc.concat(deSubtarea(o, s)), []));
   }
 
   /** Entregables agrupados por índice de periodo: { 0: [...], 1: [...] }. */
@@ -83,6 +111,7 @@
     return {
       total: l.length,
       deTarea: l.filter(e => e._contexto === "tarea").length,
+      deSubtarea: l.filter(e => e._contexto === "subtarea").length,
       deOferta: l.filter(e => e._contexto === "oferta").length
     };
   }
@@ -112,8 +141,8 @@
   /* ---------- Movimientos ---------- */
 
   /** Cambia el periodo de un entregable (con acotación al calendario). */
-  function moverAPeriodo(o, id, tareaId, periodo) {
-    const r = PL.modelo.buscarEntregable(o, id, tareaId || "");
+  function moverAPeriodo(o, id, tareaId, subtareaId, periodo) {
+    const r = PL.modelo.buscarEntregable(o, id, tareaId || "", subtareaId || "");
     if (!r) return null;
     r.entregable.periodo = Math.round(N().acota(periodo, 0, P().meses(o && o.periodos) - 1));
     return r.entregable;
@@ -132,7 +161,8 @@
   function esfuerzoEnPeriodo(o, pf, i) { return C().importePeriodo(o, pf, i); }
 
   PL.entregables = {
-    todos: todos, deTarea: deTarea, porPeriodo: porPeriodo, dePeriodo: dePeriodo,
+    todos: todos, deTarea: deTarea, deSubtarea: deSubtarea, deTareaCompleta: deTareaCompleta,
+    porPeriodo: porPeriodo, dePeriodo: dePeriodo,
     cuentaPorPeriodo: cuentaPorPeriodo, proximo: proximo, ultimo: ultimo,
     horasEstimadas: horasEstimadas, conHorasEstimadas: conHorasEstimadas, porContexto: porContexto,
     responsable: responsable, etiquetaEntrega: etiquetaEntrega, posicion: posicion,

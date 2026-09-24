@@ -62,26 +62,27 @@
   function filaTarea(o, pf, t) {
     const cols = P().columnas(o.periodos);
     const valores = valoresDeTarea(o, t);
-    return '<tr class="pa-gantt__fila pa-gantt__fila--tarea">' +
+    return '<tr class="pa-gantt__fila pa-gantt__fila--tarea' + PL.vistas.claseTono(o, t.id) + '">' +
       '<th class="pa-gantt__concepto pa-gantt__concepto-clic" data-ir="' + t.id + '" scope="row">' + N().esc(t.nombre) + "</th>" +
       celdasBarra(columnasActivas(valores, cols), "pa-barra--tarea") +
       '<td class="pa-gantt__total">' + C().tareaHoras(t).toLocaleString("es-ES") + " h</td></tr>";
   }
 
-  function filaSubtarea(o, pf, s) {
+  function filaSubtarea(o, pf, s, tareaId) {
     const cols = P().columnas(o.periodos);
     const valores = valoresDeSubtarea(o, s);
-    return '<tr class="pa-gantt__fila pa-gantt__fila--subtarea">' +
+    return '<tr class="pa-gantt__fila pa-gantt__fila--subtarea' + PL.vistas.claseTono(o, tareaId) + '">' +
       '<th class="pa-gantt__concepto pa-gantt__concepto-clic" data-ir="' + s.id + '" scope="row">' + N().esc(s.nombre) + "</th>" +
       celdasBarra(columnasActivas(valores, cols), "") +
       '<td class="pa-gantt__total">' + C().subtareaHoras(s).toLocaleString("es-ES") + " h</td></tr>";
   }
 
-  function filaEntregable(o, pf, e) {
+  function filaEntregable(o, pf, e, tareaId) {
     const cols = P().columnas(o.periodos);
     const r = E().responsable(pf, e);
-    const titulo = e.nombre + " · entrega " + P().mesCorto(o.periodos, e.periodo) + (r ? " · " + r.nombre : "");
-    return '<tr class="pa-gantt__fila pa-gantt__fila--entregable">' +
+    const nivel = e._contexto === "subtarea" ? " · de la subtarea" : (e._contexto === "tarea" ? " · de la tarea" : " · de la oferta");
+    const titulo = e.nombre + " · entrega " + P().mesCorto(o.periodos, e.periodo) + (r ? " · " + r.nombre : "") + nivel;
+    return '<tr class="pa-gantt__fila pa-gantt__fila--entregable' + PL.vistas.claseTono(o, tareaId) + '">' +
       '<th class="pa-gantt__concepto" scope="row" title="' + N().esc(titulo) + '">' + N().esc(e.nombre) + "</th>" +
       celdasHito(cols, e.periodo) +
       '<td class="pa-gantt__total">' + (N().num(e.horas) ? N().num(e.horas).toLocaleString("es-ES") + " h" : "—") + "</td></tr>";
@@ -114,13 +115,16 @@
     const filas = [];
     N().lista(o.tareas).forEach(t => {
       filas.push(filaTarea(o, pf, t));
-      N().lista(t.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "tarea" }))));
-      N().lista(t.subtareas).forEach(s => filas.push(filaSubtarea(o, pf, s)));
+      N().lista(t.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "tarea" }), t.id)));
+      N().lista(t.subtareas).forEach(s => {
+        filas.push(filaSubtarea(o, pf, s, t.id));
+        N().lista(s.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "subtarea" }), t.id)));
+      });
     });
     const hitosOferta = N().lista(o.entregables);
     if (hitosOferta.length) {
       filas.push('<tr class="pa-gantt__fila"><th class="pa-gantt__concepto pa-mini pa-mini--fuerte" colspan="' + (cols.length + 2) + '" scope="row">Hitos de la oferta</th></tr>');
-      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }))));
+      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }), null)));
     }
 
     const totalHitos = E().todos(o).length;
@@ -156,13 +160,16 @@
     const filas = [];
     N().lista(o.tareas).forEach(t => {
       filas.push(filaTarea(o, pf, t));
-      N().lista(t.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "tarea" }))));
-      N().lista(t.subtareas).forEach(s => filas.push(filaSubtarea(o, pf, s)));
+      N().lista(t.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "tarea" }), t.id)));
+      N().lista(t.subtareas).forEach(s => {
+        filas.push(filaSubtarea(o, pf, s, t.id));
+        N().lista(s.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "subtarea" }), t.id)));
+      });
     });
     const hitosOferta = N().lista(o.entregables);
     if (hitosOferta.length) {
       filas.push('<tr class="pa-gantt__fila"><th class="pa-gantt__concepto pa-mini pa-mini--fuerte" colspan="' + (cols.length + 2) + '" scope="row">Hitos de la oferta</th></tr>');
-      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }))));
+      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }), null)));
     }
     const colgroup = '<colgroup><col class="pa-gantt__col-concepto">' +
       cols.map(() => '<col style="width:2.6rem">').join("") + '<col class="pa-gantt__col-total"></colgroup>';

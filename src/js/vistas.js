@@ -52,9 +52,10 @@
   /* ---------- Controles ---------- */
 
   /** Selector de periodo de entrega (con el rótulo que el usuario ve). */
-  function selectPeriodo(o, actual, campo, id, tareaId) {
+  function selectPeriodo(o, actual, campo, id, tareaId, subtareaId) {
     const cols = P().columnas(o.periodos);
-    return '<select class="nz-input nz-input--sm" data-campo="' + campo + '" data-id="' + id + '" data-tarea="' + (tareaId || "") + '" ' +
+    return '<select class="nz-input nz-input--sm" data-campo="' + campo + '" data-id="' + id +
+      '" data-tarea="' + (tareaId || "") + '" data-subtarea="' + (subtareaId || "") + '" ' +
       'title="Mes de entrega" aria-label="Mes de entrega" style="min-width:7rem">' +
       cols.map(c => {
         const i = c.periodos[0];
@@ -63,8 +64,9 @@
       }).join("") + "</select>";
   }
 
-  function selectPerfil(pf, actual, campo, id, tareaId, vacio) {
-    return '<select class="nz-input nz-input--sm" data-campo="' + campo + '" data-id="' + id + '" data-tarea="' + (tareaId || "") + '" ' +
+  function selectPerfil(pf, actual, campo, id, tareaId, vacio, subtareaId) {
+    return '<select class="nz-input nz-input--sm" data-campo="' + campo + '" data-id="' + id +
+      '" data-tarea="' + (tareaId || "") + '" data-subtarea="' + (subtareaId || "") + '" ' +
       'style="min-width:10rem" aria-label="Responsable">' +
       '<option value=""' + (!actual ? " selected" : "") + ">" + (vacio || "— Sin responsable —") + "</option>" +
       N().lista(pf).map(p => '<option value="' + p.id + '"' + (p.id === actual ? " selected" : "") + ">" + N().esc(p.nombre) + "</option>").join("") +
@@ -72,26 +74,54 @@
   }
 
   /** Fila editable de un entregable. `e` puede venir de PL.entregables.todos(). */
-  function htmlEntregable(o, pf, e, contexto, tareaId) {
+  /* ---------- Color por tarea ----------
+     Cada tarea lleva un tono del sistema y sus subtareas y entregables lo heredan:
+     en el árbol, en el diagrama y en el informe se sigue el hilo de un vistazo.
+     Son cinco porque son los cinco que Aurora distingue de verdad. */
+  const TONOS = 5;
+
+  /** 1..5, estable mientras no cambie el orden de las tareas (0 = sin tono). */
+  function tonoDe(o, tareaId) {
+    if (!tareaId) return 0;
+    const tareas = N().lista(o && o.tareas);
+    for (let i = 0; i < tareas.length; i++) if (tareas[i].id === tareaId) return (i % TONOS) + 1;
+    return 0;
+  }
+
+  function claseTono(o, tareaId) {
+    const t = tonoDe(o, tareaId);
+    return t ? " pa-tono-" + t : "";
+  }
+
+  /** Un entregable, se cuelgue de la oferta, de una tarea o de una subtarea.
+      `data-tarea` y `data-subtarea` viajan en todos los campos para saber dónde
+      vive al editarlo. */
+  function htmlEntregable(o, pf, e, contexto, tareaId, subtareaId) {
     const id = e.id;
     const tId = (tareaId !== undefined) ? tareaId : (e._tareaId || "");
-    const esOferta = (contexto || e._contexto) === "oferta";
-    return '<div class="pa-hito" data-id="' + id + '">' +
-      '<span class="pa-hito__nombre"><input class="nz-input" data-campo="hito-nombre" data-id="' + id + '" data-tarea="' + tId + '" value="' + N().esc(e.nombre) + '" placeholder="Nombre del entregable"></span>' +
+    const sId = (subtareaId !== undefined) ? subtareaId : (e._subtareaId || "");
+    const ctx = contexto || e._contexto || "tarea";
+    const at = ' data-id="' + id + '" data-tarea="' + tId + '" data-subtarea="' + sId + '"';
+    const etiqueta = ctx === "oferta"
+      ? '<span class="nz-badge nz-badge--accent">de la oferta</span>'
+      : (ctx === "subtarea" ? "" : '<span class="nz-badge nz-badge--neutral">de la tarea</span>');
+    return '<div class="pa-hito pa-hito--' + ctx + '" data-id="' + id + '" data-subtarea="' + sId + '">' +
+      '<span class="pa-hito__nombre"><input class="nz-input" data-campo="hito-nombre"' + at + ' value="' + N().esc(e.nombre) + '" placeholder="Nombre del entregable"></span>' +
       '<span class="pa-ahora pa-mini">◆</span>' +
-      selectPeriodo(o, e.periodo, "hito-periodo", id, tId) +
-      (esOferta ? '<span class="nz-badge nz-badge--accent">de la oferta</span>' : "") +
-      selectPerfil(pf, e.responsablePerfilId, "hito-responsable", id, tId) +
-      '<label class="pa-mini pa-ahora">horas <input class="nz-input nz-input--sm pa-input-corto" type="number" min="0" step="1" data-campo="hito-horas" data-id="' + id + '" data-tarea="' + tId + '" value="' + (N().num(e.horas) || "") + '" title="Estimación orientativa: no suma al total"></label>' +
-      '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="dup-entregable" data-id="' + id + '" data-tarea="' + tId + '" title="Duplicar entregable">⧉</button>' +
-      '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-entregable" data-id="' + id + '" data-tarea="' + tId + '" title="Eliminar entregable">✕</button>' +
+      selectPeriodo(o, e.periodo, "hito-periodo", id, tId, sId) +
+      etiqueta +
+      selectPerfil(pf, e.responsablePerfilId, "hito-responsable", id, tId, "", sId) +
+      '<label class="pa-mini pa-ahora">horas <input class="nz-input nz-input--sm pa-input-corto" type="number" min="0" step="1" data-campo="hito-horas"' + at + ' value="' + (N().num(e.horas) || "") + '" title="Estimación orientativa: no suma al total"></label>' +
+      '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="dup-entregable"' + at + ' title="Duplicar entregable">⧉</button>' +
+      '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-entregable"' + at + ' title="Eliminar entregable">✕</button>' +
       '<span class="pa-hito__detalle">' +
-        '<input class="nz-input nz-input--sm pa-crece2" data-campo="hito-desc" data-id="' + id + '" data-tarea="' + tId + '" value="' + N().esc(e.descripcion || "") + '" placeholder="Qué incluye este entregable">' +
-        '<input class="nz-input nz-input--sm pa-crece" data-campo="hito-criterio" data-id="' + id + '" data-tarea="' + tId + '" value="' + N().esc(e.criterio || "") + '" placeholder="Criterio de aceptación">' +
-        '<input class="nz-input nz-input--sm pa-input-fecha" type="date" data-campo="hito-fecha" data-id="' + id + '" data-tarea="' + tId + '" value="' + N().esc(e.fecha || "") + '" title="Fecha exacta (opcional)">' +
+        '<input class="nz-input nz-input--sm pa-crece2" data-campo="hito-desc"' + at + ' value="' + N().esc(e.descripcion || "") + '" placeholder="Qué incluye este entregable">' +
+        '<input class="nz-input nz-input--sm pa-crece" data-campo="hito-criterio"' + at + ' value="' + N().esc(e.criterio || "") + '" placeholder="Criterio de aceptación">' +
+        '<input class="nz-input nz-input--sm pa-input-fecha" type="date" data-campo="hito-fecha"' + at + ' value="' + N().esc(e.fecha || "") + '" title="Fecha exacta (opcional)">' +
       "</span>" +
     "</div>";
   }
+
 
   /* ---------- Composición ---------- */
 
@@ -139,6 +169,7 @@
     nodo: nodo, escribir: escribir, vaciar: vaciar, texto: texto,
     moneda: moneda, verImportes: verImportes, imp: imp, impSi: impSi, hor: hor,
     badgeOferta: badgeOferta, selectPeriodo: selectPeriodo, selectPerfil: selectPerfil, htmlEntregable: htmlEntregable,
-    articulo: articulo, tabla: tabla, fila: fila, filaDato: filaDato, aviso: aviso, vacio: vacio, delta: delta
+    articulo: articulo, tabla: tabla, fila: fila, filaDato: filaDato, aviso: aviso, vacio: vacio, delta: delta,
+    tonoDe: tonoDe, claseTono: claseTono, TONOS: TONOS
   };
 })(typeof window !== "undefined" ? window : globalThis);

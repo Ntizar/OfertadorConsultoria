@@ -85,7 +85,7 @@
   }
 
   function nuevaSubtarea(nombre) {
-    return { id: N().uid("sb_"), nombre: N().texto(nombre, "Nueva subtarea"), _abierta: true, lineas: [] };
+    return { id: N().uid("sb_"), nombre: N().texto(nombre, "Nueva subtarea"), _abierta: true, entregables: [], lineas: [] };
   }
 
   function nuevaLinea(perfilId, nPeriodos) {
@@ -119,6 +119,7 @@
     q.unidad = N().texto(q.unidad || q.unidades, "h");
     q.tarifa = N().acota(q.tarifa, 0, 1e9);
     q.categoria = CATEGORIAS_PERFIL.indexOf(q.categoria) >= 0 ? q.categoria : "Otro";
+    q.notas = N().texto(q.notas, "");
     q.esDefecto = !!q.esDefecto;
     return q;
   }
@@ -150,6 +151,7 @@
       sb.id = sb.id || N().uid("sb_");
       sb.nombre = N().texto(sb.nombre, "Subtarea");
       if (typeof sb._abierta !== "boolean") sb._abierta = true;
+      sb.entregables = N().lista(sb.entregables).map(e => normalizarEntregable(e, nPeriodos));
       sb.lineas = N().lista(sb.lineas).map(l => {
         const ln = (l && typeof l === "object") ? l : {};
         ln.id = ln.id || N().uid("ln_");
@@ -364,21 +366,47 @@
     return null;
   }
 
-  /** Entregable por id, con su contenedor. tareaId vacío = entregables de la oferta. */
-  function buscarEntregable(o, id, tareaId) {
+  /** Entregable por id, con su contenedor, en los TRES niveles donde puede vivir:
+      la oferta (gestión, reuniones), una tarea completa o una subtarea concreta. */
+  function buscarEntregable(o, id, tareaId, subtareaId) {
+    /* En la subtarea concreta */
+    if (subtareaId) {
+      const r = buscarSubtarea(o, subtareaId);
+      if (!r) return null;
+      const l = N().lista(r.sub.entregables);
+      for (let i = 0; i < l.length; i++) {
+        if (l[i].id === id) return { entregable: l[i], tarea: r.tarea, sub: r.sub, contexto: "subtarea", contenedor: r.sub.entregables };
+      }
+      return null;
+    }
+    /* En la tarea completa */
     if (tareaId) {
       const t = buscarTarea(o, tareaId);
       if (!t) return null;
       const l = N().lista(t.entregables);
-      for (let i = 0; i < l.length; i++) if (l[i].id === id) return { entregable: l[i], tarea: t, contenedor: t.entregables };
+      for (let i = 0; i < l.length; i++) {
+        if (l[i].id === id) return { entregable: l[i], tarea: t, sub: null, contexto: "tarea", contenedor: t.entregables };
+      }
       return null;
     }
+    /* Sin pistas: se busca en los tres niveles */
     const deOferta = N().lista(o && o.entregables);
-    for (let i = 0; i < deOferta.length; i++) if (deOferta[i].id === id) return { entregable: deOferta[i], tarea: null, contenedor: o.entregables };
+    for (let i = 0; i < deOferta.length; i++) {
+      if (deOferta[i].id === id) return { entregable: deOferta[i], tarea: null, sub: null, contexto: "oferta", contenedor: o.entregables };
+    }
     const tareas = N().lista(o && o.tareas);
     for (let i = 0; i < tareas.length; i++) {
       const l = N().lista(tareas[i].entregables);
-      for (let j = 0; j < l.length; j++) if (l[j].id === id) return { entregable: l[j], tarea: tareas[i], contenedor: tareas[i].entregables };
+      for (let j = 0; j < l.length; j++) {
+        if (l[j].id === id) return { entregable: l[j], tarea: tareas[i], sub: null, contexto: "tarea", contenedor: tareas[i].entregables };
+      }
+      const subs = N().lista(tareas[i].subtareas);
+      for (let k = 0; k < subs.length; k++) {
+        const ls = N().lista(subs[k].entregables);
+        for (let j = 0; j < ls.length; j++) {
+          if (ls[j].id === id) return { entregable: ls[j], tarea: tareas[i], sub: subs[k], contexto: "subtarea", contenedor: subs[k].entregables };
+        }
+      }
     }
     return null;
   }
@@ -389,11 +417,17 @@
     return null;
   }
 
-  function colgarEntregable(o, nombre, contexto, periodo, tareaId) {
+  /** Cuelga un entregable nuevo en la oferta, en una tarea o en una subtarea. */
+  function colgarEntregable(o, nombre, contexto, periodo, tareaId, subtareaId) {
     const e = nuevoEntregable(nombre, contexto, periodo);
+    if (subtareaId) {
+      const r = buscarSubtarea(o, subtareaId);
+      if (r) { r.sub.entregables = N().lista(r.sub.entregables); r.sub.entregables.push(e); return e; }
+    }
     if (contexto === "oferta" || !tareaId) { o.entregables.push(e); return e; }
     const t = buscarTarea(o, tareaId);
     if (!t) { o.entregables.push(e); return e; }
+    t.entregables = N().lista(t.entregables);
     t.entregables.push(e);
     return e;
   }

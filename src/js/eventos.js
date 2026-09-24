@@ -66,10 +66,12 @@
         const r = M().buscarLinea(of, el.dataset.id);
         if (!r) return;
         const i = N().num(el.dataset.mes);
-        const v = N().acota(el.value, 0, 1e6);
-        /* En modo % lo tecleado es dedicación: se convierte a horas con la jornada
-           del mes (horas/día × días laborables). Las horas siguen siendo el dato. */
-        const horas = el.dataset.modo === "pct" ? C().horasDePct(of, i, v) : v;
+        /* Se admite escribir la unidad: «50» (según el modo), «50 %» o «88 h».
+           Las horas son el dato que se guarda; el % se convierte con la jornada. */
+        const leido = N().parseaCantidad(el.value);
+        if (!leido) return;
+        const esPct = leido.unidad === "%" || (leido.unidad === "" && el.dataset.modo === "pct");
+        const horas = esPct ? C().horasDePct(of, i, leido.valor) : leido.valor;
         r.linea.horas = r.linea.horas || {};
         r.linea.horas["p" + i] = N().acota(horas, 0, 1e6);
         V().trabajo.actualizarFilaHoras(of, pf(), r.linea, el.closest("tr"));
@@ -107,7 +109,7 @@
 
       /* Entregables */
       case "hito-nombre": case "hito-desc": case "hito-criterio": {
-        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "");
+        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "", el.dataset.subtarea || "");
         if (!r) return;
         const mapa = { "hito-nombre": "nombre", "hito-desc": "descripcion", "hito-criterio": "criterio" };
         r.entregable[mapa[campo]] = el.value;
@@ -115,14 +117,14 @@
         return;
       }
       case "hito-horas": {
-        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "");
+        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "", el.dataset.subtarea || "");
         if (!r) return;
         r.entregable.horas = N().acota(el.value, 0, 1e6);
         R().datos(); APP().guardar();
         return;
       }
       case "hito-fecha": {
-        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "");
+        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "", el.dataset.subtarea || "");
         if (!r) return;
         r.entregable.fecha = el.value;
         R().datos(); APP().guardar();
@@ -175,6 +177,11 @@
         if (p) { p.tarifa = N().acota(el.value, 0, 1e9); R().datos(); APP().guardar(); }
         return;
       }
+      case "perfil-notas": {
+        const p = C().perfilPorId(APP().ESTADO.perfiles, el.dataset.id);
+        if (p) { p.notas = el.value; APP().guardar(); }
+        return;
+      }
       case "perfil-unidad": {
         const p = C().perfilPorId(APP().ESTADO.perfiles, el.dataset.id);
         if (p) { p.unidad = N().texto(el.value, "h"); APP().guardar(); }
@@ -223,20 +230,29 @@
         return;
       }
       case "periodo-rotulo": { R().todo(); return; }   /* al salir del campo, repintado completo */
+      case "horas": {
+        /* Al salir del campo se deja escrito el valor limpio en la unidad del modo. */
+        const r = M().buscarLinea(of, el.dataset.id);
+        if (!r) return;
+        const i = N().num(el.dataset.mes);
+        const h = N().num((r.linea.horas || {})["p" + i]);
+        el.value = N().fmtCampo(el.dataset.modo === "pct" ? C().pctDeHoras(of, i, h) : h);
+        return;
+      }
       case "linea-perfil": {
         const r = M().buscarLinea(of, el.dataset.id);
         if (r) { r.linea.perfilId = el.value; R().todo(); APP().guardar(); }
         return;
       }
       case "hito-periodo": {
-        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "");
+        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "", el.dataset.subtarea || "");
         if (!r) return;
         r.entregable.periodo = Math.round(N().acota(el.value, 0, P().meses(of.periodos) - 1));
         R().todo(); APP().guardar();
         return;
       }
       case "hito-responsable": {
-        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "");
+        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "", el.dataset.subtarea || "");
         if (!r) return;
         r.entregable.responsablePerfilId = el.value;
         R().todo(); APP().guardar();

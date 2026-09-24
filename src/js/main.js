@@ -19,10 +19,10 @@
   const A = () => PL.almacen;
   const V = () => PL.vistas;
 
-  const VISTAS = ["trabajo", "oferta", "resumen", "informe", "ajustes"];
+  const VISTAS = ["trabajo", "oferta", "perfiles", "resumen", "informe", "ajustes"];
   const PANELES = {
-    trabajo: "pa-trabajo-panel", oferta: "pa-oferta-panel", resumen: "pa-resumen-panel",
-    informe: "pa-informe-panel", ajustes: "pa-ajustes-panel"
+    trabajo: "pa-trabajo-panel", oferta: "pa-oferta-panel", perfiles: "pa-perfiles-panel",
+    resumen: "pa-resumen-panel", informe: "pa-informe-panel", ajustes: "pa-ajustes-panel"
   };
 
   let tGuardar = null, tDatos = null;
@@ -149,6 +149,7 @@
 
     trabajo: function () { pintarVista("trabajo"); },
     oferta: function () { pintarVista("oferta"); },
+    perfiles: function () { pintarVista("perfiles"); },
     resumen: function () { pintarVista("resumen"); },
     informe: function () { pintarVista("informe"); },
     ajustes: function () { pintarVista("ajustes"); },
@@ -163,7 +164,7 @@
         PL.repintar.cabecera();
         pintarCalendario();
         pintarGantt();
-        ["oferta", "resumen", "informe", "ajustes"].forEach(pintarVista);
+        ["oferta", "perfiles", "resumen", "informe", "ajustes"].forEach(pintarVista);
       }, 150);
     },
 
@@ -174,7 +175,7 @@
       tDatos = setTimeout(function () {
         pintarCalendario();
         PL.vistas.trabajo.renderEditor();
-        ["oferta", "resumen", "informe", "ajustes"].forEach(pintarVista);
+        ["oferta", "perfiles", "resumen", "informe", "ajustes"].forEach(pintarVista);
       }, 120);
     },
 

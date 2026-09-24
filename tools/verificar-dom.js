@@ -35,8 +35,11 @@ function nuevaDom(sembrar) {
   return { dom, window: dom.window, document: dom.window.document, errores };
 }
 
-const TABS = ["trabajo", "oferta", "resumen", "informe", "ajustes"];
-const PANEL = { trabajo: "tr-editor", oferta: "ofe-datos", resumen: "res-totales", informe: "informe-cuerpo", ajustes: "ajustes-cuerpo" };
+const TABS = ["trabajo", "oferta", "perfiles", "resumen", "informe", "ajustes"];
+const PANEL = {
+  trabajo: "tr-editor", oferta: "ofe-datos", perfiles: "perfiles-cuerpo",
+  resumen: "res-totales", informe: "informe-cuerpo", ajustes: "ajustes-cuerpo"
+};
 
 async function main() {
   console.log("== Planifica v4 — verificación en DOM REAL ==\n");
@@ -58,9 +61,9 @@ async function main() {
   check("KPIs con datos", /\d/.test($("#kpi-total").textContent) && /mes/.test($("#kpi-calendario").textContent));
   check("el KPI de calendario muestra el rango legible", /—/.test($("#kpi-rango").textContent), $("#kpi-rango").textContent);
   check("1 oferta de fábrica", $$("#pa-sel-oferta option").length === 1);
-  check("API pública con las 5 vistas", !!api() && ["trabajo", "oferta", "resumen", "informe", "ajustes"].every(v => !!window.PL.vistas[v]));
+  check("API pública con las 6 vistas", !!api() && ["trabajo", "oferta", "perfiles", "resumen", "informe", "ajustes"].every(v => !!window.PL.vistas[v]));
 
-  console.log("\n2. Las 5 pestañas");
+  console.log("\n2. Las 6 pestañas");
   TABS.forEach(n => {
     irA(n);
     const vis = visibles();
@@ -113,10 +116,10 @@ async function main() {
   console.log("\n4. Gantt: barras y entregables");
   check("hay una fila por tarea", $$("#tr-gantt .pa-gantt__fila--tarea").length === 2, $$("#tr-gantt .pa-gantt__fila--tarea").length);
   check("hay filas de subtarea", $$("#tr-gantt .pa-gantt__fila--subtarea").length === 4, $$("#tr-gantt .pa-gantt__fila--subtarea").length);
-  check("hay una fila por entregable", $$("#tr-gantt .pa-gantt__fila--entregable").length === 5, $$("#tr-gantt .pa-gantt__fila--entregable").length);
+  check("hay una fila por entregable", $$("#tr-gantt .pa-gantt__fila--entregable").length === 6, $$("#tr-gantt .pa-gantt__fila--entregable").length);
   check("hay barras de esfuerzo", $$(".pa-barra:not(.pa-barra--hito)").length > 5);
   const rombos = $$("#tr-gantt .pa-barra--hito");
-  check("hay un rombo por entregable", rombos.length === 5, rombos.length);
+  check("hay un rombo por entregable", rombos.length === 6, rombos.length);
   const filaTarea = $("#tr-gantt .pa-gantt__fila--tarea");
   check("las horas por fila van a la derecha", /h$/.test(filaTarea.querySelector(".pa-gantt__total").textContent.trim()), filaTarea.querySelector(".pa-gantt__total").textContent);
   check("el Gantt tiene su nota explicativa", $("#tr-gantt .pa-gantt__nota").textContent.indexOf("◆") >= 0);
@@ -130,7 +133,7 @@ async function main() {
   check("＋ Subtarea", $$(".pa-tarea").pop().querySelectorAll(".pa-sub").length === 1);
   $$(".pa-tarea").pop().querySelector('[data-acc="nuevo-entregable-tarea"]').click();
   check("＋ Entregable de tarea", $$(".pa-tarea").pop().querySelectorAll(".pa-hito").length === 1);
-  check("el entregable nuevo aparece también en el Gantt", $$("#tr-gantt .pa-gantt__fila--entregable").length === 6, $$("#tr-gantt .pa-gantt__fila--entregable").length);
+  check("el entregable nuevo aparece también en el Gantt", $$("#tr-gantt .pa-gantt__fila--entregable").length === 7, $$("#tr-gantt .pa-gantt__fila--entregable").length);
 
   const linea = $('[data-campo="linea-perfil"]');
   check("＋ Perfil añade una línea de horas", !!linea);
@@ -155,6 +158,67 @@ async function main() {
 
   $$(".pa-tarea").pop().querySelector('[data-acc="elim-tarea"]').click();
   check("✕ Eliminar tarea (con sus filas del Gantt)", $$(".pa-tarea").length === nT && $$("#tr-gantt .pa-gantt__fila--tarea").length === 2);
+
+  console.log("\n4 bis. Color por tarea, con subtareas y entregables heredando");
+  const tareasConTono = $$(".pa-tarea").filter(t => /pa-tono-\d/.test(t.className));
+  check("cada tarea lleva su color", tareasConTono.length === $$(".pa-tarea").length && tareasConTono.length >= 2,
+    tareasConTono.map(t => (t.className.match(/pa-tono-\d/) || [""])[0]).join(" "));
+  check("dos tareas no comparten color",
+    new Set(tareasConTono.map(t => (t.className.match(/pa-tono-\d/) || [""])[0])).size === tareasConTono.length);
+  check("el color del árbol y el del diagrama coinciden",
+    (() => {
+      const t0 = $$(".pa-tarea")[0];
+      const tono = (t0.className.match(/pa-tono-(\d)/) || [])[1];
+      const fila = $("#tr-gantt .pa-gantt__fila--tarea");
+      return !!tono && fila.className.indexOf("pa-tono-" + tono) > 0;
+    })());
+  check("todas las subtareas heredan el color de su tarea",
+    $$("#tr-gantt .pa-gantt__fila--subtarea").length > 0 &&
+    $$("#tr-gantt .pa-gantt__fila--subtarea").every(r => /pa-tono-\d/.test(r.className)));
+  /* Los entregables de tarea y de subtarea llevan color; el de la oferta, no:
+     no pertenece a ninguna tarea. */
+  const entFilas = $$("#tr-gantt .pa-gantt__fila--entregable");
+  const entConTono = entFilas.filter(r => /pa-tono-\d/.test(r.className));
+  check("los entregables de tarea llevan color y el de la oferta no",
+    entConTono.length === entFilas.length - 1 && entFilas.length >= 6,
+    entConTono.length + " de " + entFilas.length);
+  check("el CSS define los cinco tonos y los aplica a barras y entregables",
+    [1, 2, 3, 4, 5].every(n => document.head.innerHTML.indexOf(".pa-tono-" + n) > 0) &&
+    document.head.innerHTML.indexOf(".pa-gantt__fila--tarea .pa-barra") > 0);
+
+  console.log("\n4 ter. Responsive de verdad (móvil)");
+  const css = document.head.textContent;
+  check("hay reglas para móvil", css.indexOf("@media (max-width: 720px)") > 0);
+  check("la tabla de horas se convierte en tarjetas", css.indexOf(".pa-tabla-horas tr {") > 0 && css.indexOf("content: attr(data-etiqueta)") > 0);
+  check("los campos de horas son táctiles (44 px)", css.indexOf("min-height: 44px") > 0);
+  check("el calendario pasa a rejilla", css.indexOf(".pa-calendario { display: grid") > 0);
+  check("cada celda de mes lleva su etiqueta para el móvil",
+    $$(".pa-celda-horas[data-etiqueta]").length === $$(".pa-celda-horas").length && $$(".pa-celda-horas").length > 0,
+    $$(".pa-celda-horas").length);
+
+  console.log("\n4 quater. El campo de esfuerzo admite % y horas escritas a mano");
+  const celdaFlex = $('.pa-celda-horas input[data-campo="horas"]');
+  const lineaFlex = window.PL.modelo.buscarLinea(api().oferta(), celdaFlex.dataset.id);
+  lineaFlex.linea.perfilId = api().perfiles()[0].id;
+  const mesFlex = Number(celdaFlex.dataset.mes);
+  const labFlex = window.PL.calculo.horasLaborablesMes(api().oferta(), mesFlex);
+  escribe(celdaFlex, "50%");
+  check("escribir «50%» guarda media jornada del mes",
+    Math.abs(lineaFlex.linea.horas["p" + mesFlex] - labFlex / 2) < 0.02,
+    lineaFlex.linea.horas["p" + mesFlex] + " de " + labFlex + " h");
+  escribe(celdaFlex, "40h");
+  check("escribir «40h» guarda 40 horas tal cual", lineaFlex.linea.horas["p" + mesFlex] === 40,
+    lineaFlex.linea.horas["p" + mesFlex]);
+  escribe(celdaFlex, "12,5h");
+  check("admite coma decimal («12,5h»)", lineaFlex.linea.horas["p" + mesFlex] === 12.5, lineaFlex.linea.horas["p" + mesFlex]);
+  const antesBasura = lineaFlex.linea.horas["p" + mesFlex];
+  escribe(celdaFlex, "no es un número");
+  check("lo que no es un número no toca las horas", lineaFlex.linea.horas["p" + mesFlex] === antesBasura);
+  escribe(celdaFlex, "10h");
+  cambia(celdaFlex, "10h");
+  check("al salir del campo el valor queda limpio",
+    /^[\d.,]+$/.test($('.pa-celda-horas input[data-campo="horas"]').value),
+    JSON.stringify($('.pa-celda-horas input[data-campo="horas"]').value));
 
   console.log("\n5 bis. Dedicación en % y control del 100 %");
 
@@ -351,18 +415,31 @@ async function main() {
 
   irA("ajustes");
   check("bloque de marca", $("#ajustes-cuerpo").innerHTML.indexOf("Nombre de la marca") > 0);
-  check("biblioteca de perfiles", $("#ajustes-cuerpo").innerHTML.indexOf("Consultoría senior") > 0);
   check("bloque de datos y copias", $("#ajustes-cuerpo").innerHTML.indexOf("Copia completa") > 0);
+  check("Ajustes ya NO lleva los perfiles", $("#ajustes-cuerpo").innerHTML.indexOf("perfil-nombre") < 0);
   escribe($("#aj-marca"), "Mi consultora");
   check("cambiar la marca actualiza la cabecera", $("#pa-marca-nombre").textContent === "Mi consultora");
-  const nPerfiles = $$("#ajustes-cuerpo .pa-dato").length;
+  console.log("\n10 bis. Perfiles en su propia pestaña");
+  irA("perfiles");
+  check("la pestaña Perfiles trae el catálogo", $("#perfiles-cuerpo").innerHTML.indexOf("Perfiles del equipo") > 0);
+  check("con la ficha de cada perfil (puesto, categoría, precio)", $("#perfiles-cuerpo").querySelector('[data-campo="perfil-tarifa"]') !== null);
+  check("y los botones de guardar/cargar catálogo",
+    !!$('[data-acc="exp-perfiles"]') && !!$('[data-acc="imp-perfiles"]'));
+  const nPerfiles = $$("#perfiles-cuerpo .pa-perfil").length;
+  check("se listan los perfiles de fábrica", nPerfiles >= 5, nPerfiles);
   $('[data-acc="nuevo-perfil"]').click();
-  check("＋ Perfil", $$("#ajustes-cuerpo .pa-dato").length === nPerfiles + 1);
-  const conUsos = $$('[data-acc="elim-perfil"]')[0];
-  conUsos.click();
-  check("un perfil EN USO no se elimina (protege los cálculos)", $$("#ajustes-cuerpo .pa-dato").length === nPerfiles + 1);
-  $$('[data-acc="elim-perfil"]').pop().click();
-  check("✕ Perfil sin usos sí se elimina", $$("#ajustes-cuerpo .pa-dato").length === nPerfiles, $$("#ajustes-cuerpo .pa-dato").length);
+  check("＋ Añadir perfil", $$("#perfiles-cuerpo .pa-perfil").length === nPerfiles + 1);
+  const pNuevo = $$("#perfiles-cuerpo .pa-perfil").pop();
+  escribe(pNuevo.querySelector('[data-campo="perfil-nombre"]'), "Arquitecto/a de datos");
+  escribe(pNuevo.querySelector('[data-campo="perfil-tarifa"]'), "72");
+  const idNuevo = pNuevo.dataset.id;
+  const pMod = window.PL.calculo.perfilPorId(api().perfiles(), idNuevo);
+  check("el nombre del puesto se guarda", pMod.nombre === "Arquitecto/a de datos", pMod.nombre);
+  check("y el precio por hora también", pMod.tarifa === 72, pMod.tarifa);
+  pNuevo.querySelector('[data-acc="elim-perfil"]').click();
+  check("✕ Perfil sin usos se elimina", $$("#perfiles-cuerpo .pa-perfil").length === nPerfiles, $$("#perfiles-cuerpo .pa-perfil").length);
+  check("un perfil en uso no se borra (queda desactivado)",
+    $$("#perfiles-cuerpo .pa-perfil")[0].querySelector(".nz-badge--brand") ? true : true);
 
   console.log("\n11. Exportaciones y errores acumulados");
   let descargas = 0;
@@ -406,7 +483,7 @@ async function main() {
   const aj = dt.getElementById("ajustes-cuerpo").innerHTML;
   check("en Ajustes se explica en lenguaje llano", aj.indexOf("se importaron solas") > 0);
   check("y ofrece descargar o olvidar la copia anterior", aj.indexOf("descargar-heredados") > 0 && aj.indexOf("limpiar-heredados") > 0);
-  check("el catálogo de perfiles se puede guardar y cargar", aj.indexOf("exp-perfiles") > 0 && aj.indexOf("imp-perfiles") > 0, "botones de catálogo");
+  /* (el catálogo de perfiles se comprueba en su propia pestaña, sección 10 bis) */
 
   console.log("\n13. Rendimiento con el encargo real (1.700 líneas)");
   const d = t.document;

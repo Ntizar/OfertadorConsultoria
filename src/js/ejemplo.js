@@ -100,16 +100,27 @@
       M2.conHoras(M2.nuevaLinea(tec.id, 6), { p1: 8, p2: 8 })
     ];
     t1.subtareas = [s1, s2];
-    t1.entregables = [
-      Object.assign(M2.nuevoEntregable("1.1 Informe de requisitos", "tarea", 0), {
+    /* Los entregables cuelgan de la subtarea que los produce. */
+    s1.entregables = [
+      Object.assign(M2.nuevoEntregable("1.1 Informe de requisitos", "subtarea", 0), {
         descripcion: "Análisis de la web actual, usuarios y contenidos.",
         criterio: "Validado por el cliente en la reunión de alcance",
         responsablePerfilId: jp.id, horas: 32
-      }),
-      Object.assign(M2.nuevoEntregable("1.2 Prototipo UX navegable", "tarea", 2), {
+      })
+    ];
+    s2.entregables = [
+      Object.assign(M2.nuevoEntregable("1.2 Prototipo UX navegable", "subtarea", 2), {
         descripcion: "Prototipo de las 8 pantallas principales.",
         criterio: "Prototipo revisado y aprobado en Figma",
         responsablePerfilId: med.id, horas: 54
+      })
+    ];
+    /* Y uno a nivel de la TAREA COMPLETA, porque también se entregan cosas así. */
+    t1.entregables = [
+      Object.assign(M2.nuevoEntregable("1.3 Manual de estilo", "tarea", 3), {
+        descripcion: "Guía de estilo para que el cliente mantenga la web.",
+        criterio: "Manual entregado y explicado al equipo del cliente",
+        responsablePerfilId: med.id, horas: 12
       })
     ];
 
@@ -126,13 +137,15 @@
       M2.conHoras(M2.nuevaLinea(jru.id, 6), { p4: 16, p5: 8 })
     ];
     t2.subtareas = [s3, s4];
-    t2.entregables = [
-      Object.assign(M2.nuevoEntregable("2.1 Web en preproducción", "tarea", 4), {
+    s3.entregables = [
+      Object.assign(M2.nuevoEntregable("2.1 Web en preproducción", "subtarea", 4), {
         descripcion: "Sitio completo funcionando en entorno de pruebas.",
         criterio: "Checklist de pruebas funcionales superado",
         responsablePerfilId: jru.id, horas: 76
-      }),
-      Object.assign(M2.nuevoEntregable("2.2 Puesta en producción", "tarea", 5), {
+      })
+    ];
+    s4.entregables = [
+      Object.assign(M2.nuevoEntregable("2.2 Puesta en producción", "subtarea", 5), {
         descripcion: "Publicación, dominios y formación al equipo.",
         criterio: "Acta de entrega y formación realizada",
         responsablePerfilId: sen.id, horas: 30
