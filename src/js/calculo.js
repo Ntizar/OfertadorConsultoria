@@ -1,18 +1,18 @@
 "use strict";
 /* =====================================================================
-   Planifica v3 — CÁLCULO ECONÓMICO
-   Motor PURO: no toca el DOM ni el estado global. Todas las funciones
-   reciben la oferta (pr) y la biblioteca de perfiles (pf).
+   Planifica v4 — CÁLCULO
+   Motor PURO de importes de una oferta. Recibe siempre (oferta, perfiles).
+   Sin DOM, sin estado global, sin seguimiento.
 
-   CONTRATO DE EXACTITUD (no negociable):
-   el redondeo por línea con criterio Excel (nucleo.r2) es lo que hace que
-   los totales cuadren al céntimo con la hoja de cálculo del cliente.
-   No cambiar el ORDEN ni el punto de redondeo sin volver a verificar
-   contra el encargo real (587.009,36 €).
+   CONTRATO DE EXACTITUD (no negociable): el redondeo a 2 decimales se hace
+   LÍNEA a LÍNEA y luego se suma, igual que la hoja de cálculo del cliente.
+   Ese orden es lo que hace que el encargo real cuadre al céntimo
+   (587.009,36 €). No cambiar el punto de redondeo sin volver a verificar.
    ===================================================================== */
 (function (raiz) {
   const PL = (raiz.PL = raiz.PL || {});
   const N = () => PL.nucleo;
+  const P = () => PL.periodos;
 
   const lista = v => N().lista(v);
 
@@ -29,136 +29,183 @@
     return p ? N().num(p.tarifa) : 0;
   }
 
-  /* ---------- Horas (suman primas) ---------- */
+  /* ---------- Horas ---------- */
 
-  function lineaHoras(l) { return N().suma(Object.keys((l && l.horas) || {}).map(k => l.horas[k])); }
-
-  function subHoras(s) { return N().suma(lista(s && s.lineas).map(lineaHoras)); }
-
-  function tareaHoras(t) { return N().suma(lista(t && t.subtareas).map(subHoras)); }
-
-  function horasProyecto(pr) { return N().suma(lista(pr && pr.tareas).map(tareaHoras)); }
-
-  function horasMes(pr, i) {
+  function lineaHoras(l) {
+    const h = (l && l.horas) || {};
     let s = 0;
-    lista(pr && pr.tareas).forEach(t => lista(t.subtareas).forEach(sb => lista(sb.lineas).forEach(l => {
-      s += N().num(((l.horas) || {})["m" + i]);
-    })));
+    for (const k in h) s += N().num(h[k]);
     return s;
   }
 
-  function horasPorPerfil(pr) {
+  function lineasHoras(lineas, i) {
+    let s = 0;
+    lista(lineas).forEach(l => { s += N().num(((l.horas) || {})["p" + i]); });
+    return s;
+  }
+
+  function subtareaHoras(s) { return N().suma(lista(s && s.lineas), lineaHoras); }
+  function tareaHoras(t) { return N().suma(lista(t && t.subtareas), subtareaHoras); }
+  function ofertaHoras(o) { return N().suma(lista(o && o.tareas), tareaHoras); }
+
+  function horasPeriodo(o, i) {
+    let s = 0;
+    lista(o && o.tareas).forEach(t => lista(t.subtareas).forEach(sb => {
+      s += lineasHoras(sb.lineas, i);
+    }));
+    return s;
+  }
+
+  function horasPorPerfil(o) {
     const mapa = {};
-    lista(pr && pr.tareas).forEach(t => lista(t.subtareas).forEach(sb => lista(sb.lineas).forEach(l => {
+    lista(o && o.tareas).forEach(t => lista(t.subtareas).forEach(sb => lista(sb.lineas).forEach(l => {
       if (!l.perfilId) return;
       mapa[l.perfilId] = N().num(mapa[l.perfilId]) + lineaHoras(l);
     })));
     return mapa;
   }
 
-  /* ---------- Importes de consultoría ---------- */
+  /** Horas por perfil y periodo: { perfilId: [h0, h1, …] }. */
+  function horasPerfilPeriodo(o) {
+    const n = P().meses(o && o.periodos);
+    const mapa = {};
+    lista(o && o.tareas).forEach(t => lista(t.subtareas).forEach(sb => lista(sb.lineas).forEach(l => {
+      if (!l.perfilId) return;
+      const arr = mapa[l.perfilId] = mapa[l.perfilId] || new Array(n).fill(0);
+      for (let i = 0; i < n; i++) arr[i] += N().num(((l.horas) || {})["p" + i]);
+    })));
+    return mapa;
+  }
 
-  /* El redondeo a 2 decimales se hace LÍNEA a LÍNEA y luego se suma:
-     es el criterio de la hoja de cálculo original. */
+  /* ---------- Importes ---------- */
+
   function lineaImporte(l, pf) { return N().r2(lineaHoras(l) * tarifaDe(pf, l.perfilId)); }
+  function subtareaImporte(s, pf) { return N().r2(N().suma(lista(s && s.lineas), l => lineaImporte(l, pf))); }
+  function tareaImporte(t, pf) { return N().r2(N().suma(lista(t && t.subtareas), s => subtareaImporte(s, pf))); }
+  function importeOferta(o, pf) { return N().r2(N().suma(lista(o && o.tareas), t => tareaImporte(t, pf))); }
 
-  function subImporte(s, pf) { return N().r2(N().suma(lista(s && s.lineas).map(l => lineaImporte(l, pf)))); }
+  function importePerfil(o, pf, perfilId) {
+    const h = horasPorPerfil(o)[perfilId];
+    return h ? N().r2(N().num(h) * tarifaDe(pf, perfilId)) : 0;
+  }
 
-  function tareaImporte(t, pf) { return N().r2(N().suma(lista(t && t.subtareas).map(s => subImporte(s, pf)))); }
-
-  function importeProyecto(pr, pf) { return N().r2(N().suma(lista(pr && pr.tareas).map(t => tareaImporte(t, pf)))); }
-
-  function importeMes(pr, pf, i) {
+  function importePeriodo(o, pf, i) {
     let s = 0;
-    lista(pr && pr.tareas).forEach(t => lista(t.subtareas).forEach(sb => lista(sb.lineas).forEach(l => {
-      s += N().num(((l.horas) || {})["m" + i]) * tarifaDe(pf, l.perfilId);
+    lista(o && o.tareas).forEach(t => lista(t.subtareas).forEach(sb => lista(sb.lineas).forEach(l => {
+      s += N().num(((l.horas) || {})["p" + i]) * tarifaDe(pf, l.perfilId);
     })));
     return N().r2(s);
   }
 
-  function importePerfil(pr, pf, perfilId) {
-    const h = horasPorPerfil(pr)[perfilId];
-    return h ? N().r2(N().num(h) * tarifaDe(pf, perfilId)) : 0;
+  function importeTareaPeriodo(t, pf, i) {
+    let s = 0;
+    lista(t && t.subtareas).forEach(sb => lista(sb.lineas).forEach(l => {
+      s += N().num(((l.horas) || {})["p" + i]) * tarifaDe(pf, l.perfilId);
+    }));
+    return N().r2(s);
   }
 
-  /* ---------- Gastos, descuento, impuestos y total ---------- */
-
-  function gastosTotal(pr) {
-    return N().r2(N().suma(lista(pr && pr.gastos).map(g => N().num(g.unidades) * N().num(g.precio))));
-  }
+  /* ---------- Gastos, descuento, impuestos, total ---------- */
 
   function gastoImporte(g) { return N().r2(N().num(g && g.unidades) * N().num(g && g.precio)); }
+  function gastosTotal(o) { return N().r2(N().suma(lista(o && o.gastos), gastoImporte)); }
 
-  function subtotalProyecto(pr, pf) { return N().r2(importeProyecto(pr, pf) + gastosTotal(pr)); }
+  function subtotalOferta(o, pf) { return N().r2(importeOferta(o, pf) + gastosTotal(o)); }
 
-  function descuentoImporte(pr, pf) {
-    const base = subtotalProyecto(pr, pf);
-    const d = (pr && pr.descuento) || {};
+  function descuentoImporte(o, pf) {
+    const base = subtotalOferta(o, pf);
+    const d = (o && o.descuento) || {};
     if (d.tipo === "%") return N().r2(base * N().num(d.valor) / 100);
     if (d.tipo === "fijo") return N().r2(Math.min(base, N().num(d.valor)));
     return 0;
   }
 
-  function baseImponible(pr, pf) { return N().r2(subtotalProyecto(pr, pf) - descuentoImporte(pr, pf)); }
+  function baseImponible(o, pf) { return N().r2(subtotalOferta(o, pf) - descuentoImporte(o, pf)); }
 
-  function nombreImpuesto(pr) {
-    const t = (pr && pr.impuestos) || {};
+  function nombreImpuesto(o) {
+    const t = (o && o.impuestos) || {};
     if (t.tipo === "irpf") return "IRPF";
     if (t.tipo === "iva") return "IVA";
     return "";
   }
 
-  function impuestoImporte(pr, pf) {
-    const t = (pr && pr.impuestos) || {};
+  function impuestoImporte(o, pf) {
+    const t = (o && o.impuestos) || {};
     if (!t.tipo || t.tipo === "ninguno" || !N().num(t.tasa)) return 0;
-    const base = baseImponible(pr, pf);
+    const base = baseImponible(o, pf);
     if (t.tipo === "irpf") return N().r2(-base * N().num(t.tasa) / 100);
     return t.incluido
       ? N().r2(base * N().num(t.tasa) / (100 + N().num(t.tasa)))
       : N().r2(base * N().num(t.tasa) / 100);
   }
 
-  function totalProyecto(pr, pf) { return N().r2(baseImponible(pr, pf) + impuestoImporte(pr, pf)); }
+  function totalOferta(o, pf) { return N().r2(baseImponible(o, pf) + impuestoImporte(o, pf)); }
+
+  /** Media por periodo (para el KPI de esfuerzo). */
+  function mediaPeriodo(o, pf) {
+    const n = P().meses(o && o.periodos);
+    return n ? N().r2(totalOferta(o, pf) / n) : 0;
+  }
 
   /* ---------- Anualidades ---------- */
 
-  /** Importe de consultoría por año natural (sin gastos ni impuestos). */
-  function anualidades(pr, pf) {
+  function anualidades(o, pf) {
     const mapa = {};
-    const meses = N().acota(pr && pr.meses, 1, 60);
-    for (let i = 0; i < meses; i++) {
-      const y = N().anioDeMes(pr && pr.fechaInicio, i);
-      mapa[y] = N().r2(N().num(mapa[y]) + importeMes(pr, pf, i));
+    const n = P().meses(o && o.periodos);
+    for (let i = 0; i < n; i++) {
+      const y = P().fecha(o.periodos, i).getFullYear();
+      mapa[y] = N().r2(N().num(mapa[y]) + importePeriodo(o, pf, i));
     }
     return mapa;
   }
 
-  function mesesProyecto(pr) { return Math.round(N().acota(pr && pr.meses, 1, 60)); }
+  /* ---------- Usos de un perfil ---------- */
 
-  /* ---------- Usos de un perfil en toda la biblioteca ---------- */
-
-  function usosPerfil(proyectos, perfilId) {
+  function usosPerfil(ofertas, perfilId) {
     let n = 0;
-    lista(proyectos).forEach(pr => {
-      lista(pr.tareas).forEach(t => {
+    lista(ofertas).forEach(o => {
+      lista(o.tareas).forEach(t => {
         lista(t.subtareas).forEach(s => lista(s.lineas).forEach(l => { if (l.perfilId === perfilId) n++; }));
         lista(t.entregables).forEach(e => { if (e.responsablePerfilId === perfilId) n++; });
       });
-      lista(pr.entregables).forEach(e => { if (e.responsablePerfilId === perfilId) n++; });
+      lista(o.entregables).forEach(e => { if (e.responsablePerfilId === perfilId) n++; });
     });
     return n;
   }
 
+  /* ---------- Duplicar ---------- */
+
+  function clonarTarea(t) {
+    const c = N().clonar(t);
+    c.id = N().uid("ta_");
+    lista(c.entregables).forEach(e => { e.id = N().uid("en_"); });
+    lista(c.subtareas).forEach(s => {
+      s.id = N().uid("sb_");
+      lista(s.lineas).forEach(l => { l.id = N().uid("ln_"); });
+    });
+    return c;
+  }
+
+  function clonarSubtarea(s) {
+    const c = N().clonar(s);
+    c.id = N().uid("sb_");
+    lista(c.lineas).forEach(l => { l.id = N().uid("ln_"); });
+    return c;
+  }
+
   PL.calculo = {
     perfilPorId: perfilPorId, tarifaDe: tarifaDe,
-    lineaHoras: lineaHoras, subHoras: subHoras, tareaHoras: tareaHoras,
-    horasProyecto: horasProyecto, horasMes: horasMes, horasPorPerfil: horasPorPerfil,
-    lineaImporte: lineaImporte, subImporte: subImporte, tareaImporte: tareaImporte,
-    importeProyecto: importeProyecto, importeMes: importeMes, importePerfil: importePerfil,
-    gastosTotal: gastosTotal, gastoImporte: gastoImporte,
-    subtotalProyecto: subtotalProyecto, descuentoImporte: descuentoImporte,
+    lineaHoras: lineaHoras, lineasHoras: lineasHoras,
+    subtareaHoras: subtareaHoras, tareaHoras: tareaHoras, ofertaHoras: ofertaHoras,
+    horasPeriodo: horasPeriodo, horasPorPerfil: horasPorPerfil, horasPerfilPeriodo: horasPerfilPeriodo,
+    lineaImporte: lineaImporte, subtareaImporte: subtareaImporte, tareaImporte: tareaImporte,
+    importeOferta: importeOferta, importePerfil: importePerfil,
+    importePeriodo: importePeriodo, importeTareaPeriodo: importeTareaPeriodo,
+    gastoImporte: gastoImporte, gastosTotal: gastosTotal,
+    subtotalOferta: subtotalOferta, descuentoImporte: descuentoImporte,
     baseImponible: baseImponible, nombreImpuesto: nombreImpuesto,
-    impuestoImporte: impuestoImporte, totalProyecto: totalProyecto,
-    anualidades: anualidades, mesesProyecto: mesesProyecto, usosPerfil: usosPerfil
+    impuestoImporte: impuestoImporte, totalOferta: totalOferta, mediaPeriodo: mediaPeriodo,
+    anualidades: anualidades, usosPerfil: usosPerfil,
+    clonarTarea: clonarTarea, clonarSubtarea: clonarSubtarea
   };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Compila Planifica v3: incrusta Aurora 7 + el CSS propio + los módulos JS
-en un único HTML autocontenido (abrible con doble clic, sin CDN).
+"""Compila Planifica v4: incrusta Aurora 7 + el CSS propio + los módulos JS
+en un único HTML autocontenido (abrible con doble clic, sin CDN, sin servidor).
 
 Uso:  py -3.12 tools/compilar.py
 
 Guardas (si alguna falla, NO se escribe el destino y sale con código 1):
-  · falta algún fichero fuente            · queda algún placeholder sin sustituir
-  · falta alguna de las 8 secciones       · el JS no ensambla (paréntesis/llaves)
+  · falta algún fichero fuente        · queda algún marcador sin sustituir
+  · falta alguna de las 5 secciones   · vuelve el selector roto main>section
 """
 import re
 import sys
@@ -29,22 +29,22 @@ PACKS = [
     "packs/p13-charts.css",
 ]
 
-# Orden de carga OBLIGATORIO: utilidades → modelo → cálculo → datos → vistas → eventos → arranque.
+# Orden de carga OBLIGATORIO: núcleo → periodos → modelo → cálculo → datos →
+# gantt → vistas → acciones → eventos → arranque.
 MODULOS_JS = [
     "nucleo.js",
+    "periodos.js",
     "modelo.js",
     "ejemplo.js",
     "calculo.js",
     "entregables.js",
     "comparar.js",
     "almacen.js",
+    "gantt.js",
     "vistas.js",
-    "vista-estructura.js",
-    "vista-entregables.js",
-    "vista-escenarios.js",
+    "vista-trabajo.js",
+    "vista-oferta.js",
     "vista-resumen.js",
-    "vista-cronograma.js",
-    "vista-gastos.js",
     "vista-informe.js",
     "vista-ajustes.js",
     "acciones.js",
@@ -52,8 +52,11 @@ MODULOS_JS = [
     "main.js",
 ]
 
-SECCIONES = ["sec-estructura", "sec-entregables", "sec-escenarios", "sec-resumen",
-             "sec-cronograma", "sec-gastos", "sec-informe", "sec-ajustes"]
+SECCIONES = ["sec-trabajo", "sec-oferta", "sec-resumen", "sec-informe", "sec-ajustes"]
+
+PROHIBIDO = [
+    (r'\$\$\("main>section"\)', 'ha vuelto el selector roto $$("main>section")'),
+]
 
 
 def morir(mensaje):
@@ -72,7 +75,6 @@ def main():
     html = (BASE / "src" / "index.html").read_text(encoding="utf-8")
     css_propio = (BASE / "src" / "css" / "app.css").read_text(encoding="utf-8")
 
-    # --- JS por módulos, con cabecera de cada uno para poder leerlo en el HTML final ---
     trozos, faltan = [], []
     for m in MODULOS_JS:
         ruta = BASE / "src" / "js" / m
@@ -84,31 +86,28 @@ def main():
         morir("faltan módulos JS: %s" % ", ".join(faltan))
     js = "\n".join(trozos)
 
-    # --- CSS de Aurora + el propio ---
     packs = "\n".join("/* ====== Aurora 7 %s: %s ====== */\n%s" % (TAG, p, lee_aurora(p)) for p in PACKS)
-    bloque_css = "<style>\n/* ====== Aurora 7 %s incrustado (%d packs) ====== */\n%s\n/* ====== CSS propio de la aplicación ====== */\n%s\n</style>" % (
+    bloque_css = ("<style>\n/* ====== Aurora 7 %s incrustado (%d packs) ====== */\n%s\n"
+                  "/* ====== CSS propio de la aplicación ====== */\n%s\n</style>") % (
         TAG, len(PACKS), packs, css_propio)
 
-    if "<!--PACKS_CSS-->" not in html:
-        morir("el HTML fuente no tiene el marcador <!--PACKS_CSS-->")
-    if "<!--APP_CSS-->" not in html:
-        morir("el HTML fuente no tiene el marcador <!--APP_CSS-->")
-    if "/*APP_JS*/" not in html:
-        morir("el HTML fuente no tiene el marcador /*APP_JS*/")
+    for marcador in ("<!--PACKS_CSS-->", "<!--APP_CSS-->", "/*APP_JS*/"):
+        if marcador not in html:
+            morir("el HTML fuente no tiene el marcador %s" % marcador)
 
     html = html.replace("<!--PACKS_CSS-->", bloque_css)
     html = html.replace("<!--APP_CSS-->", "")
     html = html.replace("/*APP_JS*/", js)
 
-    # --- Guardas del resultado ---
     for marcador in ("<!--PACKS_CSS-->", "<!--APP_CSS-->", "/*APP_JS*/"):
         if marcador in html:
             morir("quedó el marcador %s sin sustituir" % marcador)
     for sec in SECCIONES:
         if 'id="%s"' % sec not in html:
             morir("falta la sección %s" % sec)
-    if re.search(r'\$\$\("main>section"\)', html):
-        morir("ha vuelto el selector roto $$(\"main>section\")")
+    for patron, aviso in PROHIBIDO:
+        if re.search(patron, html):
+            morir(aviso)
 
     destino = BASE / "docs" / "index.html"
     destino.parent.mkdir(parents=True, exist_ok=True)

@@ -1,71 +1,151 @@
 /* =====================================================================
-   Planifica v3 — CSS propio de la app
-   SOLO estructura y disposición (.pa-*). Colores, formas y tipografía
-   vienen de los tokens de Aurora 7 (var(--nz-*)). Ni un color a mano.
+   Planifica v4 — CSS propio
+   SOLO estructura y disposición (.pa-*). Colores, formas y tipografía vienen
+   de los tokens de Aurora 7. El acento del sistema (--nz-accent, naranja de
+   Aurora) se usa para lo que debe destacar: barras del Gantt, marcadores de
+   entregable y foco de los campos.
    ===================================================================== */
 
-/* ---------- Filas y anchos ---------- */
+/* ---------- Filas y rejillas ---------- */
 .pa-fila { display: flex; flex-wrap: wrap; gap: var(--nz-space-2); align-items: center; }
 .pa-fila--fin { justify-content: flex-end; }
 .pa-fila--apretada { gap: var(--nz-space-1); }
-.pa-crece { flex: 1; min-width: 180px; }
-.pa-crece2 { flex: 2; min-width: 220px; }
-/* Campo que ocupa las 2 columnas del nz-formgrid--2 (Aurora no trae modificador para esto) */
+.pa-crece { flex: 1; min-width: 170px; }
+.pa-crece2 { flex: 2; min-width: 210px; }
 .pa-ancho { grid-column: 1 / -1; }
 .pa-espacio { flex: 1; }
-.pa-centrado { text-align: center; }
 .pa-ahora { white-space: nowrap; }
-
-/* ---------- Cabecera ---------- */
-.pa-logo { height: 26px; max-width: 150px; object-fit: contain; display: block; }
-.pa-pie { position: fixed; bottom: 0; left: 0; right: 0; }
-
-/* ---------- Formularios ---------- */
-.pa-input-num { max-width: 5.5rem; text-align: right; }
-.pa-input-fecha { max-width: 11rem; }
-.pa-input-ancho { max-width: 9rem; }
-.pa-input-corto { max-width: 4rem; }
 .pa-mini { font-size: var(--nz-text-xs); color: var(--nz-text-soft); }
-.pa-mini--fuerte { font-weight: 700; }
-
-/* ---------- Árbol de tareas y subtareas ---------- */
-.pa-tarea { margin-bottom: var(--nz-space-3); }
-.pa-sub { border: 1px solid var(--nz-border); border-radius: var(--nz-radius-md); margin-top: var(--nz-space-2); background: var(--nz-surface); }
-.pa-sub__cab { display: flex; flex-wrap: wrap; gap: var(--nz-space-2); align-items: center; padding: var(--nz-space-2); }
-.pa-sub__cuerpo { padding: 0 var(--nz-space-2) var(--nz-space-2); overflow-x: auto; }
-.pa-hitos { padding: var(--nz-space-2); border-top: 1px dashed var(--nz-border); }
-.pa-tabla-grid { min-width: 100%; }
-.pa-tabla-grid th, .pa-tabla-grid td { white-space: nowrap; }
-.pa-tabla-grid td:first-child, .pa-tabla-grid th:first-child {
-  position: sticky; left: 0; background: var(--nz-surface); z-index: 1; min-width: 13rem;
-}
-.pa-tabla-grid thead th:first-child { background: var(--nz-surface-2, var(--nz-surface)); }
-
-/* ---------- Listas de filas (gastos, perfiles, plantillas, hitos) ---------- */
-.pa-fila-dato { display: flex; flex-wrap: wrap; gap: var(--nz-space-2); align-items: center; padding: var(--nz-space-2) 0; border-top: 1px dashed var(--nz-border); }
+.pa-mini--fuerte { font-weight: 700; color: var(--nz-text); }
+.pa-bloque { margin-bottom: var(--nz-space-4); }
 .pa-celda-importe { min-width: 7rem; text-align: right; }
 
-/* ---------- Entregables ---------- */
+/* ---------- Cabecera y pie ---------- */
+.pa-logo { height: 26px; max-width: 150px; object-fit: contain; display: block; }
+.pa-cabecera { margin: var(--nz-space-3) 0 var(--nz-space-2); }
+.pa-pie { position: fixed; bottom: 0; left: 0; right: 0; }
+.pa-bloque-gantt { margin: var(--nz-space-3) 0; }
+
+/* ---------- Formularios ---------- */
+.pa-input-num { max-width: 5rem; text-align: right; }
+.pa-input-corto { max-width: 4rem; }
+.pa-input-fecha { max-width: 10rem; }
+.pa-input-inline { border: 0; background: transparent; padding: 0 var(--nz-space-1); }
+.pa-input-inline:focus { background: var(--nz-surface); border-radius: var(--nz-radius-sm); }
+
+/* =====================================================================
+   CALENDARIO Y GANTT
+   ===================================================================== */
+
+.pa-calendario {
+  display: flex; flex-wrap: wrap; gap: var(--nz-space-2); align-items: center;
+  padding: var(--nz-space-2) var(--nz-space-3);
+  border: 1px solid var(--nz-border); border-radius: var(--nz-radius-md);
+  background: var(--nz-surface);
+}
+.pa-calendario__dato { display: flex; align-items: center; gap: var(--nz-space-1); }
+.pa-calendario__duracion { font-weight: 700; }
+
+.pa-gantt-scroll { overflow-x: auto; border: 1px solid var(--nz-border); border-radius: var(--nz-radius-md); background: var(--nz-surface); }
+.pa-gantt { border-collapse: separate; border-spacing: 0; width: 100%; font-size: var(--nz-text-xs); }
+.pa-gantt th, .pa-gantt td { padding: 0; border-bottom: 1px solid var(--nz-border-soft); }
+
+/* Columna de conceptos (fija a la izquierda al desplazar) */
+.pa-gantt__concepto {
+  position: sticky; left: 0; z-index: 2; background: var(--nz-surface);
+  text-align: left; font-weight: 600; padding: var(--nz-space-1) var(--nz-space-2);
+  min-width: 14rem; max-width: 20rem; border-right: 1px solid var(--nz-border);
+}
+.pa-gantt__total {
+  text-align: right; font-variant-numeric: tabular-nums; padding: var(--nz-space-1) var(--nz-space-2);
+  min-width: 5rem; border-left: 1px solid var(--nz-border); background: var(--nz-surface);
+}
+
+/* Cabecera de años y meses */
+.pa-gantt__anios th {
+  font-size: var(--nz-text-2xs, var(--nz-text-xs)); text-transform: uppercase; letter-spacing: .04em;
+  color: var(--nz-text-soft); background: var(--nz-surface-2, var(--nz-surface));
+  border-bottom: 1px solid var(--nz-border); padding: var(--nz-space-1) 0; text-align: center;
+}
+.pa-gantt__meses th {
+  min-width: 3.2rem; background: var(--nz-surface-2, var(--nz-surface));
+  border-right: 1px solid var(--nz-border-soft); border-bottom: 2px solid var(--nz-border);
+}
+.pa-gantt__rotulo {
+  width: 100%; border: 0; background: transparent; text-align: center;
+  font: inherit; font-weight: 700; color: var(--nz-text-soft);
+  padding: var(--nz-space-1) 0; cursor: text; text-transform: uppercase;
+}
+.pa-gantt__rotulo:hover { color: var(--nz-text); background: var(--nz-brand-soft); }
+.pa-gantt__rotulo:focus { background: var(--nz-surface); color: var(--nz-text); outline: 2px solid var(--nz-accent); outline-offset: -2px; }
+.pa-gantt__rotulo--editado { color: var(--nz-accent-strong, var(--nz-accent)); }
+
+/* Filas del árbol */
+.pa-gantt__fila--tarea .pa-gantt__concepto { background: var(--nz-brand-soft); color: var(--nz-brand-strong, var(--nz-brand)); }
+.pa-gantt__fila--subtarea .pa-gantt__concepto { padding-left: var(--nz-space-4); font-weight: 500; }
+.pa-gantt__fila--entregable .pa-gantt__concepto { padding-left: var(--nz-space-4); font-weight: 500; }
+.pa-gantt__fila--entregable { background: var(--nz-accent-soft); }
+.pa-gantt__fila--entregable .pa-gantt__concepto { background: var(--nz-accent-soft); }
+.pa-gantt__concepto-clic { cursor: pointer; }
+.pa-gantt__concepto-clic:hover { text-decoration: underline; }
+
+/* Celdas y barras */
+.pa-gantt__celda {
+  height: 1.7rem; border-right: 1px solid var(--nz-border-soft);
+  background-image: linear-gradient(to right, var(--nz-border-soft) 0 1px, transparent 1px);
+  background-position: right top; background-repeat: no-repeat;
+}
+.pa-barra { display: block; height: 0.85rem; margin: 0.42rem 0; background: var(--nz-brand); }
+.pa-barra--tarea { background: var(--nz-brand-strong, var(--nz-brand)); height: 1rem; margin: 0.35rem 0; }
+.pa-barra--inicio { border-radius: var(--nz-radius-full) 0 0 var(--nz-radius-full); }
+.pa-barra--fin { border-radius: 0 var(--nz-radius-full) var(--nz-radius-full) 0; }
+.pa-barra--sola { border-radius: var(--nz-radius-full); }
+.pa-barra--hito { background: transparent; height: 1.4rem; margin: 0.15rem 0; text-align: center; }
+.pa-barra--hito::after {
+  content: "◆"; color: var(--nz-accent); font-size: var(--nz-text-md); line-height: 1.4rem;
+}
+.pa-gantt__celda--hoy { background: var(--nz-accent-soft); }
+.pa-gantt__nota { padding: var(--nz-space-2); border-top: 1px solid var(--nz-border); background: var(--nz-surface-2, var(--nz-surface)); }
+
+/* =====================================================================
+   EDITOR DEL ESFUERZO
+   ===================================================================== */
+
+.pa-tarea { margin-bottom: var(--nz-space-3); }
+.pa-tarea__cab { display: flex; flex-wrap: wrap; gap: var(--nz-space-2); align-items: center; }
+.pa-sub {
+  border: 1px solid var(--nz-border); border-radius: var(--nz-radius-md);
+  margin-top: var(--nz-space-2); background: var(--nz-surface);
+}
+.pa-sub > summary {
+  display: flex; flex-wrap: wrap; gap: var(--nz-space-2); align-items: center;
+  padding: var(--nz-space-2); cursor: pointer; list-style: none;
+}
+.pa-sub > summary::-webkit-details-marker { display: none; }
+.pa-sub__cuerpo { padding: 0 var(--nz-space-2) var(--nz-space-2); overflow-x: auto; }
 .pa-hito { display: flex; flex-wrap: wrap; gap: var(--nz-space-2); align-items: center; padding: var(--nz-space-2) 0; border-top: 1px dashed var(--nz-border); }
-.pa-hito__nombre { flex: 2; min-width: 200px; }
-.pa-hito__detalle { flex: 1 1 100%; }
-.pa-punto { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: var(--nz-radius-full); border: 2px solid var(--nz-brand); margin-right: var(--nz-space-1); vertical-align: middle; }
-.pa-punto--aceptado { background: var(--nz-brand); }
-.pa-punto--entregado { background: var(--nz-success, var(--nz-brand)); border-color: var(--nz-success, var(--nz-brand)); }
-.pa-punto--encurso { border-style: dashed; }
+.pa-hito__nombre { flex: 2; min-width: 190px; }
+.pa-hito__detalle { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: var(--nz-space-2); }
 
-/* ---------- Comparador ---------- */
-.pa-delta { font-variant-numeric: tabular-nums; font-weight: 700; }
-.pa-delta--mas::before { content: "+"; }
-.pa-bloque { margin-bottom: var(--nz-space-4); }
-.pa-cambio { padding: var(--nz-space-1) 0; border-top: 1px dashed var(--nz-border); }
+/* Tabla de horas perfil × periodo */
+.pa-tabla-horas { min-width: 100%; }
+.pa-tabla-horas th, .pa-tabla-horas td { white-space: nowrap; }
+.pa-tabla-horas td:first-child, .pa-tabla-horas th:first-child {
+  position: sticky; left: 0; background: var(--nz-surface); z-index: 1; min-width: 12rem;
+}
+.pa-tabla-horas thead th:first-child { background: var(--nz-surface-2, var(--nz-surface)); }
 
-/* ---------- Cronograma ---------- */
-.pa-marcadores { display: flex; gap: var(--nz-space-1); align-items: flex-end; min-height: 3.5rem; }
-.pa-marcador { flex: 1; text-align: center; font-size: var(--nz-text-xs); color: var(--nz-text-soft); }
-.pa-marcador__diamante { color: var(--nz-brand); font-size: var(--nz-text-sm); display: block; }
+/* =====================================================================
+   LISTAS (gastos, perfiles, plantillas, fotos)
+   ===================================================================== */
 
-/* ---------- Informe (pantalla e impresión) ---------- */
+.pa-dato { display: flex; flex-wrap: wrap; gap: var(--nz-space-2); align-items: center; padding: var(--nz-space-2) 0; border-top: 1px dashed var(--nz-border); }
+.pa-dato--destacado { background: var(--nz-accent-soft); }
+
+/* =====================================================================
+   INFORME
+   ===================================================================== */
+
 .pa-informe { max-width: 52rem; margin: 0 auto; }
 .pa-informe h1 { font-size: var(--nz-text-xl); margin: var(--nz-space-3) 0 var(--nz-space-1); }
 .pa-informe h2 { font-size: var(--nz-text-md); margin-top: var(--nz-space-4); border-bottom: 2px solid var(--nz-brand); padding-bottom: 2px; }
@@ -75,16 +155,19 @@
 .pa-informe__cab { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--nz-space-2); align-items: flex-start; border-bottom: 3px solid var(--nz-brand); padding-bottom: var(--nz-space-2); }
 .pa-informe__pie { margin-top: var(--nz-space-5); padding-top: var(--nz-space-2); border-top: 1px solid var(--nz-border); font-size: var(--nz-text-xs); color: var(--nz-text-soft); display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--nz-space-2); }
 .pa-num { text-align: right; font-variant-numeric: tabular-nums; }
-.pa-salto { page-break-inside: avoid; }
+.pa-hito-informe { color: var(--nz-accent-strong, var(--nz-accent)); font-weight: 700; }
 
-/* ---------- Aviso de error y confirmación ---------- */
+/* =====================================================================
+   AVISOS
+   ===================================================================== */
+
 #pa-error {
   display: none; background: var(--nz-danger-soft, var(--nz-surface)); color: var(--nz-danger);
   border-bottom: 1px solid var(--nz-danger); padding: var(--nz-space-2) var(--nz-space-3);
   font-size: var(--nz-text-xs); white-space: pre-wrap;
 }
 #pa-error.is-visible { display: block; }
-#pa-aviso-herederos { margin-bottom: var(--nz-space-3); }
+#pa-herederos:not(:empty) { margin-bottom: var(--nz-space-3); }
 
 #pa-toast {
   position: fixed; bottom: 3rem; left: 50%; transform: translateX(-50%);
@@ -94,14 +177,14 @@
 }
 #pa-toast.is-visible { opacity: 1; }
 
-/* ---------- Modo "solo tiempos": oculta todos los importes ---------- */
+/* Modo «solo tiempos»: oculta los importes en pantalla */
 body.pa-sin-importes .pa-importe { display: none; }
 
 /* ---------- Impresión ---------- */
 @media print {
   .nz-navbar, .nz-tabs, #pa-error, .pa-no-imprimir { display: none; }
   main { padding: 0; max-width: none; }
-  /* Se oculta todo menos el informe: las secciones NO cuelgan directamente de <main>. */
+  /* Las secciones cuelgan de .nz-tabs__panel: se ocultan por id, no por <main>. */
   main section[id^="sec-"]:not(#sec-informe) { display: none !important; }
   #sec-informe .nz-article { box-shadow: none; border: none; padding: 0; }
   .pa-informe { max-width: none; }

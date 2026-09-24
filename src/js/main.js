@@ -1,23 +1,32 @@
 "use strict";
 /* =====================================================================
-   Planifica v3 — ARRANQUE
-   Une todo: carga (con migración y aviso de datos heredados), repintado por
-   partes, cambio de pestaña y errores en pantalla.
+   Planifica v4 — ARRANQUE
+   Une todo: carga con migración y aviso, repintado CONECTADO (cualquier
+   cambio se refleja en todas las vistas) y errores en pantalla.
 
-   Rendimiento: solo se repinta la vista de la pestaña activa. Las demás se
-   repintan al entrar. Al teclear horas, la fila se actualiza en el sitio.
+   Rendimiento: `escribir()` compara el HTML antes de tocar el DOM, así que
+   repintar las 5 vistas en cada cambio es barato y no produce parpadeos.
+   Mientras se teclean horas solo se repinta el resto (el editor se actualiza
+   fila a fila), de modo que nunca se pierde el foco.
    ===================================================================== */
 (function (raiz) {
   const PL = (raiz.PL = raiz.PL || {});
   const N = () => PL.nucleo;
+  const P = () => PL.periodos;
   const M = () => PL.modelo;
   const C = () => PL.calculo;
   const E = () => PL.entregables;
   const A = () => PL.almacen;
   const V = () => PL.vistas;
 
+  const VISTAS = ["trabajo", "oferta", "resumen", "informe", "ajustes"];
+  const PANELES = {
+    trabajo: "pa-trabajo-panel", oferta: "pa-oferta-panel", resumen: "pa-resumen-panel",
+    informe: "pa-informe-panel", ajustes: "pa-ajustes-panel"
+  };
+
   let tGuardar = null, tDatos = null;
-  let pestanaActual = "estructura";
+  let pestanaActual = "trabajo";
 
   /* ---------- Aplicación ---------- */
 
@@ -27,60 +36,53 @@
 
     pr: function () {
       const e = app.ESTADO;
-      if (!e) return null;
-      return e.proyectos.filter(p => p.id === e.activo)[0] || e.proyectos[0] || null;
+      if (!e || !e.ofertas.length) return null;
+      return e.ofertas.filter(x => x.id === e.activa)[0] || e.ofertas[0];
     },
     pf: function () { return (app.ESTADO && app.ESTADO.perfiles) || []; },
     moneda: function () { return (app.ESTADO && app.ESTADO.marca && app.ESTADO.marca.moneda) || "€"; },
     verImportes: function () { return !!(app.ESTADO && app.ESTADO.mostrarImportes); },
-    pestana: function (nombre) { if (nombre) mostrarPestana(nombre); return pestanaActual; },
+    pestana: function (n) { if (n) mostrarPestana(n); return pestanaActual; },
 
-    /** Guardado diferido (cada cambio no escribe en disco). */
     guardar: function () {
       clearTimeout(tGuardar);
-      tGuardar = setTimeout(() => {
+      tGuardar = setTimeout(function () {
         const err = A().guardar(app.ESTADO);
         if (err) app.toast("No se pudo guardar: " + err);
         const el = V().nodo("pa-guardado");
-        if (el) { el.textContent = "Guardado ✓"; setTimeout(() => { el.textContent = ""; }, 1500); }
+        if (el) { el.textContent = "Guardado ✓"; setTimeout(function () { el.textContent = ""; }, 1500); }
       }, 250);
     },
 
     toast: function (mensaje) {
       let el = V().nodo("pa-toast");
-      if (!el) {
-        el = document.createElement("div");
-        el.id = "pa-toast";
-        document.body.appendChild(el);
-      }
+      if (!el) { el = document.createElement("div"); el.id = "pa-toast"; document.body.appendChild(el); }
       el.textContent = mensaje;
       el.classList.add("is-visible");
       clearTimeout(el.__tm);
-      el.__tm = setTimeout(() => el.classList.remove("is-visible"), 2800);
+      el.__tm = setTimeout(function () { el.classList.remove("is-visible"); }, 2800);
     },
 
-    /** Reemplaza el estado entero (borrar todo, restaurar ejemplo, importar). */
     reemplazarEstado: function (nuevo, pestana) {
       app.ESTADO = nuevo;
       app.ui.comparacion = null;
-      PL.repintar.todo();
       pestanaActual = null;
-      mostrarPestana(pestana || "estructura");
-      app.guardar();
-    },
-
-    sincronizar: function () { PL.repintar.todo(); }
+      mostrarPestana(pestana || "trabajo");
+    }
   };
   PL.app = app;
 
-  /* ---------- Repintado por partes ---------- */
-
-  const vistas = ["estructura", "entregables", "escenarios", "resumen", "cronograma", "gastos", "informe", "ajustes"];
+  /* ---------- Repintado conectado ---------- */
 
   function pintarVista(nombre) {
     const v = PL.vistas[nombre];
     if (v && typeof v.render === "function") v.render();
   }
+
+  function pintarCalendario() { PL.vistas.trabajo.renderCalendario(); }
+  function pintarGantt() { PL.vistas.trabajo.renderGantt(); }
+
+  function todasLasVistas() { VISTAS.forEach(pintarVista); }
 
   PL.repintar = {
     cabecera: function () {
@@ -89,97 +91,122 @@
       const marca = e.marca || {};
       V().texto("pa-marca-nombre", marca.nombre || "Planifica");
       V().texto("pa-pie-marca", marca.nombre || "Planifica");
-      document.title = (marca.nombre || "Planifica") + " — Ofertas y planificación de proyectos";
+      document.title = (marca.nombre || "Planifica") + " — Ofertas y planificación";
+
       const img = V().nodo("pa-logo");
       if (img) { if (marca.logo) { img.src = marca.logo; img.hidden = false; } else { img.hidden = true; } }
 
-      const sel = V().nodo("pa-sel-proyecto");
+      const sel = V().nodo("pa-sel-oferta");
       if (sel) {
-        const html = N().lista(e.proyectos).map(p =>
-          '<option value="' + p.id + '"' + (p.id === e.activo ? " selected" : "") + ">" + N().esc(p.nombre) +
-          (p.estado && p.estado !== "borrador" ? " · " + M().ESTADOS_OFERTA[p.estado].texto : "") + "</option>").join("");
+        const html = N().lista(e.ofertas).map(x =>
+          '<option value="' + x.id + '"' + (x.id === e.activa ? " selected" : "") + ">" + N().esc(x.nombre) +
+          (x.estado && x.estado !== "borrador" ? " · " + M().ESTADOS_OFERTA[x.estado].texto : "") + "</option>").join("");
         if (sel.__paHtml !== html) { sel.innerHTML = html; sel.__paHtml = html; }
       }
+
       document.body.classList.toggle("pa-sin-importes", !e.mostrarImportes);
       const btn = V().nodo("btn-importes");
       if (btn) btn.textContent = e.mostrarImportes ? "👁 €" : "👁 h";
 
       const inp = V().nodo("inp-ofe-nombre");
       if (inp && o && inp.value !== o.nombre) inp.value = o.nombre || "";
-      V().texto("pa-estado-badge", "");
       const badge = V().nodo("pa-estado-badge");
       if (badge) badge.innerHTML = o ? V().badgeOferta(o) : "";
-      V().texto("pa-meta-oferta", o ? (C().mesesProyecto(o) + " meses desde " + N().etiquetaMes(o.fechaInicio, 0) + (o.fecha ? " · " + o.fecha : "")) : "");
-      PL.repintar.kpis();
+      V().texto("pa-meta-oferta", o
+        ? ((o.cliente && o.cliente.nombre ? o.cliente.nombre + " · " : "") + P().duracionLegible(o.periodos) + (o.fecha ? " · " + N().fechaCorta(o.fecha) : ""))
+        : "");
+      this.kpis();
     },
 
     kpis: function () {
       const o = app.pr(), pf = app.pf();
       if (!o) return;
-      const imp = app.verImportes();
-      const est = E().porEstado(o);
-      const res = E().resumenFacturacion(o, pf);
-      V().texto("kpi-total", imp ? V().imp(C().totalProyecto(o, pf)) : "—");
+      const conImp = app.verImportes();
       const t = o.impuestos || {};
-      V().texto("kpi-total-detalle", imp
-        ? ((t.tipo && t.tipo !== "ninguno") ? (C().nombreImpuesto(o) + " " + N().fmtNum(t.tasa) + " %" + (t.incluido ? " incluido" : "")) : "sin impuestos")
+      V().texto("kpi-total", conImp ? V().imp(C().totalOferta(o, pf)) : "—");
+      V().texto("kpi-total-detalle", conImp
+        ? (C().nombreImpuesto(o) ? C().nombreImpuesto(o) + " " + N().fmtNum(t.tasa) + " %" + (t.incluido ? " incluido" : "") : "sin impuestos")
         : "modo solo tiempos");
-      V().texto("kpi-horas", V().hor(C().horasProyecto(o)));
-      V().texto("kpi-estructura", N().lista(o.tareas).length + " tareas · " + N().suma(o.tareas, x => N().lista(x.subtareas).length) + " subtareas");
-      V().texto("kpi-entregables", String(est.total));
-      V().texto("kpi-avance", est.finalizados + " de " + est.total + " finalizados (" + N().fmtPct(est.pct) + ")");
-      V().texto("kpi-facturado", imp ? V().imp(res.pendienteFacturar) : "—");
-      V().texto("kpi-cliente", imp
-        ? ("facturado " + V().imp(res.facturado))
-        : ((o.cliente && o.cliente.nombre) || "—"));
+      V().texto("kpi-horas", V().hor(C().ofertaHoras(o)));
+      const perfilesUsados = Object.keys(C().horasPorPerfil(o)).length;
+      V().texto("kpi-perfiles", perfilesUsados + " perfil(es) · " + N().lista(o.tareas).length + " tareas");
+      V().texto("kpi-calendario", P().meses(o.periodos) + " meses");
+      V().texto("kpi-rango", P().rangoLegible(o.periodos));
+      const conteo = E().porContexto(o);
+      V().texto("kpi-entregables", String(conteo.total));
+      const prox = E().proximo(o);
+      V().texto("kpi-cliente", prox
+        ? ("primer entrega: " + P().mesCorto(o.periodos, prox.periodo) + (prox._tareaNombre ? " · " + prox._tareaNombre : ""))
+        : "sin entregables");
     },
 
-    estructura: function () { pintarVista("estructura"); },
-    entregables: function () { pintarVista("entregables"); },
-    escenarios: function () { pintarVista("escenarios"); },
+    trabajo: function () { pintarVista("trabajo"); },
+    oferta: function () { pintarVista("oferta"); },
     resumen: function () { pintarVista("resumen"); },
-    cronograma: function () { pintarVista("cronograma"); },
-    gastos: function () { pintarVista("gastos"); },
     informe: function () { pintarVista("informe"); },
     ajustes: function () { pintarVista("ajustes"); },
+    calendario: pintarCalendario,
+    gantt: pintarGantt,
 
-    /** Tras editar horas o importes: KPIs + la vista activa (con retardo). */
+    /** Cambio con cifras: se repinta TODO menos el editor (el foco se conserva).
+        Así el Gantt, los KPIs y las demás pestañas van en vivo mientras se teclea. */
     datos: function () {
       clearTimeout(tDatos);
       tDatos = setTimeout(function () {
-        PL.repintar.kpis();
-        const v = PL.vistas[pestanaActual];
-        if (v && pestanaActual !== "estructura" && typeof v.render === "function") v.render();
+        PL.repintar.cabecera();
+        pintarCalendario();
+        pintarGantt();
+        ["oferta", "resumen", "informe", "ajustes"].forEach(pintarVista);
+      }, 150);
+    },
+
+    /** Mientras se renombra un periodo: se repinta todo MENOS el Gantt, que contiene
+        el campo que el usuario está escribiendo (así no se le quita el foco). */
+    rotulo: function () {
+      clearTimeout(tDatos);
+      tDatos = setTimeout(function () {
+        pintarCalendario();
+        PL.vistas.trabajo.renderEditor();
+        ["oferta", "resumen", "informe", "ajustes"].forEach(pintarVista);
       }, 120);
     },
 
-    /** Repintado completo de lo visible (cabecera, KPIs y la pestaña activa). */
+    /** Repintado completo (incluido el editor). Tras añadir, borrar o mover. */
     todo: function () {
       PL.repintar.cabecera();
-      pintarVista(pestanaActual);
+      todasLasVistas();
+      refrescarHeredados();   /* el aviso de datos antiguos se apaga al borrarlos */
     }
   };
 
   /* ---------- Pestañas ---------- */
 
   function mostrarPestana(nombre) {
-    if (vistas.indexOf(nombre) < 0) nombre = "estructura";
+    if (VISTAS.indexOf(nombre) < 0) nombre = "trabajo";
     pestanaActual = nombre;
-    /* OJO: querySelectorAll devuelve un NodeList, no un Array: hay que convertirlo
-       (N.lista() solo acepta arrays reales y devolvería [] en silencio). */
-    Array.prototype.forEach.call(document.querySelectorAll("#pa-tabs .nz-tabs__tab"), b => {
+    Array.prototype.forEach.call(document.querySelectorAll("#pa-tabs .nz-tabs__tab"), function (b) {
       b.setAttribute("aria-selected", String(b.dataset.tab === nombre));
     });
     /* Las secciones cuelgan de .nz-tabs__panel: se localizan por id, nunca por
-       descendencia directa de <main> (ese fue el bug que dejó 5 pestañas muertas). */
-    Array.prototype.forEach.call(document.querySelectorAll('main section[id^="sec-"]'), s => {
+       descendencia directa de <main> (ése fue el bug que dejó pestañas muertas). */
+    Array.prototype.forEach.call(document.querySelectorAll('main section[id^="sec-"]'), function (s) {
       s.hidden = (s.id !== "sec-" + nombre);
     });
     pintarVista(nombre);
-    if (app.ESTADO) { app.ESTADO.pestana = nombre; app.guardar(); }
+    if (app.ESTADO) { app.ESTADO.ui.pestana = nombre; app.guardar(); }
+    void PANELES;
   }
 
   /* ---------- Aviso de datos heredados ---------- */
+
+  /** Refresca el aviso según lo que haya ahora mismo en el navegador. */
+  function refrescarHeredados() {
+    const hay = A().datosHeredados();
+    avisoHeredados(hay.length
+      ? "Se han encontrado datos de versiones anteriores de la aplicación (" + hay.join(", ") +
+        ") y se han traído a la versión actual. Tus ofertas están completas."
+      : null);
+  }
 
   function avisoHeredados(aviso) {
     if (!aviso) { V().vaciar("pa-herederos"); return; }
@@ -188,8 +215,6 @@
       ' <button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="limpiar-heredados">Borrar los datos antiguos</button>' +
       ' <span class="pa-mini">(los datos actuales no se tocan)</span>'));
   }
-
-  /* ---------- Errores en pantalla ---------- */
 
   function errorVisible(mensaje) {
     const el = V().nodo("pa-error");
@@ -204,40 +229,33 @@
     window.addEventListener("error", ev => errorVisible(ev.message || "error desconocido"));
     window.addEventListener("unhandledrejection", ev => errorVisible((ev.reason && ev.reason.message) || "promesa rechazada"));
 
-    let lectura = { estado: null, heredado: false, aviso: "", origen: 0 };
+    let lectura = null;
     try { lectura = A().cargar(); }
     catch (e) { lectura = { estado: M().estadoInicial(), heredado: false, aviso: "No se pudieron leer los datos guardados (" + e.message + "): se empieza de cero." }; }
 
     app.ESTADO = lectura.estado || M().estadoInicial();
-    if (!N().lista(app.ESTADO.proyectos).length) app.ESTADO = M().estadoInicial();
-    if (!app.pr()) app.ESTADO.activo = app.ESTADO.proyectos[0].id;
+    if (!app.ESTADO.ofertas.length) app.ESTADO = M().estadoInicial();
+    if (!app.pr()) app.ESTADO.activa = app.ESTADO.ofertas[0].id;
 
-    PL.enviar.instalarVistas();
     PL.eventos.montar();
-
-    PL.repintar.cabecera();
-    mostrarPestana(app.ESTADO.pestana || "estructura");
-    avisoHeredados(lectura.aviso);
-    PL.repintar.todo();
+    mostrarPestana(app.ESTADO.ui.pestana || "trabajo");
+    PL.repintar.todo();                       /* pinta todo y avisa de los datos heredados */
+    if (lectura.aviso) avisoHeredados(lectura.aviso);   /* un aviso concreto (p. ej. lectura fallida) manda */
   }
 
-  /* ---------- Puente mínimo para el arnés de verificación ---------- */
-
-  PL.enviar = {
-    instalarVistas: function () { /* las vistas ya se han registrado al cargarse */ },
-    /** Permite a los arneses y a la consola inspeccionar y forzar repintados. */
-    api: {
-      estado: () => app.ESTADO,
-      oferta: () => app.pr(),
-      perfiles: () => app.pf(),
-      repintar: () => { PL.repintar.todo(); },
-      pestana: n => mostrarPestana(n),
-      total: () => C().totalProyecto(app.pr(), app.pf()),
-      facturacion: () => E().resumenFacturacion(app.pr(), app.pf())
-    }
+  /* ---------- API para los arneses y la consola ---------- */
+  raiz.Planifica = {
+    estado: function () { return app.ESTADO; },
+    oferta: function () { return app.pr(); },
+    perfiles: function () { return app.pf(); },
+    repintar: function () { PL.repintar.todo(); },
+    pestana: function (n) { mostrarPestana(n); },
+    total: function () { return C().totalOferta(app.pr(), app.pf()); },
+    horas: function () { return C().ofertaHoras(app.pr()); },
+    entregables: function () { return E().todos(app.pr()); },
+    periodos: function () { return app.pr().periodos; },
+    ui: function () { return app.ui; }
   };
-
-  raiz.Planifica = PL.enviar.api;
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", arrancar);
   else arrancar();

@@ -1,16 +1,17 @@
 "use strict";
 /* =====================================================================
-   Planifica v3 — ALMACÉN
+   Planifica v4 — ALMACÉN
    Persistencia en el navegador, importación/exportación (JSON y CSV) y
-   detección de datos heredados de versiones antiguas.
+   detección de datos heredados de versiones anteriores.
 
-   Es el único módulo que habla con localStorage y el único que provoca
-   descargas (crea un <a> temporal). No pinta nada.
+   Único módulo que habla con localStorage y el único que provoca descargas.
+   No pinta nada.
    ===================================================================== */
 (function (raiz) {
   const PL = (raiz.PL = raiz.PL || {});
   const N = () => PL.nucleo;
   const M = () => PL.modelo;
+  const P = () => PL.periodos;
   const C = () => PL.calculo;
   const E = () => PL.entregables;
 
@@ -18,50 +19,49 @@
     try { return typeof localStorage !== "undefined" && !!localStorage; } catch (e) { return false; }
   };
 
-  /* ---------- Carga y guardado ---------- */
+  /* ---------- Cargar y guardar ---------- */
 
   /**
-   * Lee el estado guardado. Si solo hay datos de versiones anteriores (v1/v2),
-   * los migra y lo indica en `heredado` para que la app avise al usuario.
+   * Lee el estado guardado. Si solo hay datos de versiones anteriores, los
+   * migra y lo indica en `heredado` para que la app avise.
    * Devuelve {estado, origen, heredado, aviso}.
    */
   function cargar() {
     const M2 = M();
     if (!tieneLS()) return { estado: M2.estadoInicial(), origen: 0, heredado: false, aviso: "" };
 
-    /* 1) Estado actual (v3) */
     let bruto = null;
     try { bruto = localStorage.getItem(M2.CLAVE); } catch (e) { bruto = null; }
     if (bruto) {
       try {
         const d = JSON.parse(bruto);
-        if (d && Array.isArray(d.proyectos)) {
+        if (d && (Array.isArray(d.ofertas) || Array.isArray(d.proyectos))) {
           return { estado: M2.normalizarEstado(d), origen: M2.VERSION_DATOS, heredado: false, aviso: "" };
         }
       } catch (e) { /* datos corruptos: se intenta con los antiguos */ }
     }
 
-    /* 2) Datos antiguos (v2 o v1) */
     for (let i = 0; i < M2.CLAVES_ANTIGUAS.length; i++) {
       let viejo = null;
       try { viejo = localStorage.getItem(M2.CLAVES_ANTIGUAS[i]); } catch (e) { viejo = null; }
       if (!viejo) continue;
       try {
         const d = JSON.parse(viejo);
-        if (d && Array.isArray(d.proyectos)) {
+        const ofertas = d && (d.ofertas || d.proyectos);
+        if (Array.isArray(ofertas)) {
           const r = M2.migrar(d);
           return {
             estado: M2.normalizarEstado(r.estado), origen: r.origen, heredado: true,
-            aviso: "Datos de la versión " + r.origen + " migrados a la actual (" + r.estado.proyectos.length + " oferta(s), " + r.estado.perfiles.length + " perfil(es))."
+            aviso: "Se han migrado las ofertas guardadas con la versión " + r.origen + " (" +
+              r.estado.ofertas.length + " oferta(s), " + r.estado.perfiles.length + " perfil(es))."
           };
         }
-      } catch (e) { /* se prueba la siguiente clave */ }
+      } catch (e) { /* se prueba con la siguiente clave */ }
     }
 
     return { estado: M2.estadoInicial(), origen: 0, heredado: false, aviso: "" };
   }
 
-  /** ¿Quedan datos de versiones anteriores en el navegador? */
   function datosHeredados() {
     const M2 = M();
     if (!tieneLS()) return [];
@@ -74,29 +74,27 @@
     return out;
   }
 
-  /** Guarda el estado. Devuelve "" si fue bien o el motivo del fallo. */
   function guardar(estado) {
     const M2 = M();
-    if (!tieneLS()) return "sin almacenamiento";
+    if (!tieneLS()) return "sin almacenamiento disponible";
     try {
       estado.version = M2.VERSION_DATOS;
       localStorage.setItem(M2.CLAVE, JSON.stringify(estado));
       return "";
     } catch (e) {
       return (e && e.name === "QuotaExceededError")
-        ? "almacenamiento lleno (borra ofertas antiguas o descarga una copia)"
+        ? "almacenamiento lleno (descarga una copia y borra ofertas antiguas)"
         : "no se pudo guardar";
     }
   }
 
-  /** Limpia las claves de versiones anteriores (tras avisar y respaldar). */
   function olvidarHeredados() {
     const M2 = M();
     if (!tieneLS()) return;
     M2.CLAVES_ANTIGUAS.forEach(k => { try { localStorage.removeItem(k); } catch (e) { /* nada */ } });
   }
 
-  /* ---------- Descarga de ficheros ---------- */
+  /* ---------- Descargas ---------- */
 
   function descargar(nombre, contenido, tipo) {
     const blob = new Blob([contenido], { type: tipo || "application/octet-stream" });
@@ -110,14 +108,11 @@
     setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) { /* nada */ } a.remove(); }, 400);
   }
 
-  const nombreFichero = (base, ext) => N().slug(base) + "-" + N().hoyISO() + "." + ext;
+  function nombreFichero(base, ext) { return N().slug(base) + "-" + N().hoyISO() + "." + ext; }
 
-  /* ---------- Exportación ---------- */
-
-  function exportarProyecto(pr, pf) {
-    descargar(nombreFichero(pr.nombre, "json"),
-      JSON.stringify({ tipo: "planifica-proyecto", version: M().VERSION_DATOS, proyecto: pr }, null, 2),
-      "application/json");
+  function exportarOferta(o) {
+    descargar(nombreFichero(o.nombre, "json"),
+      JSON.stringify({ tipo: "planifica-oferta", version: M().VERSION_DATOS, oferta: o }, null, 2), "application/json");
   }
 
   function exportarTodo(estado) {
@@ -129,109 +124,104 @@
       JSON.stringify({
         tipo: "planifica-biblioteca", version: M().VERSION_DATOS,
         perfiles: estado.perfiles, perfilesInactivos: estado.perfilesInactivos, plantillas: estado.plantillas
-      }, null, 2),
-      "application/json");
+      }, null, 2), "application/json");
   }
 
-  /** CSV de la oferta: `;`, coma decimal y BOM para que Excel lo abra en español. */
-  function csvProyecto(pr, pf, moneda, mostrarImportes) {
+  /* ---------- CSV ---------- */
+
+  /** CSV de la oferta: `;`, coma decimal y BOM, para Excel en español. */
+  function csvOferta(o, pf, mostrarImportes) {
     const sep = ";";
-    const meses = C().mesesProyecto(pr);
+    const n = P().meses(o.periodos);
     const imp = mostrarImportes !== false;
     const cell = v => '"' + String(v === null || v === undefined ? "" : v).replace(/"/g, '""') + '"';
     const numES = v => String(N().r2(v)).replace(".", ",");
 
-    const filas = [];
-    filas.push(["Oferta", pr.nombre]);
-    filas.push(["Cliente", (pr.cliente && pr.cliente.nombre) || ""]);
-    filas.push(["Referencia", (pr.cliente && pr.cliente.ref) || ""]);
-    filas.push(["Estado", (M().ESTADOS_OFERTA[pr.estado] || {}).texto || ""]);
-    filas.push(["Fecha", pr.fecha || ""]);
-    filas.push(["Válida hasta", N().fechaValidez(pr)]);
-    filas.push(["Duración", meses + " meses desde " + N().etiquetaMes(pr.fechaInicio, 0)]);
-    filas.push([]);
+    const f = [];
+    f.push(["Oferta", o.nombre]);
+    f.push(["Cliente", (o.cliente && o.cliente.nombre) || ""]);
+    f.push(["Contacto", (o.cliente && o.cliente.contacto) || ""]);
+    f.push(["Referencia", (o.cliente && o.cliente.ref) || ""]);
+    f.push(["Estado", (M().ESTADOS_OFERTA[o.estado] || {}).texto || ""]);
+    f.push(["Fecha", o.fecha || ""]);
+    f.push(["Validez", P().duracionLegible(o.periodos)]);
+    f.push(["Condiciones de pago", o.condicionesPago || ""]);
+    f.push([]);
 
-    /* Detalle de esfuerzo */
-    filas.push(["BLOQUE", "Tarea", "Subtarea", "Perfil"].concat(
-      Array.from({ length: meses }, (_, i) => N().etiquetaMes(pr.fechaInicio, i))
-    ).concat(["Total horas", "Tarifa", "Importe"]));
-    N().lista(pr.tareas).forEach(t => N().lista(t.subtareas).forEach(s => N().lista(s.lineas).forEach(l => {
+    /* Cabecera de periodos: banda de año y rótulo editado */
+    const cols = P().columnas(o.periodos);
+    f.push(["CALENDARIO"].concat(cols.map(c => cell([].concat(c.periodos.map(i => P().etiqueta(o.periodos, i))).join(" + ")))));
+    f.push(["Año"].concat(cols.map(c => c.anio)));
+
+    /* Esfuerzo */
+    f.push(["Tarea", "Subtarea", "Perfil"].concat(Array.from({ length: n }, (_, i) => P().etiqueta(o.periodos, i)))
+      .concat(["Total horas", "Tarifa", "Importe"]));
+    N().lista(o.tareas).forEach(t => N().lista(t.subtareas).forEach(s => N().lista(s.lineas).forEach(l => {
       const p = C().perfilPorId(pf, l.perfilId);
-      filas.push(["Horas", t.nombre, s.nombre, p ? p.nombre : "(sin perfil)"].concat(
-        Array.from({ length: meses }, (_, i) => numES(N().num((l.horas || {})["m" + i])))
-      ).concat([
-        numES(C().lineaHoras(l)),
-        imp ? numES(p ? p.tarifa : 0) : "",
-        imp ? numES(C().lineaImporte(l, pf)) : ""
-      ]));
+      f.push(["Esfuerzo", t.nombre, s.nombre, p ? p.nombre : "(sin perfil)"]
+        .concat(Array.from({ length: n }, (_, i) => numES(N().num((l.horas || {})["p" + i]))))
+        .concat([numES(C().lineaHoras(l)), imp ? numES(p ? p.tarifa : 0) : "", imp ? numES(C().lineaImporte(l, pf)) : ""]));
     })));
-    filas.push([]);
+    f.push([]);
 
     /* Entregables */
-    const plan = E().planFacturacion(pr, pf);
-    if (plan.length) {
-      filas.push(["ENTREGABLES", "Entregable", "Dónde", "Mes", "Estado", "Criterio de aceptación", "%", "Importe", "Facturado"]);
-      plan.forEach(h => filas.push([
-        h.contexto === "oferta" ? "Oferta" : "Tarea", h.nombre, h.tareaNombre || "—", h.mesEtiqueta,
-        h.estadoTexto, h.criterio || "", numES(h.pct), imp ? numES(h.importe) : "", h.facturado ? "Sí" : "No"
-      ]));
-      filas.push([]);
+    const ents = E().todos(o);
+    if (ents.length) {
+      f.push(["ENTREGABLES", "Entregable", "Origen", "Entrega", "Fecha", "Responsable", "Criterio de aceptación", "Horas estimadas"]);
+      ents.forEach(e => {
+        const r = E().responsable(pf, e);
+        f.push(["Entregable", e.nombre, e._contexto === "oferta" ? "Oferta" : e._tareaNombre,
+          P().mesCorto(o.periodos, e.periodo), e.fecha || "", r ? r.nombre : "", e.criterio || "", numES(e.horas)]);
+      });
+      f.push([]);
     }
 
     /* Totales */
-    const linea = (texto, valor) => filas.push([texto, "", "", "", "", "", "", imp ? numES(valor) : ""]);
-    linea("Consultoría", C().importeProyecto(pr, pf));
-    if (C().gastosTotal(pr)) linea("Gastos generales", C().gastosTotal(pr));
-    linea("Subtotal", C().subtotalProyecto(pr, pf));
-    if (pr.descuento && pr.descuento.tipo) linea("Descuento", -C().descuentoImporte(pr, pf));
-    linea("Base imponible", C().baseImponible(pr, pf));
-    if (C().nombreImpuesto(pr)) linea(C().nombreImpuesto(pr) + " " + N().num(pr.impuestos.tasa) + " %", C().impuestoImporte(pr, pf));
-    linea("TOTAL", C().totalProyecto(pr, pf));
+    const linea = (texto_, valor) => f.push([texto_, "", "", "", "", "", "", imp ? numES(valor) : ""]);
+    linea("Consultoría", C().importeOferta(o, pf));
+    if (C().gastosTotal(o)) linea("Gastos generales", C().gastosTotal(o));
+    linea("Subtotal", C().subtotalOferta(o, pf));
+    if (o.descuento && o.descuento.tipo) linea("Descuento", -C().descuentoImporte(o, pf));
+    linea("Base imponible", C().baseImponible(o, pf));
+    if (C().nombreImpuesto(o)) linea(C().nombreImpuesto(o) + " " + N().num(o.impuestos.tasa) + " %", C().impuestoImporte(o, pf));
+    linea("TOTAL", C().totalOferta(o, pf));
 
-    const res = E().resumenFacturacion(pr, pf);
-    if (res.hitos) {
-      filas.push([]);
-      filas.push(["PLAN DE FACTURACIÓN", "", "", "", "", "", "", imp ? numES(res.total) : ""]);
-      filas.push(["Facturado (entregado/aceptado)", "", "", "", "", "", "", imp ? numES(res.facturado) : ""]);
-      filas.push(["Pendiente de facturar", "", "", "", "", "", "", imp ? numES(res.pendienteFacturar) : ""]);
-    }
-
-    void moneda;
-    return "\uFEFF" + filas.map(f => f.map(cell).join(sep)).join("\r\n");
+    return "\uFEFF" + f.map(fila => fila.map(cell).join(sep)).join("\r\n");
   }
 
   /* ---------- Importación ---------- */
 
-  /** Parsea y clasifica un JSON importado. No aplica nada todavía. */
-  function analizarImportacion(texto) {
+  function analizarImportacion(texto_) {
     let d = null;
-    try { d = JSON.parse(texto); }
+    try { d = JSON.parse(texto_); }
     catch (e) { return { ok: false, error: "El archivo no es un JSON válido." }; }
     if (!d || typeof d !== "object") return { ok: false, error: "El JSON no contiene datos de Planifica." };
 
-    if (d.tipo === "planifica-proyecto" && d.proyecto) return { ok: true, tipo: "proyecto", datos: d.proyecto };
+    if ((d.tipo === "planifica-oferta" || d.tipo === "planifica-proyecto") && (d.oferta || d.proyecto)) {
+      return { ok: true, tipo: "oferta", datos: d.oferta || d.proyecto };
+    }
     if (d.tipo === "planifica-biblioteca") return { ok: true, tipo: "biblioteca", datos: d };
-    if (Array.isArray(d.proyectos)) {
-      const origen = (d.version === 3) ? 3 : (d.version === 2 ? 2 : 1);
+    const ofertas = d.ofertas || d.proyectos;
+    if (Array.isArray(ofertas)) {
+      const origen = (d.version === 4) ? 4 : ((d.version === 3 || d.version === 2) ? d.version : 1);
       return { ok: true, tipo: "estado", origen: origen, datos: d };
     }
     return { ok: false, error: "Formato no reconocido: se espera una oferta, una biblioteca o una copia completa de Planifica." };
   }
 
-  /** Aplica una importación ya analizada. opciones: {reemplazar, aplicarMarca}. */
   function aplicarImportacion(estado, analisis, opciones) {
     const M2 = M();
     const o = opciones || {};
     const r = { estado: estado, mensaje: "", ofertas: 0, perfiles: 0, plantillas: 0 };
-
     if (!analisis || !analisis.ok) { r.mensaje = (analisis && analisis.error) || "Importación no válida."; return r; }
 
-    if (analisis.tipo === "proyecto") {
-      const p = M2.normalizarProyecto(analisis.datos, false);
-      const i = estado.proyectos.findIndex(x => x.id === p.id);
-      if (i >= 0) { estado.proyectos[i] = p; r.ofertas = 1; } else { estado.proyectos.push(p); r.ofertas = 1; }
-      estado.activo = p.id;
-      r.mensaje = "Oferta importada: " + p.nombre;
+    if (analisis.tipo === "oferta") {
+      const nueva = M2.normalizarOferta(analisis.datos, false);
+      const i = estado.ofertas.findIndex(x => x.id === nueva.id);
+      if (i >= 0) estado.ofertas[i] = nueva; else estado.ofertas.push(nueva);
+      estado.activa = nueva.id;
+      r.ofertas = 1;
+      r.mensaje = "Oferta importada: " + nueva.nombre;
       return r;
     }
 
@@ -248,11 +238,10 @@
         const pl = M2.normalizarPlantilla(p0);
         if (!N().lista(estado.plantillas).some(x => x.id === pl.id)) { estado.plantillas.push(pl); r.plantillas++; }
       });
-      r.mensaje = "Biblioteca importada: " + r.perfiles + " perfil(es), " + r.plantillas + " plantilla(s).";
+      r.mensaje = "Biblioteca importada: " + r.perfiles + " perfil(es) y " + r.plantillas + " plantilla(s).";
       return r;
     }
 
-    /* Copia completa (estado), de cualquier versión */
     const mig = M2.migrar(analisis.datos);
     const nuevo = M2.normalizarEstado(mig.estado);
     if (o.reemplazar) {
@@ -260,22 +249,20 @@
       estado.perfiles = nuevo.perfiles;
       estado.perfilesInactivos = nuevo.perfilesInactivos;
       estado.plantillas = nuevo.plantillas.length ? nuevo.plantillas : M2.estadoInicial().plantillas;
-      estado.plantillasOferta = nuevo.plantillasOferta;
-      estado.proyectos = nuevo.proyectos;
-      estado.activo = nuevo.activo;
-      r.ofertas = nuevo.proyectos.length;
-      r.mensaje = "Datos reemplazados: " + r.ofertas + " oferta(s)" + (mig.origen < 3 ? ", migradas desde la versión " + mig.origen : "") + ".";
+      estado.ofertas = nuevo.ofertas;
+      estado.activa = nuevo.activa;
+      r.ofertas = nuevo.ofertas.length;
+      r.mensaje = "Datos reemplazados: " + r.ofertas + " oferta(s)" + (mig.origen < 4 ? ", migradas desde la versión " + mig.origen : "") + ".";
     } else {
-      /* Fusionar: se añade lo que no exista y se actualiza por id */
       (nuevo.perfiles || []).forEach(p => { if (!C().perfilPorId(estado.perfiles, p.id)) { estado.perfiles.push(p); r.perfiles++; } });
       (nuevo.plantillas || []).forEach(pl => { if (!N().lista(estado.plantillas).some(x => x.id === pl.id)) { estado.plantillas.push(pl); r.plantillas++; } });
-      (nuevo.proyectos || []).forEach(p => {
-        const i = estado.proyectos.findIndex(x => x.id === p.id);
-        if (i >= 0) estado.proyectos[i] = p; else estado.proyectos.push(p);
+      (nuevo.ofertas || []).forEach(of => {
+        const i = estado.ofertas.findIndex(x => x.id === of.id);
+        if (i >= 0) estado.ofertas[i] = of; else estado.ofertas.push(of);
         r.ofertas++;
       });
-      if (!C().perfilPorId(estado.perfiles, estado.activo)) estado.activo = estado.proyectos[0].id;
-      r.mensaje = "Fusionado: " + r.ofertas + " oferta(s), " + r.perfiles + " perfil(es) nuevo(s).";
+      if (!estado.ofertas.some(x => x.id === estado.activa)) estado.activa = estado.ofertas[0].id;
+      r.mensaje = "Fusionado: " + r.ofertas + " oferta(s) y " + r.perfiles + " perfil(es) nuevo(s).";
     }
     return r;
   }
@@ -283,7 +270,7 @@
   PL.almacen = {
     tieneLS: tieneLS, cargar: cargar, guardar: guardar, datosHeredados: datosHeredados,
     olvidarHeredados: olvidarHeredados, descargar: descargar, nombreFichero: nombreFichero,
-    exportarProyecto: exportarProyecto, exportarTodo: exportarTodo, exportarBiblioteca: exportarBiblioteca,
-    csvProyecto: csvProyecto, analizarImportacion: analizarImportacion, aplicarImportacion: aplicarImportacion
+    exportarOferta: exportarOferta, exportarTodo: exportarTodo, exportarBiblioteca: exportarBiblioteca,
+    csvOferta: csvOferta, analizarImportacion: analizarImportacion, aplicarImportacion: aplicarImportacion
   };
 })(typeof window !== "undefined" ? window : globalThis);

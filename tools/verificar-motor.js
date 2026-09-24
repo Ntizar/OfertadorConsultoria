@@ -1,147 +1,303 @@
 "use strict";
 /* =====================================================================
-   Planifica v3 — VERIFICACIÓN DEL MOTOR (sin DOM)
-   Estado inicial, cadena de totales, normalización defensiva y migraciones.
-   Contrato: los totales del encargo real cuadran al céntimo.
+   Planifica v4 — VERIFICACIÓN DEL MOTOR (sin DOM)
+   Contrato de exactitud + periodos (meses editables) + entregables + fotos.
 
    Uso:  node tools/verificar-motor.js
    ===================================================================== */
 const { cargarPL, contador, leerDato } = require("./arnes");
 
-const { sandbox, PL } = cargarPL();
-const C = PL.calculo, M = PL.modelo, U = PL.nucleo, E = PL.entregables;
-const t = contador("Planifica v3 — motor (sin DOM)");
+const CARGADO = cargarPL();
+const { sandbox, PL } = CARGADO;
+const t = contador("Planifica v4 — motor (sin DOM)");
 const check = t.check;
 
-const { estadoInicial, perfilesDefecto, plantillasDefecto, proyectoEjemplo } = PL.ejemplo;
-let ESTADO = M.estadoInicial();
-const pr0 = ESTADO.proyectos[0];
+if (CARGADO.faltan.length) {
+  console.log("  ⚠ módulos que faltan: " + CARGADO.faltan.join(", "));
+}
+check("los 8 módulos del motor se cargan", CARGADO.cargados.length === 8, CARGADO.cargados.join(", "));
+
+const N = PL.nucleo, P = PL.periodos, M = PL.modelo, C = PL.calculo, E = PL.entregables, X = PL.comparar;
+const ESTADO = M.estadoInicial();
+const OF = ESTADO.ofertas[0];
 const PF = ESTADO.perfiles;
 
 /* ---------- 1. Estado inicial ---------- */
 t.grupo("1. Estado inicial y valores de fábrica");
-check("versión de datos v3", ESTADO.version === 3, ESTADO.version);
-check("7 perfiles por defecto precargados", ESTADO.perfiles.length === 7, ESTADO.perfiles.length);
-check("perfiles marcados esDefecto", ESTADO.perfiles.every(p => p.esDefecto === true));
-check("perfiles con categoría", ESTADO.perfiles.every(p => p.categoria && p.categoria !== ""));
-check("plantilla de fábrica presente", ESTADO.plantillas.length === 1 && ESTADO.plantillas[0].id === "pl_estandar");
-check("plantilla con entregables", ESTADO.plantillas[0].tareas.some(x => (x.entregables || []).length > 0));
-check("1 oferta de ejemplo", ESTADO.proyectos.length === 1);
-check("el ejemplo es guía", pr0.guia === true);
-check("el ejemplo tiene cliente estructurado", !!pr0.cliente && typeof pr0.cliente === "object" && !!pr0.cliente.nombre);
-check("el ejemplo tiene impuestos y descuento", pr0.impuestos.tipo === "iva" && pr0.descuento.tipo === "%" && pr0.descuento.valor > 0);
-check("el ejemplo trae entregables en tareas", pr0.tareas.every(x => (x.entregables || []).length > 0));
-check("el ejemplo trae entregables de oferta", (pr0.entregables || []).length > 0);
-check("importe del ejemplo > 0", C.importeProyecto(pr0, PF) > 0, C.importeProyecto(pr0, PF));
+check("versión de datos v4", ESTADO.version === 4, ESTADO.version);
+check("7 perfiles de fábrica", ESTADO.perfiles.length === 7, ESTADO.perfiles.length);
+check("perfiles con categoría válida", ESTADO.perfiles.every(p => M.CATEGORIAS_PERFIL.indexOf(p.categoria) >= 0));
+check("perfiles con unidad", ESTADO.perfiles.every(p => p.unidad === "h"));
+check("plantilla de fábrica con entregables", ESTADO.plantillas.length === 1 && ESTADO.plantillas[0].tareas.some(x => (x.entregables || []).length > 0));
+check("1 oferta de ejemplo", ESTADO.ofertas.length === 1);
+check("la oferta activa es el ejemplo", ESTADO.activa === OF.id && OF.guia === true);
+check("cliente estructurado", !!OF.cliente.nombre && !!OF.cliente.ref);
+check("calendario de 6 periodos", P.meses(OF.periodos) === 6, P.meses(OF.periodos));
+check("hay entregables en tareas y en la oferta", E.todos(OF).some(e => e._contexto === "tarea") && E.todos(OF).some(e => e._contexto === "oferta"));
+check("el importe del ejemplo es > 0", C.importeOferta(OF, PF) > 0, C.importeOferta(OF, PF));
 
 /* ---------- 2. Cadena de totales ---------- */
-t.grupo("\n2. Cadena de totales del ejemplo");
-const st = C.subtotalProyecto(pr0, PF), ds = C.descuentoImporte(pr0, PF), bi = C.baseImponible(pr0, PF);
-const iv = C.impuestoImporte(pr0, PF), tt = C.totalProyecto(pr0, PF);
-check("subtotal = consultoría + gastos", Math.abs(st - (C.importeProyecto(pr0, PF) + C.gastosTotal(pr0))) < 0.005);
-check("descuento 5 % correcto", Math.abs(ds - U.r2(st * 0.05)) < 0.01, ds + " vs " + U.r2(st * 0.05));
+t.grupo("\n2. Cadena de totales (contrato de exactitud)");
+const st = C.subtotalOferta(OF, PF), ds = C.descuentoImporte(OF, PF), bi = C.baseImponible(OF, PF);
+const iv = C.impuestoImporte(OF, PF), tt = C.totalOferta(OF, PF);
+check("subtotal = consultoría + gastos", Math.abs(st - (C.importeOferta(OF, PF) + C.gastosTotal(OF))) < 0.005);
+check("descuento 5 %", Math.abs(ds - N.r2(st * 0.05)) < 0.01);
 check("base = subtotal − descuento", Math.abs(bi - (st - ds)) < 0.005);
-check("IVA 21 % sobre la base", Math.abs(iv - U.r2(bi * 0.21)) < 0.01);
+check("IVA 21 % sobre la base", Math.abs(iv - N.r2(bi * 0.21)) < 0.01);
 check("total = base + IVA", Math.abs(tt - (bi + iv)) < 0.005);
-check("anualidades suman el importe de consultoría", (() => {
-  const a = C.anualidades(pr0, PF); let s = 0; for (const k in a) s += a[k];
-  return Math.abs(s - C.importeProyecto(pr0, PF)) < 0.02;
+check("los importes por periodo suman la consultoría", (() => {
+  let s = 0;
+  for (let i = 0; i < P.meses(OF.periodos); i++) s += C.importePeriodo(OF, PF, i);
+  return Math.abs(N.r2(s) - C.importeOferta(OF, PF)) < 0.02;
 })());
-check("importe mensual suma el importe de consultoría", (() => {
-  let s = 0; for (let i = 0; i < pr0.meses; i++) s += C.importeMes(pr0, PF, i);
-  return Math.abs(U.r2(s) - C.importeProyecto(pr0, PF)) < 0.02;
+check("las anualidades suman la consultoría", (() => {
+  const a = C.anualidades(OF, PF);
+  let s = 0; for (const k in a) s += a[k];
+  return Math.abs(N.r2(s) - C.importeOferta(OF, PF)) < 0.02;
+})());
+check("las horas por perfil suman las horas de la oferta", (() => {
+  const h = C.horasPorPerfil(OF);
+  let s = 0; for (const k in h) s += h[k];
+  return Math.abs(s - C.ofertaHoras(OF)) < 0.005;
 })());
 
-/* ---------- 3. Migración del encargo real (v1) ---------- */
-t.grupo("\n3. Encargo real Ineco (v1 → v3): totales al céntimo");
-const bruto = leerDato("carga-ineco-abono-unico.json");
-const mig = M.migrar(JSON.parse(bruto));
+/* ---------- 3. Encargo real Ineco (v1 → v4) ---------- */
+t.grupo("\n3. Encargo real Ineco (v1 → v4): al céntimo del Excel");
+const mig = M.migrar(JSON.parse(leerDato("carga-ineco-abono-unico.json")));
 const EST2 = M.normalizarEstado(mig.estado);
 check("detecta el origen v1", mig.origen === 1, mig.origen);
-check("migra a v3", EST2.version === 3);
-const prIneco = EST2.proyectos.filter(p => p.id === "pr_ineco-abono2")[0] || EST2.proyectos[0];
-check("proyecto del encargo presente tras migrar", !!prIneco && EST2.proyectos.length > 0);
-check("biblioteca migrada: 13 perfiles", EST2.perfiles.length === 13, EST2.perfiles.length);
-check("perfiles migrados con categoría válida", EST2.perfiles.every(p => M.CATEGORIAS_PERFIL.indexOf(p.categoria) >= 0));
-check("perfil pf_jp con categoría 'Otro' (sin inventar)", (EST2.perfiles.filter(p => p.id === "pf_jp")[0] || {}).categoria === "Otro");
-check("migración v1: sin impuestos inyectados", prIneco.impuestos.tipo === "ninguno", prIneco.impuestos.tipo);
-check("migración v1: estado por defecto borrador", prIneco.estado === "borrador");
-check("migración v1: cliente estructurado", !!prIneco.cliente && typeof prIneco.cliente === "object");
-check("migración v1: entregables y escenarios vacíos (no inventados)", (prIneco.entregables || []).length === 0 && (prIneco.escenarios || []).length === 0);
+check("migra a v4", EST2.version === 4);
+check("13 perfiles migrados", EST2.perfiles.length === 13, EST2.perfiles.length);
+const IN = EST2.ofertas.filter(o => o.id === "pr_ineco-abono2")[0] || EST2.ofertas[0];
+check("la oferta del encargo está presente", !!IN);
+check("4 tareas", N.lista(IN.tareas).length === 4, N.lista(IN.tareas).length);
+check("el calendario migrado tiene 14 periodos", P.meses(IN.periodos) === 14, P.meses(IN.periodos));
+check("las horas se migran de m# a p#", (() => {
+  const l = IN.tareas[0].subtareas[0].lineas[0];
+  const horas = Object.keys(l.horas).filter(k => k.charAt(0) === "p");
+  return horas.length === 14 && l.horas.p0 !== undefined;
+})());
+check("v1 no inventa impuestos", IN.impuestos.tipo === "ninguno", IN.impuestos.tipo);
+check("v1 no inventa entregables", N.lista(IN.entregables).length === 0);
+check("v1 no inventa fotos", N.lista(IN.fotos).length === 0);
 
-/* Reparto por tarea del encargo real, verificado por DOS vías independientes
-   (aritmética en Python sobre el JSON y este motor JS): coinciden al céntimo.
-   OJO — hallazgo 24-sep-2026: el arnés antiguo traía otros cuatro números
-   (155.235,46 / 271.269,94 / 137.359,99 / 23.143,97) que sumaban el total
-   correcto pero NO correspondían a ninguna tarea real, y además nunca se
-   comprobaban (buscaba las tareas por "Tarea "+inicial y las del encargo se
-   llaman "Tarea A — …", así que se saltaba los cuatro checks en silencio). */
-const totalesExcel = { ta_A: 165965.73, ta_B: 137329.44, ta_C: 195871.83, ta_D: 87842.36 };
-Object.keys(totalesExcel).forEach(k => {
-  const tar = prIneco.tareas.filter(x => x.id === k)[0];
+/* Reparto por tarea verificado por dos vías independientes (Python sobre el JSON
+   y este motor): coinciden. El arnés antiguo traía cuatro números inventados que
+   sumaban bien pero no eran de ninguna tarea, y ni se comprobaban. */
+const reparto = { ta_A: 165965.73, ta_B: 137329.44, ta_C: 195871.83, ta_D: 87842.36 };
+Object.keys(reparto).forEach(k => {
+  const tar = N.lista(IN.tareas).filter(x => x.id === k)[0];
   const real = tar ? C.tareaImporte(tar, EST2.perfiles) : -1;
-  check("reparto " + k + " = " + totalesExcel[k].toLocaleString("es-ES", { minimumFractionDigits: 2 }),
-    Math.abs(real - totalesExcel[k]) < 0.005, real);
+  check("reparto " + k + " = " + reparto[k].toLocaleString("es-ES", { minimumFractionDigits: 2 }), Math.abs(real - reparto[k]) < 0.005, real);
 });
-check("la suma de los repartos por tarea da el total del Excel",
-  Math.abs(U.r2(Object.keys(totalesExcel).reduce((s, k) => s + totalesExcel[k], 0)) - 587009.36) < 0.005);
-const totalExcel = 587009.36;
-check("TOTAL sin impuestos = 587.009,36 € (al céntimo del Excel)",
-  Math.abs(C.subtotalProyecto(prIneco, EST2.perfiles) - totalExcel) < 0.005, C.subtotalProyecto(prIneco, EST2.perfiles));
+check("TOTAL del encargo = 587.009,36 € (Excel)", Math.abs(C.subtotalOferta(IN, EST2.perfiles) - 587009.36) < 0.005, C.subtotalOferta(IN, EST2.perfiles));
+check("los 4 repartos suman el total", Math.abs(N.r2(Object.keys(reparto).reduce((s, k) => s + reparto[k], 0)) - 587009.36) < 0.005);
 
-/* ---------- 4. Migración v2 → v3 ---------- */
-t.grupo("\n4. Migración v2 → v3");
-const v2 = {
-  version: 2, marca: { nombre: "Marca V2", sub: "", moneda: "€", logo: "" }, mostrarImportes: true,
-  perfiles: [{ id: "pf_x", nombre: "Perfil X", tarifa: 50, categoria: "Consultoría media" }],
-  plantillas: [], proyectos: [{
-    id: "pr_v2", nombre: "Oferta v2", cliente: { nombre: "Cli", contacto: "", ref: "" }, estado: "enviada",
-    impuestos: { tipo: "iva", tasa: 21, incluido: false }, descuento: { tipo: "", valor: 0 },
-    tareas: [{ id: "ta_1", nombre: "T", subtareas: [{ id: "sb_1", nombre: "S", lineas: [{ id: "ln_1", perfilId: "pf_x", horas: { m0: 10 } }] }] }]
+/* ---------- 4. Periodos: formato y edición ---------- */
+t.grupo("\n4. Periodos: meses con banda de año y rótulos editables");
+const per = P.conInicio(P.porDefecto(), "2026-10");
+/* Calendario limpio: lo usan los checks que no deben arrastrar mutaciones previas
+   (los objetos de periodos se normalizan EN SITIO, así que se reutilizan con cuidado). */
+const nuevoCal = () => P.conInicio(P.porDefecto(), "2026-10");
+check("el calendario empieza donde se pide", per.inicio === "2026-10", per.inicio);
+check("etiqueta automática del primer mes = OCT", P.etiqueta(per, 0) === "OCT", P.etiqueta(per, 0));
+check("el año NO se repite en cada columna", P.etiqueta(per, 0).indexOf("26") < 0 && P.etiqueta(per, 3) === "ENE", P.etiqueta(per, 3));
+check("banda de año: 2026 y 2027", (() => {
+  const b = P.bandas(P.conN(per, 6));
+  return b.length === 2 && b[0].anio === 2026 && b[0].n === 3 && b[1].anio === 2027 && b[1].n === 3;
+})());
+check("columnas: una por mes en zoom mes", P.columnas(P.conN(per, 6)).length === 6);
+check("duración legible con rango de fechas", P.duracionLegible(P.conN(per, 6)) === "6 meses · octubre de 2026 — marzo de 2027", P.duracionLegible(P.conN(per, 6)));
+check("posición legible de un entregable", P.posicionLegible(P.conN(per, 6), 2) === "mes 3 de 6 (dic 2026)", P.posicionLegible(P.conN(per, 6), 2));
+check("mes largo para el informe", P.mesLargo(per, 0) === "octubre de 2026", P.mesLargo(per, 0));
+check("el plural de mes es correcto (no «mess»)", P.duracionLegible(P.conN(per, 6)).indexOf("mess") < 0);
+
+/* Edición a mano */
+P.editar(per, 1, "Fase 1");
+check("rótulo editado a mano", P.etiqueta(per, 1) === "Fase 1");
+check("la edición se marca como tal", P.estaEditada(per, 1) === true);
+check("los demás siguen automáticos", P.etiqueta(per, 2) === "DIC" && P.estaEditada(per, 2) === false);
+check("cuenta de rótulos editados", P.cuantasEditadas(per) === 1);
+P.volverAuto(per, 1);
+check("volver al automático", P.etiqueta(per, 1) === "NOV" && P.cuantasEditadas(per) === 0);
+P.editar(per, 0, "S1"); P.editar(per, 1, "S2"); P.editar(per, 2, "S3");
+check("varios rótulos a la vez", P.cuantasEditadas(per) === 3);
+check("el CSV/HTML usan el rótulo editado", P.etiqueta(per, 1) === "S2");
+P.volverTodoAuto(per);
+check("volver todo al automático", P.cuantasEditadas(per) === 0 && P.etiqueta(per, 0) === "OCT");
+
+/* Zoom trimestre */
+const perT = P.conZoom(P.conN(per, 12), "trimestre");
+check("zoom trimestre agrupa en 4 columnas", P.columnas(perT).length === 4, P.columnas(perT).length);
+check("rótulos de trimestre T1..T4", P.columnas(perT).map(c => c.etiqueta).join(",") === "T4,T1,T2,T3", P.columnas(perT).map(c => c.etiqueta).join(","));
+check("el trimestre agrupa sus meses", P.columnas(perT)[0].periodos.length === 3 && P.columnas(perT)[0].periodos[0] === 0);
+check("la etiqueta manual manda también en trimestre", (() => {
+  const p2 = P.conZoom(P.editar(P.conN(per, 12), 0, "Arranque"), "trimestre");
+  return P.columnas(p2)[0].etiqueta === "Arranque";
+})());
+check("siguienteZoom alterna", P.siguienteZoom("mes") === "trimestre" && P.siguienteZoom("trimestre") === "mes");
+
+/* Cambios de calendario */
+check("conN acota entre 1 y 60", P.meses(P.conN(per, 999)) === 60 && P.meses(P.conN(per, 0)) === 1);
+check("al acortar se tiran los rótulos que sobran", (() => {
+  const p2 = P.editar(P.conN(P.volverTodoAuto(per), 6), 5, "Final");
+  const p3 = P.conN(p2, 3);
+  return P.cuantasEditadas(p3) === 0;
+})());
+/* Cada desplazamiento sobre su propio calendario: los objetos de periodos se
+   normalizan EN SITIO, así que reutilizar el mismo falsea el resultado (este check
+   pasaba precisamente porque el desfase UTC de -1 contrarrestaba el +2). */
+const movMas = P.desplazar(P.conInicio(P.porDefecto(), "2026-10"), 2);
+const movMenos = P.desplazar(P.conInicio(P.porDefecto(), "2026-10"), -3);
+check("desplazar +2 meses (2026-10 → 2026-12)", movMas.inicio === "2026-12", movMas.inicio);
+check("desplazar -3 meses (2026-10 → 2026-07)", movMenos.inicio === "2026-07", movMenos.inicio);
+check("indiceDe localiza una fecha dentro del calendario", P.indiceDe(P.conN(nuevoCal(), 6), new Date(2026, 11, 15)) === 2, P.indiceDe(P.conN(nuevoCal(), 6), new Date(2026, 11, 15)));
+check("indiceDe devuelve -1 fuera del calendario", P.indiceDe(P.conN(nuevoCal(), 6), new Date(2030, 0, 1)) === -1);
+check("normalizar rechaza basura y cae al mes actual", P.normalizar({ inicio: "lol", n: "x", zoom: "z" }).zoom === "mes");
+
+/* ---------- 5. Entregables ---------- */
+t.grupo("\n5. Entregables (compromisos de entrega)");
+const ents = E.todos(OF);
+check("5 entregables en el ejemplo", ents.length === 5, ents.length);
+check("4 son de tarea y 1 de la oferta", E.porContexto(OF).deTarea === 4 && E.porContexto(OF).deOferta === 1, JSON.stringify(E.porContexto(OF)));
+check("todos traen periodo dentro del calendario", ents.every(e => e.periodo >= 0 && e.periodo < P.meses(OF.periodos)));
+check("todos traen criterio de aceptación", ents.every(e => !!e.criterio));
+check("todos traen responsable", ents.every(e => !!E.responsable(PF, e)), ents.filter(e => !E.responsable(PF, e)).length);
+check("ordenados por periodo", ents.every((e, i) => i === 0 || ents[i - 1].periodo <= e.periodo));
+check("agrupación por periodo", (() => {
+  const m = E.porPeriodo(OF);
+  return N.suma(Object.keys(m).map(k => m[k].length)) === ents.length;
+})());
+check("marcadores por periodo (para el Gantt)", E.marcadoresPorPeriodo(OF).length === P.meses(OF.periodos));
+check("el último entregable del ejemplo cae en el mes 6", E.ultimo(OF).periodo === 5, E.ultimo(OF).periodo);
+check("el próximo es el primero del calendario", E.proximo(OF).periodo === 0);
+check("horas estimadas suman y son informativas", E.horasEstimadas(OF) > 0, E.horasEstimadas(OF));
+check("las horas de los entregables NO tocan el importe de la oferta", (() => {
+  const antes = C.importeOferta(OF, PF);
+  OF.tareas[0].entregables[0].horas = 9999;
+  const despues = C.importeOferta(OF, PF);
+  OF.tareas[0].entregables[0].horas = 32;
+  return antes === despues;
+})());
+check("etiqueta de entrega legible", /^\S+ \d{4}/.test(E.etiquetaEntrega(OF, ents[0])), E.etiquetaEntrega(OF, ents[0]));
+check("moverAPeriodo cambia el mes del entregable", (() => {
+  const e = E.todos(OF)[0];
+  E.moverAPeriodo(OF, e.id, e._tareaId, 4);
+  const ok = M.buscarEntregable(OF, e.id, e._tareaId).entregable.periodo === 4;
+  E.moverAPeriodo(OF, e.id, e._tareaId, 0);
+  return ok;
+})());
+check("moverAPeriodo acota al calendario", (() => {
+  const e = E.todos(OF)[0];
+  E.moverAPeriodo(OF, e.id, e._tareaId, 99);
+  const v = M.buscarEntregable(OF, e.id, e._tareaId).entregable.periodo;
+  E.moverAPeriodo(OF, e.id, e._tareaId, 0);
+  return v === P.meses(OF.periodos) - 1;
+})());
+check("sin estados de seguimiento en el modelo", ents.every(e => e.estado === undefined));
+check("sin % de facturación en el modelo", ents.every(e => e.facturacionPct === undefined));
+
+/* ---------- 6. Fotos: escenarios y versiones ---------- */
+t.grupo("\n6. Escenarios y versiones (fotos comparables)");
+const oF = M.normalizarOferta(JSON.parse(JSON.stringify(OF)));
+const base = X.resumen(oF, PF);
+const f1 = X.crearFoto(oF, "escenario", "Base", "Lo ofertado");
+check("escenario creado con su foto", !!f1.snapshot && X.fotosDe(oF, "escenario").length === 1);
+check("la foto guarda el calendario", !!f1.snapshot.periodos && f1.snapshot.periodos.n === 6);
+check("la foto no guarda importes (se recalculan)", f1.snapshot.total === undefined);
+/* Recortar: la mitad de horas en la segunda tarea */
+oF.tareas[1].subtareas.forEach(s => s.lineas.forEach(l => { for (const k in l.horas) l.horas[k] = Math.round(l.horas[k] / 2); }));
+const recortada = X.resumen(oF, PF);
+const f2 = X.crearFoto(oF, "escenario", "Recortada", "Sin la mitad del desarrollo");
+check("el escenario recortado cuesta menos", recortada.total < base.total, recortada.total + " vs " + base.total);
+
+const cmp = X.comparar(oF, PF, f1.snapshot, f2.snapshot, "Base", "Recortada");
+const lineaTotal = cmp.economia.filter(l => l.clave === "total")[0];
+check("el delta del TOTAL es la resta", Math.abs(lineaTotal.d - N.r2(recortada.total - base.total)) < 0.005);
+check("delta negativo al recortar", lineaTotal.d < 0);
+check("economía con 6 líneas", cmp.economia.length === 6);
+check("estructura con 6 líneas", cmp.estructura.length === 6);
+check("horas por perfil con deltas", cmp.porPerfil.length > 0 && cmp.porPerfil.some(x => x.d !== 0));
+check("importe por periodo con etiquetas", cmp.porPeriodo.length === 6 && cmp.porPeriodo.every(m => !!m.etiqueta));
+check("detecta el cambio de horas de una tarea", cmp.cambios.some(c => /Horas en/.test(c.texto)), JSON.stringify(cmp.cambios.map(c => c.texto)));
+check("sin rastro de facturación en la comparación", JSON.stringify(cmp).indexOf("facturado") < 0);
+
+/* Cambios de estructura y de calendario */
+const antesFx = X.foto(oF);
+oF.tareas.push(M.nuevaTarea("3. Formación"));
+oF.tareas[0].entregables[0].periodo = 3;
+oF.periodos = P.conN(oF.periodos, 9);
+const cmp2 = X.comparar(oF, PF, antesFx, X.foto(oF), "Antes", "Ahora");
+check("detecta tarea nueva", cmp2.cambios.some(c => c.tipo === "alta" && /Formación/.test(c.texto)));
+check("detecta entrega movida de mes", cmp2.cambios.some(c => /Entrega de/.test(c.texto)), JSON.stringify(cmp2.cambios.map(c => c.texto)));
+check("detecta cambio de duración", cmp2.cambios.some(c => /Duración/.test(c.texto)));
+check("no inventa cambios inexistentes", cmp2.cambios.filter(c => /renombrad/.test(c.texto)).length === 0);
+
+/* Versión y aplicación */
+const v1 = X.crearFoto(oF, "version", "v1 enviada al cliente", "Por correo");
+check("versión congelada con su resumen", !!v1.resumen && v1.resumen.total > 0, v1.resumen && v1.resumen.total);
+check("las fotos se separan por tipo", X.fotosDe(oF, "version").length === 1 && X.fotosDe(oF, "escenario").length === 2);
+const totalAntes = C.totalOferta(oF, PF);
+X.aplicarFoto(oF, f1.snapshot);
+check("aplicar la foto base restaura el importe", Math.abs(C.totalOferta(oF, PF) - totalAntes) > 0.005);
+check("aplicarFoto no borra las fotos", N.lista(oF.fotos).length === 3);
+check("aplicar una foto nula no rompe", X.aplicarFoto(oF, null) === oF);
+X.borrarFoto(oF, f2.id);
+check("borrar foto por id", N.lista(oF.fotos).length === 2);
+
+/* ---------- 7. Normalización defensiva y migraciones ---------- */
+t.grupo("\n7. Normalización defensiva");
+const roto = M.normalizarOferta({
+  nombre: "", periodos: { inicio: "malo", n: 999, etiquetas: { 0: "x", 99: "sobra" } },
+  validezDias: -4, cliente: "Texto plano v1",
+  impuestos: { tipo: "loquesea", tasa: -3 }, descuento: { tipo: "loco", valor: -2 },
+  gastos: [{ nombre: "x" }],
+  entregables: [{ nombre: "E", periodo: 500, facturacionPct: 50, estado: "aceptado" }],
+  tareas: [{ nombre: "T", entregables: [{ nombre: "E2", mes: 3 }], subtareas: [{ lineas: [{ perfilId: "pf_x", horas: { m0: 3, m99: 7 } }] }] }]
+});
+check("calendario acotado a 60", roto.periodos.n === 60, roto.periodos.n);
+check("inicio inválido → mes válido", /^\d{4}-\d{2}$/.test(roto.periodos.inicio), roto.periodos.inicio);
+check("se tiran los rótulos fuera de rango", roto.periodos.etiquetas[99] === undefined && roto.periodos.etiquetas[0] === "x");
+check("validez no negativa", roto.validezDias >= 0);
+check("cliente texto → objeto", typeof roto.cliente === "object" && roto.cliente.nombre === "Texto plano v1");
+check("impuesto inválido → iva", roto.impuestos.tipo === "iva");
+check("tasa acotada", roto.impuestos.tasa === 0, roto.impuestos.tasa);
+check("descuento inválido → vacío", roto.descuento.tipo === "");
+check("horas fuera de rango descartadas", roto.tareas[0].subtareas[0].lineas[0].horas.p99 === undefined);
+check("horas migradas de m# a p#", roto.tareas[0].subtareas[0].lineas[0].horas.p0 === 3);
+check("entregable: periodo acotado y 'mes' convertido", roto.tareas[0].entregables[0].periodo === 3 && roto.tareas[0].entregables[0].mes === undefined);
+check("campos de seguimiento eliminados", roto.entregables[0].facturacionPct === undefined && roto.entregables[0].estado === undefined);
+check("datos basura no rompen", !!M.normalizarEstado(null).ofertas.length && !!M.normalizarOferta(null).id);
+
+/* Migración v3 → v4: escenarios y versiones se unifican en fotos */
+const v3 = {
+  version: 3, perfiles: [{ id: "pf_a", nombre: "A", tarifa: 10, categoria: "Otro" }], plantillas: [],
+  proyectos: [{
+    id: "pr_1", nombre: "Oferta v3", cliente: { nombre: "C" }, meses: 4, fechaInicio: "2027-01",
+    impuestos: { tipo: "iva", tasa: 21 }, tareas: [{ id: "ta_1", nombre: "T", entregables: [{ id: "en_1", nombre: "E", mes: 2, facturacionPct: 30, estado: "encurso" }], subtareas: [] }],
+    escenarios: [{ id: "es_1", nombre: "Base", etiqueta: "x", creado: "2026-01-01", snapshot: {} }],
+    versiones: [{ id: "vs_1", etiqueta: "v1", fecha: "2026-01-02", nota: "n", snapshot: {} }]
   }]
 };
-const m2 = M.migrar(v2);
-const EST3 = M.normalizarEstado(m2.estado);
-const prV2 = EST3.proyectos[0];
-check("origen detectado v2", m2.origen === 2);
-check("v2 conserva sus impuestos (IVA 21)", prV2.impuestos.tipo === "iva" && prV2.impuestos.tasa === 21);
-check("v2 conserva el esfuerzo", C.importeProyecto(prV2, EST3.perfiles) === 500, C.importeProyecto(prV2, EST3.perfiles));
-check("v2 gana campos v3 vacíos", Array.isArray(prV2.entregables) && Array.isArray(prV2.tareas[0].entregables) && Array.isArray(prV2.escenarios) && Array.isArray(prV2.versiones));
-check("v2 conserva marca y estado de la oferta", EST3.marca.nombre === "Marca V2" && prV2.estado === "enviada");
+const m3 = M.migrar(v3);
+const E3 = M.normalizarEstado(m3.estado);
+const OF3 = E3.ofertas[0];
+check("v3 → v4 migra el calendario", P.meses(OF3.periodos) === 4 && OF3.periodos.inicio === "2027-01", JSON.stringify(OF3.periodos));
+check("v3 → v4 unifica escenarios y versiones en fotos", N.lista(OF3.fotos).length === 2 && OF3.fotos.some(f => f.tipo === "escenario") && OF3.fotos.some(f => f.tipo === "version"));
+check("v3 → v4 limpia los campos de seguimiento", OF3.tareas[0].entregables[0].facturacionPct === undefined);
+check("v3 → v4 conserva los impuestos", OF3.impuestos.tipo === "iva" && OF3.impuestos.tasa === 21);
+check("v3 → v4 renombra proyectos → ofertas", E3.ofertas.length === 1 && E3.proyectos === undefined);
 
-/* ---------- 5. Normalización defensiva ---------- */
-t.grupo("\n5. Normalización defensiva");
-const roto = {
-  id: "pr_roto", nombre: "", meses: 999, fecha: "", validezDias: -5, cliente: "Texto plano v1",
-  impuestos: { tipo: "cualquiera", tasa: -3 }, descuento: { tipo: "loco", valor: -2 },
-  gastos: [{ nombre: "x" }],
-  tareas: [{ nombre: "T", entregables: [{ nombre: "E", estado: "inventado", mes: 99, facturacionPct: 500 }],
-    subtareas: [{ lineas: [{ perfilId: "pf_jp", horas: { m0: 3, m99: 7 } }] }] }]
-};
-const rn = M.normalizarProyecto(roto);
-check("meses acotados a 60", rn.meses === 60, rn.meses);
-check("validez no negativa", rn.validezDias >= 0);
-check("cliente texto plano → objeto", typeof rn.cliente === "object" && rn.cliente.nombre === "Texto plano v1");
-check("tipo de impuesto inválido → iva", rn.impuestos.tipo === "iva");
-check("tasa acotada 0..100", rn.impuestos.tasa === 0, rn.impuestos.tasa);
-check("descuento de tipo inválido → vacío", rn.descuento.tipo === "");
-check("horas de meses inexistentes descartadas", rn.tareas[0].subtareas[0].lineas[0].horas.m99 === undefined && rn.tareas[0].subtareas[0].lineas[0].horas.m0 === 3);
-check("tasa decimal aceptada", M.normalizarProyecto({ impuestos: { tipo: "iva", tasa: "21,5" } }).impuestos.tasa === 21.5);
-check("estado de entregable inválido → pendiente", rn.tareas[0].entregables[0].estado === "pendiente");
-check("mes de entregable acotado al proyecto", rn.tareas[0].entregables[0].mes <= 59);
-check("porcentaje de facturación acotado 0..100", rn.tareas[0].entregables[0].facturacionPct === 100);
-check("oferta sin tareas no rompe", !!M.normalizarProyecto({}).tareas);
-check("datos basura no rompen", !!M.normalizarProyecto(null).id && !!M.normalizarEstado(null).proyectos.length);
-
-/* ---------- 6. Redondeo estilo Excel ---------- */
-t.grupo("\n6. Redondeo y precisión");
-check("r2(0.1+0.2) = 0.3", U.r2(0.1 + 0.2) === 0.3, U.r2(0.1 + 0.2));
-check("r2 acepta coma decimal", U.r2("1.005") === 1.01 || U.r2("1.005") === 1, U.r2("1.005"));
-check("num('1.234,56') no explota", U.num("1.234,56") === 1.234);
-check("lineaImporte redondea a 2 decimales", (() => {
-  const p = M.normalizarProyecto({ meses: 1, tareas: [{ subtareas: [{ lineas: [{ perfilId: "pf_a", horas: { m0: 3.333 } }] }] }] });
-  return U.r2(C.lineaImporte(p.tareas[0].subtareas[0].lineas[0], [{ id: "pf_a", tarifa: 3 }])) === 10;
+/* ---------- 8. Redondeo ---------- */
+t.grupo("\n8. Redondeo y precisión");
+check("r2(0.1+0.2) = 0.3", N.r2(0.1 + 0.2) === 0.3);
+check("acepta coma decimal", N.num("1,5") === 1.5);
+check("el importe de línea redondea a 2 decimales", (() => {
+  const of2 = M.normalizarOferta({ periodos: { n: 1 }, tareas: [{ subtareas: [{ lineas: [{ perfilId: "pf_a", horas: { p0: 3.333 } }] }] }] });
+  return N.r2(C.lineaImporte(of2.tareas[0].subtareas[0].lineas[0], [{ id: "pf_a", tarifa: 3 }])) === 10;
 })());
+check("fechaCorta formatea dd/mm/aaaa", N.fechaCorta("2027-03-15") === "15/03/2027", N.fechaCorta("2027-03-15"));
+check("fechaLarga en español", N.fechaLarga("2027-03-15").indexOf("marzo") > 0, N.fechaLarga("2027-03-15"));
 
 t.resumen();
 process.exit(t.ko ? 1 : 0);

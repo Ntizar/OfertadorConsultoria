@@ -1,8 +1,8 @@
 "use strict";
 /* =====================================================================
-   Planifica v3 — ARNÉS COMÚN
-   Carga los módulos de la app en un sandbox de Node (sin DOM) para poder
-   verificar el motor puro, y ofrece el contador de comprobaciones.
+   Planifica v4 — ARNÉS COMÚN
+   Carga los módulos en un sandbox de Node (sin DOM) para verificar el motor
+   puro, y ofrece el contador de comprobaciones.
    ===================================================================== */
 const fs = require("fs");
 const vm = require("vm");
@@ -11,50 +11,58 @@ const path = require("path");
 const RAIZ = path.join(__dirname, "..");
 const DIR_JS = path.join(RAIZ, "src", "js");
 
-/* Orden de concatenación real del build: aquí se carga igual.
-   Los módulos que aún no existan se saltan (permite verificar por fases). */
-const MODULOS = ["nucleo.js", "modelo.js", "ejemplo.js", "calculo.js", "entregables.js", "comparar.js", "almacen.js"];
+/* Orden de carga real del build (MISMO orden que compilar.py). */
+const MODULOS = [
+  "nucleo.js", "periodos.js", "modelo.js", "ejemplo.js",
+  "calculo.js", "entregables.js", "comparar.js", "almacen.js"
+];
 
-function cargarPL(extra) {
+/* Módulos de vista (solo se cargan si el arnés pasa el DOM). */
+const MODULOS_VISTA = [
+  "vistas.js", "vista-oferta.js", "vista-trabajo.js", "vista-resumen.js",
+  "vista-informe.js", "vista-ajustes.js", "acciones.js", "eventos.js", "main.js"
+];
+
+function cargar(modulos, extra) {
   const sandbox = Object.assign({
     console: console, Math: Math, JSON: JSON, Date: Date, Number: Number, String: String,
     Array: Array, Object: Object, Map: Map, Set: Set, RegExp: RegExp, Error: Error,
     parseInt: parseInt, parseFloat: parseFloat, isFinite: isFinite, isNaN: isNaN,
     Infinity: Infinity, NaN: NaN
   }, extra || {});
-  /* Los módulos usan `typeof window !== "undefined" ? window : globalThis`:
-     dentro del sandbox, window ES el sandbox. */
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
 
-  const cargados = [];
-  MODULOS.forEach(f => {
+  const cargados = [], faltan = [];
+  (modulos || MODULOS).forEach(f => {
     const ruta = path.join(DIR_JS, f);
-    if (!fs.existsSync(ruta)) return;
+    if (!fs.existsSync(ruta)) { faltan.push(f); return; }
     vm.runInContext(fs.readFileSync(ruta, "utf8"), sandbox, { filename: f });
     cargados.push(f);
   });
-  vm.runInContext("var __MODULOS_CARGADOS = " + JSON.stringify(cargados) + ";", sandbox);
-  return { sandbox: sandbox, PL: sandbox.PL, cargados: cargados };
+  return { sandbox: sandbox, PL: sandbox.PL, cargados: cargados, faltan: faltan };
 }
 
-/** Contador de comprobaciones con salida por consola y código de salida. */
+/** Carga solo el motor (sin DOM). */
+function cargarPL(extra) { return cargar(MODULOS, extra); }
+
+/** Contador de comprobaciones con salida por consola. */
 function contador(titulo) {
   let ok = 0, ko = 0;
   const fallos = [];
   if (titulo) console.log("== " + titulo + " ==\n");
   return {
-    check: function (nombre, cond, detalle) {
+    check(nombre, cond, detalle) {
       if (cond) { ok++; console.log("  ✓ " + nombre); }
       else { ko++; fallos.push(nombre); console.log("  ✗ " + nombre + (detalle === undefined ? "" : " → " + detalle)); }
     },
-    grupo: function (t) { console.log("\n" + t); },
-    info: function (t) { console.log("  · " + t); },
+    grupo(t) { console.log("\n" + t); },
+    info(t) { console.log("  · " + t); },
     get ok() { return ok; },
     get ko() { return ko; },
     get fallos() { return fallos; },
-    resumen: function (silencio) {
+    resumen(silencio) {
       if (!silencio) {
         console.log("\n---------------------------------------------");
         console.log((ko === 0 ? "RESULTADO: " : "FALLOS: ") + ok + " OK / " + ko + " FALLOS" + (ko ? " (" + fallos.join("; ") + ")" : ""));
@@ -64,9 +72,6 @@ function contador(titulo) {
   };
 }
 
-/** Lee un JSON de datos/ con nombre y lo devuelve como cadena (para migrar). */
-function leerDato(nombre) {
-  return fs.readFileSync(path.join(RAIZ, "datos", nombre), "utf8");
-}
+function leerDato(nombre) { return fs.readFileSync(path.join(RAIZ, "datos", nombre), "utf8"); }
 
-module.exports = { RAIZ: RAIZ, DIR_JS: DIR_JS, MODULOS: MODULOS, cargarPL: cargarPL, contador: contador, leerDato: leerDato };
+module.exports = { RAIZ: RAIZ, DIR_JS: DIR_JS, MODULOS: MODULOS, MODULOS_VISTA: MODULOS_VISTA, cargar: cargar, cargarPL: cargarPL, contador: contador, leerDato: leerDato };

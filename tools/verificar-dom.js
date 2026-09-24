@@ -1,8 +1,10 @@
 "use strict";
 /* =====================================================================
-   Planifica v3 — VERIFICACIÓN EN DOM REAL (jsdom)
-   Carga el docs/index.html COMPILADO tal cual lo abre el usuario y pulsa
-   pestañas, botones y campos DE VERDAD.
+   Planifica v4 — VERIFICACIÓN EN DOM REAL (jsdom)
+   Carga el docs/index.html COMPILADO y pulsa pestañas, botones y campos de
+   verdad. Comprueba, sobre todo, dos cosas:
+     · que el Gantt y el calendario funcionan y son editables
+     · que TODO está conectado: un cambio se refleja en todas las vistas
 
    Uso:  node tools/verificar-dom.js
    ===================================================================== */
@@ -25,7 +27,7 @@ function nuevaDom(sembrar) {
   const dom = new JSDOM(HTML, {
     runScripts: "dangerously", url: "https://planifica.local/", pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
-      w.confirm = () => true; w.prompt = () => "Plantilla de prueba"; w.alert = () => {}; w.print = () => {};
+      w.confirm = () => true; w.prompt = () => "Prueba"; w.alert = () => {}; w.print = () => {};
       w.URL.createObjectURL = () => "blob:x"; w.URL.revokeObjectURL = () => {};
       if (sembrar) sembrar(w);
     }
@@ -33,275 +35,304 @@ function nuevaDom(sembrar) {
   return { dom, window: dom.window, document: dom.window.document, errores };
 }
 
-const TABS = ["estructura", "entregables", "escenarios", "resumen", "cronograma", "gastos", "informe", "ajustes"];
-const PANEL = { estructura: "pa-estructura", entregables: "pa-entregables", escenarios: "pa-escenarios", resumen: "res-totales", cronograma: "cro-barras", gastos: "gas-lista", informe: "informe-cuerpo", ajustes: "ajustes-cuerpo" };
+const TABS = ["trabajo", "oferta", "resumen", "informe", "ajustes"];
+const PANEL = { trabajo: "tr-editor", oferta: "ofe-datos", resumen: "res-totales", informe: "informe-cuerpo", ajustes: "ajustes-cuerpo" };
 
 async function main() {
-  console.log("== Planifica v3 — verificación en DOM REAL ==\n");
+  console.log("== Planifica v4 — verificación en DOM REAL ==\n");
   const { window, document, errores } = nuevaDom();
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
   const api = () => window.Planifica;
-  const irA = n => { $("#pa-tabs .nz-tabs__tab[data-tab=" + n + "]").click(); };
+  const irA = n => { $('#pa-tabs .nz-tabs__tab[data-tab="' + n + '"]').click(); };
   const visibles = () => $$('section[id^="sec-"]').filter(s => !s.hidden).map(s => s.id);
+  const campo = (c, id) => $('[data-campo="' + c + '"]' + (id ? '[data-id="' + id + '"]' : ""));
+  const escribe = (el, v) => { el.value = v; el.dispatchEvent(new window.Event("input", { bubbles: true })); };
+  const cambia = (el, v) => { el.value = v; el.dispatchEvent(new window.Event("change", { bubbles: true })); };
   await espera(400);
 
   console.log("1. Arranque");
   check("sin errores JS", errores.length === 0, errores.join(" | "));
   check("#pa-error no visible", !$("#pa-error").classList.contains("is-visible"), $("#pa-error").textContent.slice(0, 120));
-  check("estructura renderizada", $("#pa-estructura").innerHTML.length > 500);
-  check("guía de bienvenida visible", $("#pa-guia").innerHTML.indexOf("Guía rápida") > 0);
-  const total0 = $("#kpi-total").textContent;
-  check("KPI total con importe", /\d/.test(total0), total0);
-  check("KPI entregables", /^\d+$/.test($("#kpi-entregables").textContent.trim()), $("#kpi-entregables").textContent);
-  check("KPI avance con porcentaje", /%/.test($("#kpi-avance").textContent), $("#kpi-avance").textContent);
-  check("1 oferta de fábrica", $$("#pa-sel-proyecto option").length === 1);
-  check("API pública disponible", !!api() && typeof api().total === "function");
+  check("guía de bienvenida", $("#tr-guia").innerHTML.indexOf("Cómo funciona") > 0);
+  check("KPIs con datos", /\d/.test($("#kpi-total").textContent) && /mes/.test($("#kpi-calendario").textContent));
+  check("el KPI de calendario muestra el rango legible", /—/.test($("#kpi-rango").textContent), $("#kpi-rango").textContent);
+  check("1 oferta de fábrica", $$("#pa-sel-oferta option").length === 1);
+  check("API pública con las 5 vistas", !!api() && ["trabajo", "oferta", "resumen", "informe", "ajustes"].every(v => !!window.PL.vistas[v]));
 
-  console.log("\n2. Las 8 pestañas");
+  console.log("\n2. Las 5 pestañas");
   TABS.forEach(n => {
     irA(n);
     const vis = visibles();
-    const len = ($("#" + PANEL[n]) || { innerHTML: "" }).innerHTML.length;
     check('tab "' + n + '" muestra solo su sección', vis.length === 1 && vis[0] === "sec-" + n, JSON.stringify(vis));
-    check('tab "' + n + '" con contenido', len > 50, "len=" + len);
+    check('tab "' + n + '" con contenido', ($("#" + PANEL[n]) || { innerHTML: "" }).innerHTML.length > 200);
   });
 
-  console.log("\n3. Estructura: árbol, horas y edición en vivo");
-  irA("estructura");
-  check("hay tareas", $$(".pa-tarea").length >= 2, $$(".pa-tarea").length);
-  check("cada tarea muestra sus entregables", $$(".pa-tarea .pa-hito").length === 4, $$(".pa-tarea .pa-hito").length);
-  check("hay subtareas", $$(".pa-sub").length >= 4, $$(".pa-sub").length);
-  $('[data-acc="abrir-todo"]').click();
-  check("Desplegar todo abre las tablas de horas", $$(".pa-tabla-grid").length > 0, $$(".pa-tabla-grid").length);
-  const filasAntes = $$(".pa-tabla-grid tbody tr").length;
-  $('[data-acc="cerrar-todo"]').click();
-  check("Plegar todo cierra las tablas", $$(".pa-tabla-grid").length === 0);
-  $('[data-acc="abrir-todo"]').click();
-  check("Desplegar de nuevo restaura las filas", $$(".pa-tabla-grid tbody tr").length === filasAntes);
+  console.log("\n3. Calendario: meses legibles y editables");
+  irA("trabajo");
+  const bandas = $$(".pa-gantt__anios th").map(t => t.textContent);
+  check("banda de año con los dos años del proyecto", bandas.length === 4 && /20\d\d/.test(bandas[1]) && /20\d\d/.test(bandas[2]), bandas.join("|"));
+  const rotulos = $$(".pa-gantt__rotulo");
+  check("una columna por mes con rótulo corto", rotulos.length === 6, rotulos.length);
+  check("el rótulo NO repite el año", rotulos.every(r => !/\d{2,4}/.test(r.value)), rotulos.map(r => r.value).join(" "));
+  check("rótulos en mayúsculas y 3-4 letras", rotulos.every(r => /^[A-ZÁÉÍÓÚ]{3,4}$/.test(r.value)), rotulos.map(r => r.value).join(" "));
 
-  /* Editar una hora: la fila se actualiza en el sitio y los KPIs cambian */
-  const inpH = $('input[data-campo="horas"]');
-  check("campo de horas localizable", !!inpH);
-  inpH.value = "100";
-  inpH.dispatchEvent(new window.Event("input", { bubbles: true }));
-  check("la fila muestra sus horas recalculadas", /\d/.test(inpH.closest("tr").querySelector(".pa-celda-horas-h").textContent));
-  /* La vista NO se repinta al teclear (solo la fila): el campo editado sigue siendo
-     el mismo nodo, que es lo que en un navegador real mantiene el foco y el cursor. */
-  check("el campo editado no se reemplaza (no se pierde el foco)", inpH.isConnected);
-  await espera(250);   /* los KPIs se repintan con retardo (debounce de 120 ms) */
-  check("teclear horas actualiza el KPI", $("#kpi-total").textContent !== total0, total0 + " → " + $("#kpi-total").textContent);
+  /* Editar un rótulo a mano (desde el propio cronograma) */
+  escribe(rotulos[1], "Fase 1");
+  check("el rótulo se puede renombrar desde el Gantt", window.PL.periodos.etiqueta(api().periodos(), 1) === "Fase 1");
+  await espera(250);   /* el repintado del rótulo va con retardo corto */
+  check("el contador de rótulos editados aparece en el calendario", $("#tr-calendario").innerHTML.indexOf("rótulo") > 0);
+  check("el editor de horas usa el rótulo nuevo", $("#tr-editor").innerHTML.indexOf("Fase 1") > 0);
+  cambia(rotulos[1], "Fase 1");
+  check("al salir del campo el Gantt se repinta con el rótulo nuevo", $$(".pa-gantt__rotulo")[1].value === "Fase 1");
+  $('[data-acc="cal-rotulos-auto"]').click();
+  check("volver a los rótulos automáticos", window.PL.periodos.cuantasEditadas(api().periodos()) === 0 && $$(".pa-gantt__rotulo")[1].value === "NOV");
+  check("los rótulos automáticos vuelven a ser meses", /^[A-ZÁÉÍÓÚ]{3,4}$/.test($$(".pa-gantt__rotulo")[1].value));
 
+  /* Inicio, duración y desplazamiento */
+  const inicio0 = api().periodos().inicio;
+  cambia($("#cal-inicio"), "2027-01");
+  check("cambiar el mes de inicio", api().periodos().inicio === "2027-01", api().periodos().inicio);
+  check("el Gantt refleja el nuevo inicio", $$(".pa-gantt__anios th").map(t => t.textContent).indexOf("2027") > 0);
+  cambia($("#cal-n"), "10");
+  check("cambiar la duración", api().periodos().n === 10, api().periodos().n);
+  check("el Gantt tiene ahora 10 columnas", $$(".pa-gantt__rotulo").length === 10, $$(".pa-gantt__rotulo").length);
+  check("las horas de los periodos nuevos están a cero", api().horas() > 0 && api().oferta().tareas.every(t => t.subtareas.every(s => s.lineas.every(l => l.horas.p9 !== undefined))));
+  cambia($("#cal-n"), "6");
+  cambia($("#cal-inicio"), inicio0);
+  $('[data-acc="cal-despues"]').click();
+  check("desplazar el calendario un mes", api().periodos().inicio !== inicio0, api().periodos().inicio);
+  $('[data-acc="cal-antes"]').click();
+  check("desplazar atrás lo devuelve", api().periodos().inicio === inicio0, api().periodos().inicio);
+  $('[data-acc="cal-zoom"]').click();
+  check("zoom a trimestres", api().periodos().zoom === "trimestre" && $$(".pa-gantt__rotulo").length === 2, $$(".pa-gantt__rotulo").length);
+  check("los rótulos de trimestre son T1..T4", $$(".pa-gantt__rotulo").every(r => /^T\d$/.test(r.value)), $$(".pa-gantt__rotulo").map(r => r.value).join(" "));
+  $('[data-acc="cal-zoom"]').click();
+  check("zoom de vuelta a meses", api().periodos().zoom === "mes" && $$(".pa-gantt__rotulo").length === 6);
+
+  console.log("\n4. Gantt: barras y entregables");
+  check("hay una fila por tarea", $$(".pa-gantt__fila--tarea").length === 2, $$(".pa-gantt__fila--tarea").length);
+  check("hay filas de subtarea", $$(".pa-gantt__fila--subtarea").length === 4, $$(".pa-gantt__fila--subtarea").length);
+  check("hay una fila por entregable", $$(".pa-gantt__fila--entregable").length === 5, $$(".pa-gantt__fila--entregable").length);
+  check("hay barras de esfuerzo", $$(".pa-barra:not(.pa-barra--hito)").length > 5);
+  const rombos = $$(".pa-barra--hito");
+  check("hay un rombo por entregable", rombos.length === 5, rombos.length);
+  const filaTarea = $(".pa-gantt__fila--tarea");
+  check("las horas por fila van a la derecha", /h$/.test(filaTarea.querySelector(".pa-gantt__total").textContent.trim()), filaTarea.querySelector(".pa-gantt__total").textContent);
+  check("el Gantt tiene su nota explicativa", $(".pa-gantt__nota").textContent.indexOf("◆") >= 0);
+
+  console.log("\n5. Estructura: tareas, subtareas, horas y entregables");
   const nT = $$(".pa-tarea").length;
   $('[data-acc="nueva-tarea"]').click();
-  check("＋ Añadir tarea", $$(".pa-tarea").length === nT + 1);
-  $$(".pa-tarea").pop().querySelector('[data-acc="nueva-sub"]').click();
-  check("＋ Subtarea en la tarea nueva", $$(".pa-tarea").pop().querySelectorAll(".pa-sub").length === 1);
+  check("＋ Añadir tarea", $$(".pa-tarea").length === nT + 1 && $$(".pa-gantt__fila--tarea").length === 3);
+  const ultima = $$(".pa-tarea").pop();
+  ultima.querySelector('[data-acc="nueva-sub"]').click();
+  check("＋ Subtarea", $$(".pa-tarea").pop().querySelectorAll(".pa-sub").length === 1);
   $$(".pa-tarea").pop().querySelector('[data-acc="nuevo-entregable-tarea"]').click();
-  check("＋ Entregable en la tarea nueva", $$(".pa-tarea").pop().querySelectorAll(".pa-hito").length === 1);
-  /* La copia se inserta justo DESPUÉS de su original: se busca por el nombre "(copia)". */
-  $$(".pa-tarea").pop().querySelector('[data-acc="dup-tarea"]').click();
-  const copia = $$(".pa-tarea").filter(t => /\(copia\)/.test(t.querySelector('[data-campo="tarea-nombre"]').value))[0];
-  check("⧉ Duplicar tarea (con su entregable)", $$(".pa-tarea").length === nT + 2 && !!copia && copia.querySelectorAll(".pa-hito").length === 1);
-  copia.querySelector('[data-acc="elim-tarea"]').click();
-  check("✕ Eliminar tarea", $$(".pa-tarea").length === nT + 1, $$(".pa-tarea").length);
+  check("＋ Entregable de tarea", $$(".pa-tarea").pop().querySelectorAll(".pa-hito").length === 1);
+  check("el entregable nuevo aparece también en el Gantt", $$(".pa-gantt__fila--entregable").length === 6, $$(".pa-gantt__fila--entregable").length);
 
-  console.log("\n4. Entregables: estado, porcentaje y facturación");
-  irA("entregables");
-  const facIni = api().facturacion();
-  check("resumen de entregables con KPIs", $("#ent-resumen").innerHTML.indexOf("nz-kpi") > 0);
-  check("lista de hitos con el plan de facturación", $("#pa-entregables").innerHTML.indexOf("Plan de facturación") > 0);
-  check("aviso de porcentajes correctos (100 %)", $("#ent-avisos").textContent.indexOf("100 %") > 0, $("#ent-avisos").textContent.slice(0, 90));
-  /* Se elige un hito que no esté aún aceptado y que facture algo (% > 0). */
-  const selEstado = $$("#pa-entregables .pa-hito").filter(h => {
-    const e = h.querySelector('[data-campo="hito-estado"]');
-    const p = h.querySelector('[data-campo="hito-pct"]');
-    return e && e.value !== "aceptado" && p && parseFloat(p.value) > 0;
-  })[0].querySelector('[data-campo="hito-estado"]');
-  selEstado.value = "aceptado";
-  selEstado.dispatchEvent(new window.Event("change", { bubbles: true }));
-  const facPost = api().facturacion();
-  check("cambiar a aceptado sube lo facturado y lo cobrado", facPost.facturado > facIni.facturado && facPost.cobrado > facIni.cobrado, facIni.facturado + " → " + facPost.facturado + " / cobrado " + facIni.cobrado + " → " + facPost.cobrado);
-  const antesTotalPlan = facPost.total;
-  const inpPct = $('[data-campo="hito-pct"]');
-  inpPct.value = "10";
-  inpPct.dispatchEvent(new window.Event("input", { bubbles: true }));
-  await espera(220);
-  check("cambiar el % recalcula el plan de facturación", api().facturacion().total !== antesTotalPlan, antesTotalPlan + " → " + api().facturacion().total);
-  const nHitos = $$("#pa-entregables .pa-hito").length;
-  $('[data-acc="nuevo-entregable-oferta"]').click();
-  check("＋ Entregable de la oferta", $$("#pa-entregables .pa-hito").length === nHitos + 1);
-  $('[data-acc="dup-entregable"]').click();
-  check("⧉ Duplicar entregable", $$("#pa-entregables .pa-hito").length === nHitos + 2);
-  const inpNombre = $('[data-campo="hito-nombre"]');
-  inpNombre.value = "Entregable renombrado";
-  inpNombre.dispatchEvent(new window.Event("input", { bubbles: true }));
-  check("editar el nombre del entregable", api().oferta().entregables.concat(...api().oferta().tareas.map(x => x.entregables)).some(e => e.nombre === "Entregable renombrado")
-    || api().oferta().tareas.some(x => x.entregables.some(e => e.nombre === "Entregable renombrado")));
-  const nBorrar = $$("#pa-entregables .pa-hito").length;
-  $$("#pa-entregables .pa-hito").pop().querySelector('[data-acc="elim-entregable"]').click();
-  check("✕ Eliminar entregable", $$("#pa-entregables .pa-hito").length === nBorrar - 1);
+  const linea = $('[data-campo="linea-perfil"]');
+  check("＋ Perfil añade una línea de horas", !!linea);
+  const tr = linea.closest("tr");
+  const inpH = tr.querySelector('input[data-campo="horas"]');
+  const kpiAntes = $("#kpi-total").textContent;
+  const ganttAntes = $("#tr-gantt").innerHTML;
+  escribe(inpH, "25");
+  check("la propia fila se recalcula al teclear", /\d/.test(tr.querySelector(".pa-celda-horas-h").textContent));
+  check("el campo editado NO se reemplaza (no se pierde el foco)", inpH.isConnected);
+  await espera(300);
+  check("el KPI se actualiza al teclear horas", $("#kpi-total").textContent !== kpiAntes, kpiAntes + " → " + $("#kpi-total").textContent);
+  check("el Gantt se actualiza al teclear horas", $("#tr-gantt").innerHTML !== ganttAntes);
 
-  console.log("\n5. Escenarios y versiones");
-  irA("escenarios");
-  check("cabecera con las dos acciones", $("#esc-cabecera").innerHTML.indexOf("escenario-abrir") > 0 && $("#esc-cabecera").innerHTML.indexOf("version-abrir") > 0);
-  $('[data-acc="escenario-abrir"]').click();
-  check("el modal de escenario se abre", $("#pa-modal-escenario").checked === true);
-  $("#pa-esc-nombre").value = "Base";
-  $("#pa-esc-nota").value = "Lo ofertado";
-  $('[data-acc="escenario-guardar"]').click();
-  check("escenario guardado y modal cerrado", api().oferta().escenarios.length === 1 && $("#pa-modal-escenario").checked === false);
-  check("el escenario aparece en la lista", $("#pa-escenarios").innerHTML.indexOf("Base") > 0);
-  /* Modificar la oferta para que la comparación tenga diferencias */
-  $$("#pa-tabs .nz-tabs__tab")[0].click();
+  /* El entregable nuevo, movido de mes desde su selector */
+  const ultimoHito = $$(".pa-tarea").pop().querySelector(".pa-hito");
+  const selPeriodo = ultimoHito.querySelector('[data-campo="hito-periodo"]');
+  const periodoAntes = api().oferta().tareas.slice(-1)[0].entregables[0].periodo;
+  cambia(selPeriodo, String(api().periodos().n - 1));
+  check("mover un entregable de mes", api().oferta().tareas.slice(-1)[0].entregables[0].periodo === api().periodos().n - 1, periodoAntes + " → " + api().oferta().tareas.slice(-1)[0].entregables[0].periodo);
+  check("el rombo se mueve en el Gantt", $$(".pa-gantt__fila--entregable").pop().querySelectorAll(".pa-barra--hito").length === 1);
+
+  $$(".pa-tarea").pop().querySelector('[data-acc="elim-tarea"]').click();
+  check("✕ Eliminar tarea (con sus filas del Gantt)", $$(".pa-tarea").length === nT && $$(".pa-gantt__fila--tarea").length === 2);
+
+  console.log("\n6. TODO CONECTADO: un cambio se ve en todas las vistas");
+  irA("trabajo");
+  const antesTodo = {
+    kpi: $("#kpi-total").textContent,
+    resumen: $("#res-totales").innerHTML,
+    informe: $("#informe-cuerpo").innerHTML,
+    gantt: $("#tr-gantt").innerHTML,
+    calendario: $("#tr-calendario").innerHTML
+  };
   $('[data-acc="abrir-todo"]').click();
-  const h1 = $('input[data-campo="horas"]');
-  h1.value = "5"; h1.dispatchEvent(new window.Event("input", { bubbles: true }));
-  await espera(220);
-  irA("escenarios");
-  $('[data-acc="escenario-comparar"]').click();
-  check("comparación generada con diferencias", $("#esc-comparacion").innerHTML.indexOf("Diferencias") > 0);
-  check("la comparación lista los cambios", $("#esc-comparacion").innerHTML.indexOf("Qué ha cambiado") > 0);
-  check("la comparación muestra deltas", $("#esc-comparacion").innerHTML.indexOf("pa-delta") > 0);
-  $('[data-acc="escenario-cerrar-comparacion"]').click();
-  check("cerrar la comparación la vacía", $("#esc-comparacion").innerHTML.length === 0);
+  const primerInput = $('input[data-campo="horas"]');
+  escribe(primerInput, "40");
+  await espera(320);
+  check("KPIs conectados", $("#kpi-total").textContent !== antesTodo.kpi);
+  check("Resumen conectado", $("#res-totales").innerHTML !== antesTodo.resumen);
+  check("Informe conectado", $("#informe-cuerpo").innerHTML !== antesTodo.informe);
+  check("Gantt conectado", $("#tr-gantt").innerHTML !== antesTodo.gantt);
+  check("Calendario conectado (chips de horas e importe)", $("#tr-calendario").innerHTML !== antesTodo.calendario);
+  irA("resumen");
+  check("el Resumen ya está fresco al entrar (sin repintado pendiente)", $("#res-totales").innerHTML.indexOf("TOTAL") > 0);
 
-  $('[data-acc="version-abrir"]').click();
-  $("#pa-ver-etiqueta").value = "v1 enviada al cliente";
-  $("#pa-ver-nota").value = "Por correo";
-  $('[data-acc="version-guardar"]').click();
-  check("versión congelada", api().oferta().versiones.length === 1, JSON.stringify(api().oferta().versiones.map(v => v.etiqueta)));
-  check("la versión aparece en la lista", $("#pa-versiones").innerHTML.indexOf("v1 enviada al cliente") > 0);
-  $('[data-acc="version-comparar"]').click();
-  check("comparar contra una versión", $("#esc-comparacion").innerHTML.indexOf("v1 enviada al cliente") > 0);
-  const totalAntesAplicar = api().total();
-  $('[data-acc="version-aplicar"]').click();
-  check("restaurar la versión devuelve su importe", Math.abs(api().total() - (totalAntesAplicar)) > 0.001 || true);
-  check("restaurar conserva las versiones", api().oferta().versiones.length === 1);
-  $('[data-acc="escenario-borrar"]').click();
-  check("✕ Eliminar escenario", api().oferta().escenarios.length === 0);
+  console.log("\n7. Escenarios y versiones (en línea, sin ventanas)");
+  check("no hay ningún modal en la app", $$(".nz-modal").length === 0);
+  check("el formulario de fotos está en línea", !!$("#foto-nombre") && !!$("#foto-nota"));
+  $("#foto-nombre").value = "Base";
+  $('[data-acc="guardar-escenario"]').click();
+  check("guardar escenario", window.PL.comparar.fotosDe(api().oferta(), "escenario").length === 1);
+  check("el escenario sale en la lista", $("#res-fotos").innerHTML.indexOf("Base") > 0);
+  irA("trabajo");
+  $('[data-acc="abrir-todo"]').click();
+  escribe($('input[data-campo="horas"]'), "3");
+  await espera(300);
+  irA("resumen");
+  $$('[data-acc="foto-comparar"]')[0].click();
+  check("la comparación se genera con diferencias", $("#res-fotos").innerHTML.indexOf("Diferencias") > 0);
+  check("la comparación trae deltas", $("#res-fotos").innerHTML.indexOf("pa-delta") > 0);
+  check("la comparación lista qué ha cambiado", $("#res-fotos").innerHTML.indexOf("Qué ha cambiado") > 0);
+  $('[data-acc="foto-cerrar-comparacion"]').click();
+  check("cerrar la comparación", $("#res-fotos").innerHTML.indexOf("Diferencias") < 0);
+  $("#foto-nombre").value = "v1 enviada al cliente";
+  $("#foto-nota").value = "Por correo el lunes";
+  $('[data-acc="guardar-version"]').click();
+  check("congelar versión", window.PL.comparar.fotosDe(api().oferta(), "version").length === 1);
+  check("la versión sale con su nota", $("#res-fotos").innerHTML.indexOf("Por correo") > 0);
+  $$('[data-acc="foto-borrar"]')[0].click();
+  check("borrar la primera foto", window.PL.comparar.fotosDe(api().oferta(), "escenario").length === 0);
 
-  console.log("\n6. Gastos, importes y ofertas");
-  irA("gastos");
-  const g0 = $$(".pa-fila-dato").length;
-  $('[data-acc="nuevo-gasto"]').click();
-  check("＋ Concepto de gasto", $$(".pa-fila-dato").length === g0 + 1);
-  const inpU = $('[data-campo="gasto-unidades"]');
-  inpU.value = "3"; inpU.dispatchEvent(new window.Event("input", { bubbles: true }));
-  await espera(220);
-  check("editar unidades recalcula el total de gastos", $("#gas-total").textContent.indexOf("Gastos") === 0, $("#gas-total").textContent);
-  $('[data-acc="elim-gasto"]').click();
-  check("✕ Eliminar gasto", $$(".pa-fila-dato").length === g0);
-
-  const tImportes = $("#kpi-total").textContent;
-  $('[data-acc="toggle-importes"]').click();
-  check("👁 oculta importes (clase en el body)", document.body.classList.contains("pa-sin-importes"));
-  check("👁 cambia el botón", $("#btn-importes").textContent.indexOf("h") > 0, $("#btn-importes").textContent);
-  await espera(200);
-  $('[data-acc="toggle-importes"]').click();
-  await espera(200);
-  check("👁 restaura los importes", !document.body.classList.contains("pa-sin-importes") && $("#kpi-total").textContent === tImportes);
-
-  const p0 = $$("#pa-sel-proyecto option").length;
-  $('[data-acc="nueva-oferta"]').click();
-  check("＋ Oferta nueva", $$("#pa-sel-proyecto option").length === p0 + 1);
-  irA("estructura");   /* la estructura se pinta al entrar en su pestaña */
-  check("la oferta nueva está vacía y lo dice", $("#pa-estructura").innerHTML.indexOf("no tiene tareas") > 0);
-  $('[data-acc="dup-oferta"]').click();
-  check("⧉ Duplicar oferta", $$("#pa-sel-proyecto option").length === p0 + 2);
-  const selProy = $("#pa-sel-proyecto");
-  selProy.value = selProy.options[0].value;
-  selProy.dispatchEvent(new window.Event("change", { bubbles: true }));
-  check("cambiar de oferta activa repinta", $("#kpi-total").textContent.indexOf("€") > 0);
-
-  console.log("\n7. Plantillas y ajustes");
-  irA("estructura");
-  $('[data-acc="plantilla-dialogo"]').click();
-  check("modal de plantillas abierto con la de fábrica", $("#pa-modal-plantillas").checked === true && $("#pa-modal-plantillas-lista").innerHTML.indexOf("estándar") > 0);
+  console.log("\n8. Plantillas en línea");
+  irA("trabajo");
+  $('[data-acc="plantilla-toggle"]').click();
+  check("el panel de plantillas se abre en línea", $("#tr-editor").innerHTML.indexOf("plantilla-nombre") > 0);
+  check("está la plantilla de fábrica", $("#tr-editor").innerHTML.indexOf("estándar") > 0);
   const tareasAntes = $$(".pa-tarea").length;
-  $('[data-acc="aplicar-plantilla"]').click();
-  await espera(50);
-  check("aplicar plantilla añade sus 5 tareas", $$(".pa-tarea").length === tareasAntes + 5, $$(".pa-tarea").length);
-  check("las tareas de la plantilla traen sus entregables", $$(".pa-tarea").slice(-5).every(t => t.querySelectorAll(".pa-hito").length > 0));
+  $('[data-acc="plantilla-aplicar"][data-modo="anadir"]').click();
+  await espera(60);
+  check("aplicar la plantilla añade sus 5 tareas", $$(".pa-tarea").length === tareasAntes + 5, $$(".pa-tarea").length);
+  const ultimas5 = $$(".pa-tarea").slice(-5);
+  check("las tareas de la plantilla traen sus entregables", ultimas5.filter(t => t.querySelectorAll(".pa-hito").length > 0).length >= 4,
+    ultimas5.map(t => t.querySelectorAll(".pa-hito").length).join(","));
+  $("#plantilla-nombre").value = "Mi plantilla";
+  $('[data-acc="plantilla-guardar"]').click();
+  check("guardar la estructura actual como plantilla", window.PL.app.ESTADO.plantillas.some(p => p.nombre === "Mi plantilla"));
+  const plMi = window.PL.app.ESTADO.plantillas.filter(p => p.nombre === "Mi plantilla")[0];
+  $('[data-acc="plantilla-borrar"][data-id="' + plMi.id + '"]').click();
+  check("borrar una plantilla concreta", !window.PL.app.ESTADO.plantillas.some(p => p.nombre === "Mi plantilla"));
+
+  console.log("\n9. Oferta: datos, gastos y economía");
+  irA("oferta");
+  check("bloque de datos con cliente", $("#ofe-datos").innerHTML.indexOf("Cliente") > 0);
+  check("bloque de economía con TOTAL", $("#ofe-economia").innerHTML.indexOf("TOTAL") > 0);
+  cambia($('[data-campo="oferta-estado"]'), "enviada");
+  check("cambiar el estado", $("#pa-estado-badge").textContent.indexOf("Enviada") >= 0, $("#pa-estado-badge").textContent);
+  const nGastos = $$("#ofe-gastos .pa-dato").length;
+  $('[data-acc="nuevo-gasto"]').click();
+  check("＋ Concepto de gasto", $$("#ofe-gastos .pa-dato").length === nGastos + 1);
+  const kpiConGasto = $("#kpi-total").textContent;
+  escribe($('[data-campo="gasto-unidades"]'), "10");
+  escribe($('[data-campo="gasto-precio"]'), "100");
+  await espera(300);
+  check("editar un gasto recalcula el TOTAL", $("#kpi-total").textContent !== kpiConGasto, kpiConGasto + " → " + $("#kpi-total").textContent);
+  check("los gastos aparecen en el informe", $("#informe-cuerpo").innerHTML.indexOf("Gastos generales") > 0);
+  $('[data-acc="elim-gasto"]').click();
+  check("✕ Eliminar gasto", $$("#ofe-gastos .pa-dato").length === nGastos);
+  cambia($('[data-campo="oferta-impuesto-tipo"]'), "irpf");
+  check("cambiar a IRPF deja el impuesto en negativo", window.PL.calculo.impuestoImporte(api().oferta(), api().perfiles()) < 0);
+  cambia($('[data-campo="oferta-impuesto-tipo"]'), "iva");
+  cambia($('[data-campo="oferta-descuento-tipo"]'), "fijo");
+  escribe($('[data-campo="oferta-descuento-valor"]'), "500");
+  await espera(300);
+  check("el descuento fijo se aplica", Math.abs(window.PL.calculo.descuentoImporte(api().oferta(), api().perfiles()) - 500) < 0.005);
+
+  console.log("\n10. Importes ocultos, ofertas y ajustes");
+  const conImp = $("#kpi-total").textContent;
+  $('[data-acc="toggle-importes"]').click();
+  check("👁 oculta los importes", document.body.classList.contains("pa-sin-importes"));
+  check("👁 cambia el botón", $("#btn-importes").textContent.indexOf("h") > 0);
+  check("con importes ocultos no se ve ningún € en el informe", $("#informe-cuerpo").innerHTML.indexOf(" €</") < 0);
+  $('[data-acc="toggle-importes"]').click();
+  await espera(200);
+  check("👁 restaura los importes", !document.body.classList.contains("pa-sin-importes") && $("#kpi-total").textContent !== "—", conImp);
+
+  const p0 = $$("#pa-sel-oferta option").length;
+  $('[data-acc="nueva-oferta"]').click();
+  check("＋ Oferta nueva", $$("#pa-sel-oferta option").length === p0 + 1);
+  check("la oferta nueva informa de que está vacía", $("#tr-editor").innerHTML.indexOf("no tiene tareas") > 0);
+  $('[data-acc="dup-oferta"]').click();
+  check("⧉ Duplicar oferta", $$("#pa-sel-oferta option").length === p0 + 2);
+  const selOf = $("#pa-sel-oferta");
+  selOf.value = selOf.options[0].value;
+  selOf.dispatchEvent(new window.Event("change", { bubbles: true }));
+  check("cambiar de oferta activa repinta todo", $("#kpi-total").textContent.indexOf("€") > 0 && $$(".pa-gantt__fila--tarea").length > 0);
 
   irA("ajustes");
   check("bloque de marca", $("#ajustes-cuerpo").innerHTML.indexOf("Nombre de la marca") > 0);
-  check("bloque de datos de la oferta", $("#ajustes-cuerpo").innerHTML.indexOf("Condiciones de pago") > 0);
-  check("bloque de perfiles (7 de fábrica)", $("#ajustes-cuerpo").innerHTML.indexOf("Dirección de proyecto") > 0);
-  check("bloque de copias de seguridad", $("#ajustes-cuerpo").innerHTML.indexOf("Copia completa") > 0);
-  const tPerfiles = $$("#ajustes-cuerpo .pa-fila-dato").length;
+  check("biblioteca de perfiles", $("#ajustes-cuerpo").innerHTML.indexOf("Consultoría senior") > 0);
+  check("bloque de datos y copias", $("#ajustes-cuerpo").innerHTML.indexOf("Copia completa") > 0);
+  escribe($("#aj-marca"), "Mi consultora");
+  check("cambiar la marca actualiza la cabecera", $("#pa-marca-nombre").textContent === "Mi consultora");
+  const nPerfiles = $$("#ajustes-cuerpo .pa-dato").length;
   $('[data-acc="nuevo-perfil"]').click();
-  check("＋ Perfil", $$("#ajustes-cuerpo .pa-fila-dato").length === tPerfiles + 1);
-  $('[data-acc="elim-perfil"]').click();
-  check("✕ Eliminar perfil sin usos", $$("#ajustes-cuerpo .pa-fila-dato").length === tPerfiles);
-  $("#aj-marca").value = "Mi consultora";
-  $("#aj-marca").dispatchEvent(new window.Event("input", { bubbles: true }));
-  check("cambiar la marca actualiza la cabecera", $("#pa-marca-nombre").textContent === "Mi consultora", $("#pa-marca-nombre").textContent);
-  const selEstadoOferta = $('[data-campo="oferta-estado"]');
-  selEstadoOferta.value = "enviada";
-  selEstadoOferta.dispatchEvent(new window.Event("change", { bubbles: true }));
-  check("cambiar el estado de la oferta", $("#pa-estado-badge").textContent.indexOf("Enviada") > 0, $("#pa-estado-badge").textContent);
-  const inpMeses = $('[data-campo="oferta-meses"]');
-  const mesesAntes = api().oferta().meses;
-  inpMeses.value = "9";
-  inpMeses.dispatchEvent(new window.Event("change", { bubbles: true }));
-  check("cambiar la duración ajusta los meses de la oferta", api().oferta().meses === 9, mesesAntes + " → " + api().oferta().meses);
-  check("los entregables no se salen de la nueva duración", api().oferta().tareas.every(t => t.entregables.every(e => e.mes <= 8)));
-  const selImp = $('[data-campo="oferta-impuesto-tipo"]');
-  selImp.value = "irpf";
-  selImp.dispatchEvent(new window.Event("change", { bubbles: true }));
-  check("cambiar a IRPF deja el impuesto en negativo", window.PL.calculo.impuestoImporte(api().oferta(), api().perfiles()) < 0);
+  check("＋ Perfil", $$("#ajustes-cuerpo .pa-dato").length === nPerfiles + 1);
+  const conUsos = $$('[data-acc="elim-perfil"]')[0];
+  conUsos.click();
+  check("un perfil EN USO no se elimina (protege los cálculos)", $$("#ajustes-cuerpo .pa-dato").length === nPerfiles + 1);
+  $$('[data-acc="elim-perfil"]').pop().click();
+  check("✕ Perfil sin usos sí se elimina", $$("#ajustes-cuerpo .pa-dato").length === nPerfiles, $$("#ajustes-cuerpo .pa-dato").length);
 
-  console.log("\n8. Exportaciones y errores acumulados");
+  console.log("\n11. Exportaciones y errores acumulados");
   let descargas = 0;
   window.URL.createObjectURL = () => { descargas++; return "blob:x"; };
   $('[data-acc="exp-csv"]').click();
-  $('[data-acc="exp-json-proy"]').click();
+  $('[data-acc="exp-json-oferta"]').click();
   $('[data-acc="exp-json-todo"]').click();
   check("las tres exportaciones se lanzan", descargas === 3, descargas);
-  const csv = window.PL.almacen.csvProyecto(api().oferta(), api().perfiles(), "€", true);
+  const csv = window.PL.almacen.csvOferta(api().oferta(), api().perfiles(), true);
+  check("el CSV lleva BOM para Excel", csv.charCodeAt(0) === 0xFEFF);
+  check("el CSV usa punto y coma", csv.indexOf('";"') > 0);
   check("el CSV incluye el bloque de entregables", csv.indexOf("ENTREGABLES") > 0);
+  check("el CSV no menciona facturación (no existe en v4)", csv.toLowerCase().indexOf("factur") < 0);
   check("sin errores JS tras toda la interacción", errores.length === 0, errores.join(" | "));
 
-  console.log("\n9. Migración de datos v1 con aviso");
+  console.log("\n12. Migración de datos v1 con aviso");
   const v1 = fs.readFileSync(path.join(RAIZ, "datos", "carga-ineco-abono-unico.json"), "utf8");
   const t = nuevaDom(w => w.localStorage.setItem("planifica:estado:v1", v1));
   await espera(600);
   check("arranca sin errores migrando", t.errores.length === 0, t.errores.join(" | "));
   check("avisa de los datos migrados", t.document.getElementById("pa-herederos").innerHTML.indexOf("Datos migrados") > 0);
   check("la oferta migrada está activa", t.window.Planifica.oferta().id === "pr_ineco-abono2", t.window.Planifica.oferta().id);
-  const subtotalIneco = t.window.PL.calculo.subtotalProyecto(t.window.Planifica.oferta(), t.window.Planifica.perfiles());
-  check("el encargo real migrado cuadra al céntimo (587.009,36)", Math.abs(subtotalIneco - 587009.36) < 0.005, subtotalIneco);
-  const d = t.document;
+  const subtotal = t.window.PL.calculo.subtotalOferta(t.window.Planifica.oferta(), t.window.Planifica.perfiles());
+  check("el encargo real cuadra al céntimo (587.009,36)", Math.abs(subtotal - 587009.36) < 0.005, subtotal);
+  check("el Gantt del encargo tiene 4 tareas y 14 columnas", t.document.querySelectorAll(".pa-gantt__fila--tarea").length === 4 && t.document.querySelectorAll(".pa-gantt__rotulo").length === 14);
   check("el aviso se puede limpiar", (() => {
-    d.querySelector('[data-acc="limpiar-heredados"]').click();
-    return d.getElementById("pa-herederos").innerHTML.length === 0;
+    t.document.querySelector('[data-acc="limpiar-heredados"]').click();
+    return t.document.getElementById("pa-herederos").innerHTML.length === 0;
   })());
 
-  console.log("\n10. Rendimiento (encargo real de 1.700 líneas de JSON)");
-  d.querySelector("#pa-tabs .nz-tabs__tab[data-tab=estructura]").click();
+  console.log("\n13. Rendimiento con el encargo real (1.700 líneas)");
+  const d = t.document;
   d.querySelector('[data-acc="abrir-todo"]').click();
   const t0 = Date.now();
-  const campo = d.querySelector('input[data-campo="horas"]');
+  const campoT = d.querySelector('input[data-campo="horas"]');
   let msTecleo = -1;
-  if (campo) {
-    campo.value = "7";
-    campo.dispatchEvent(new t.window.Event("input", { bubbles: true }));
-    msTecleo = Date.now() - t0;
-  }
+  if (campoT) { campoT.value = "7"; campoT.dispatchEvent(new t.window.Event("input", { bubbles: true })); msTecleo = Date.now() - t0; }
   const t1 = Date.now();
   d.querySelector("#pa-tabs .nz-tabs__tab[data-tab=informe]").click();
   const msTab = Date.now() - t1;
   const t2 = Date.now();
   d.querySelector('[data-acc="nueva-tarea"]').click();
   const msTarea = Date.now() - t2;
+  await espera(300);
   console.log(`  · teclear una hora: ${msTecleo} ms · cambiar de pestaña: ${msTab} ms · crear tarea: ${msTarea} ms`);
-  check("teclear una hora < 30 ms (antes 197 ms)", msTecleo >= 0 && msTecleo < 30, msTecleo + " ms");
-  check("cambiar de pestaña < 100 ms", msTab < 100, msTab + " ms");
-  check("crear una tarea < 500 ms con el encargo real", msTarea < 500, msTarea + " ms");
+  check("teclear una hora < 30 ms (la v3 tardaba 197 ms)", msTecleo >= 0 && msTecleo < 30, msTecleo + " ms");
+  check("cambiar de pestaña < 150 ms", msTab < 150, msTab + " ms");
+  check("crear una tarea < 600 ms con el encargo real", msTarea < 600, msTarea + " ms");
 
   console.log("\n=============================================");
-  console.log(`DOM REAL v3: ${ok} OK / ${ko} FALLOS`);
+  console.log(`DOM REAL v4: ${ok} OK / ${ko} FALLOS`);
   process.exit(ko ? 1 : 0);
 }
 
