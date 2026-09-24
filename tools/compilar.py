@@ -1,45 +1,44 @@
 # -*- coding: utf-8 -*-
-"""Ensambla Planifica: incrusta style.css y app.js dentro de index.html (sin CDN)."""
-import re, pathlib
+"""Compila Planifica: incrusta Aurora 7 + CSS propio + JS en un unico HTML.
 
-BASE = pathlib.Path(r"C:\Users\d_ant\Projects\Planifica")
-SRC = BASE / "src"
-DIST = BASE / "docs"
-DIST.mkdir(exist_ok=True)
+Uso:  py -3.12 tools/compilar.py
+"""
+import re
+from pathlib import Path
 
-html = (SRC / "index.html").read_text(encoding="utf-8")
-css = (SRC / "style.css").read_text(encoding="utf-8")
-js = (SRC / "app.js").read_text(encoding="utf-8")
+BASE = Path(__file__).resolve().parents[1]
+AURORA = Path(r"C:/Users/d_ant/Projects/Aurora-7")
+TAG = "v7.2.0"
 
-# Comprobar referencias pendientes antes de incrustar
-assert "<link" in html and "style.css" in html, "falta el link del CSS"
-assert 'src="app.js"' in html, "falta el script del JS"
+PACKS = [
+    "tokens.css",
+    "packs/p1-layout.css",
+    "packs/p2-navigation.css",
+    "packs/p3-typography.css",
+    "packs/p4-actions.css",
+    "packs/p5-forms.css",
+    "packs/p6-feedback.css",
+    "packs/p7-overlays.css",
+    "packs/p8-data.css",
+    "packs/p13-charts.css",
+]
 
-# 1) Sustituir el <link> por <style> inline (lambda: evita que re.sub
-#    interprete los \u... del CSS/JS como escapes de plantilla)
-html = re.sub(
-    r'<link rel="stylesheet" href="style\.css">',
-    lambda m: "<style>\n" + css + "\n</style>",
-    html, count=1)
+def lee(rel):
+    return (AURORA / rel).read_text(encoding="utf-8")
 
-# 2) Sustituir el <script src> por JS inline (proteger </script> dentro del JS)
-js_seguro = js.replace("</script>", "<\\/script>")
-html = re.sub(
-    r'<script src="app\.js"></script>',
-    lambda m: "<script>\n" + js_seguro + "\n</script>",
-    html, count=1)
+def main():
+    html = (BASE / "src" / "index.html").read_text(encoding="utf-8")
+    css = "\n".join("/* ====== Aurora 7 %s: %s ====== */\n%s" % (TAG, p, lee(p)) for p in PACKS)
+    propio = (BASE / "src" / "style.css").read_text(encoding="utf-8") if (BASE / "src" / "style.css").exists() else ""
+    js = (BASE / "src" / "app.js").read_text(encoding="utf-8")
+    bloque = "<!-- Aurora 7 %s incrustado (%d packs) + CSS propio -->\n<style>\n%s\n%s\n</style>" % (
+        TAG, len(PACKS), css, propio)
+    html = html.replace("<!--PACKS_CSS-->", bloque)
+    html = html.replace("/*APP_JS*/", js)
+    destino = BASE / "docs" / "index.html"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(html, encoding="utf-8")
+    print("OK -> %s (%.1f KB)" % (destino, destino.stat().st_size / 1024))
 
-# Verificación: no deben quedar referencias a ficheros externos
-problemas = []
-if re.search(r'src="(?!https?://|data:)[^"]+"', html.replace('src="app.js"', "")):
-    problemas.append("quedan <script src> locales")
-if re.search(r'href="(?!\#|https?://)[^"]+\.css"', html):
-    problemas.append("quedan <link> css locales")
-for p in problemas:
-    print("PROBLEMA:", p)
-if problemas:
-    raise SystemExit(1)
-
-out = DIST / "index.html"
-out.write_text(html, encoding="utf-8")
-print(f"OK -> {out} ({out.stat().st_size/1024:.1f} KB)")
+if __name__ == "__main__":
+    main()

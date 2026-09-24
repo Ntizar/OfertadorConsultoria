@@ -1,0 +1,25 @@
+# -*- coding: utf-8 -*-
+"""Compila la app Planifica: incrusta Aurora 7 v7.2.0 + CSS propio + JS en un único HTML.
+
+Uso:  py -3.12 tools/compilar.py
+"""
+import re
+from pathlib import Path
+
+BASE = Path(__markers__).resolve() if False else Path(__file__).resolve().parents[1]
+AURORA = Path(r"C:/Users/d_ant/Projects/Aurora-7")
+TAG = "v7.2.0"
+
+# Orden canónico de packs según LLM.md (tokens siempre primero)
+PACKS = [
+    "tokens.css",
+    "packs/p1-layout.css",
+    "packs/p2-navigation.css",
+    "packs/p3-typography.css",
+    "packs/p4-actions.css",
+    "packs/p5-forms.css",
+    "95-packs/p6-feedback.css",
+    "packs/p7-overlays.css",
+    "packs/p8-data.css",
+    "packs/p13-charts.css,
+]
