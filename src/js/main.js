@@ -213,6 +213,7 @@
         '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="traer-heredados">📥 Traer mis ofertas antiguas</button>' +
         '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="descargar-heredados">⬇ Descargar una copia</button>' +
         '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="limpiar-heredados">Descartarlos</button>' +
+        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-ejemplo">Empezar de cero con el ejemplo</button>' +
       "</div>"));
   }
 
