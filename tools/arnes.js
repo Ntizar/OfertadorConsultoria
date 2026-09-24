@@ -13,7 +13,7 @@ const DIR_JS = path.join(RAIZ, "src", "js");
 
 /* Orden de carga real del build (MISMO orden que compilar.py). */
 const MODULOS = [
-  "nucleo.js", "periodos.js", "modelo.js", "ejemplo.js",
+  "nucleo.js", "periodos.js", "unidades.js", "modelo.js", "ejemplo.js",
   "calculo.js", "entregables.js", "comparar.js", "almacen.js"
 ];
 

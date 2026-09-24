@@ -106,6 +106,7 @@
       ? '<span class="nz-badge nz-badge--accent">de la oferta</span>'
       : (ctx === "subtarea" ? "" : '<span class="nz-badge nz-badge--neutral">de la tarea</span>');
     return '<div class="pa-hito pa-hito--' + ctx + '" data-id="' + id + '" data-subtarea="' + sId + '">' +
+      '<span class="pa-tono-punto" title="Entregable"></span>' +
       '<span class="pa-hito__nombre"><input class="nz-input" data-campo="hito-nombre"' + at + ' value="' + N().esc(e.nombre) + '" placeholder="Nombre del entregable"></span>' +
       '<span class="pa-ahora pa-mini">◆</span>' +
       selectPeriodo(o, e.periodo, "hito-periodo", id, tId, sId) +

@@ -71,7 +71,22 @@
         const leido = N().parseaCantidad(el.value);
         if (!leido) return;
         const esPct = leido.unidad === "%" || (leido.unidad === "" && el.dataset.modo === "pct");
-        const horas = esPct ? C().horasDePct(of, i, leido.valor) : leido.valor;
+        let horas = esPct ? C().horasDePct(of, i, leido.valor) : leido.valor;
+
+        /* TOPE: nadie puede pasar del 100 % de jornada en un mes. Si no cabe, se
+           deja en el máximo libre y se explica por qué. */
+        const disponible = r.linea.perfilId
+          ? C().horasDisponiblesPerfilMes(of, r.linea.perfilId, i, r.linea.id)
+          : C().horasLaborablesMes(of, i);
+        if (horas > disponible + 0.005) {
+          const p = C().perfilPorId(pf(), r.linea.perfilId);
+          const pctDisp = C().pctDeHoras(of, i, disponible);
+          APP().toast("⛔ " + (p ? p.nombre : "Ese perfil") + " sólo tiene " + N().fmtCampo(disponible) +
+            " h libres en " + P().mesCorto(of.periodos, i) + " (" + N().fmtCampo(pctDisp) +
+            " %). Se deja en el máximo: no se puede pasar del 100 %.");
+          horas = disponible;
+          el.value = N().fmtCampo(esPct ? pctDisp : disponible);
+        }
         r.linea.horas = r.linea.horas || {};
         r.linea.horas["p" + i] = N().acota(horas, 0, 1e6);
         V().trabajo.actualizarFilaHoras(of, pf(), r.linea, el.closest("tr"));

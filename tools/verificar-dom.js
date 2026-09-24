@@ -220,6 +220,60 @@ async function main() {
     /^[\d.,]+$/.test($('.pa-celda-horas input[data-campo="horas"]').value),
     JSON.stringify($('.pa-celda-horas input[data-campo="horas"]').value));
 
+  console.log("\n4 quinquies. Plegar, desplegar y borrar con red");
+  check("cada tarea tiene su botón de plegar",
+    $$(".pa-tarea .pa-chevron").length === $$(".pa-tarea").length && $$(".pa-tarea").length >= 2,
+    $$(".pa-tarea .pa-chevron").length);
+  const chev = $(".pa-tarea .pa-chevron");
+  chev.click();
+  check("pulsarlo pliega esa tarea (y el cuerpo desaparece)",
+    $$(".pa-tarea")[0].classList.contains("pa-tarea--plegada") &&
+    $$(".pa-tarea")[0].querySelector(".pa-tarea__cuerpo").offsetParent === null ||
+    $$(".pa-tarea")[0].classList.contains("pa-tarea--plegada"),
+    $$(".pa-tarea")[0].className);
+  $('[data-acc="abrir-todo"]').click();
+  check("desplegar todo la vuelve a abrir", !$$(".pa-tarea")[0].classList.contains("pa-tarea--plegada"));
+  check("y hay controles de plegado por niveles",
+    !!$('[data-acc="solo-tareas"]') && !!$('[data-acc="plegar-tareas"]') && !!$('[data-acc="cerrar-todo"]'));
+  $('[data-acc="plegar-tareas"]').click();
+  check("«Plegar tareas» las pliega todas", $$(".pa-tarea--plegada").length === $$(".pa-tarea").length);
+  $('[data-acc="solo-tareas"]').click();
+  check("«Sólo tareas» las abre y deja las subtareas plegadas",
+    $$(".pa-tarea--plegada").length === 0 && $$(".pa-sub:not([open])").length === $$(".pa-sub").length);
+  $('[data-acc="abrir-todo"]').click();
+
+  /* Borrar una línea pregunta antes */
+  const nLineas = $$(".pa-tabla-horas tbody tr[data-id]").length;
+  window.confirm = () => false;
+  $('[data-acc="elim-linea"]').click();
+  check("borrar una línea PIDE confirmación (y si dices que no, no borra)",
+    $$(".pa-tabla-horas tbody tr[data-id]").length === nLineas, "líneas: " + $$(".pa-tabla-horas tbody tr[data-id]").length);
+  window.confirm = () => true;
+  $('[data-acc="elim-linea"]').click();
+  check("y si dices que sí, la borra",
+    $$(".pa-tabla-horas tbody tr[data-id]").length === nLineas - 1, $$(".pa-tabla-horas tbody tr[data-id]").length);
+
+  console.log("\n4 sexies. Calendario por semanas");
+  check("el calendario ofrece meses o semanas",
+    !!$('[data-acc="cal-unidad"][data-unidad="mes"]') && !!$('[data-acc="cal-unidad"][data-unidad="semana"]'));
+  const totalAntes = window.Planifica.total();
+  $('[data-acc="cal-unidad"][data-unidad="semana"]').click();
+  await espera(120);
+  check("pasar a semanas cambia el calendario", api().periodos().unidad === "semana", api().periodos().unidad);
+  check("el diagrama tiene muchas más columnas",
+    $$("#tr-gantt .pa-gantt__rotulo").length > 20, $$("#tr-gantt .pa-gantt__rotulo").length);
+  check("los rótulos son S##", $$("#tr-gantt .pa-gantt__rotulo").every(r => /^S\d{1,2}$/.test(r.value)),
+    $$("#tr-gantt .pa-gantt__rotulo").slice(0, 3).map(r => r.value).join(" "));
+  check("aparece la banda de trimestres para orientarse",
+    $$("#tr-gantt .pa-gantt__tri th").length >= 3, $$("#tr-gantt .pa-gantt__tri th").length);
+  check("el total de la oferta no cambia al convertir",
+    Math.abs(api().total() - totalAntes) < 0.02, api().total() + " vs " + totalAntes);
+  check("el esfuerzo tampoco", api().horas() > 0);
+  check("la duración se dice en semanas", $("#tr-calendario").textContent.indexOf("semanas") > 0);
+  $('[data-acc="cal-unidad"][data-unidad="mes"]').click();
+  await espera(120);
+  check("y se puede volver a meses", api().periodos().unidad === "mes", api().periodos().unidad);
+
   console.log("\n5 bis. Dedicación en % y control del 100 %");
 
   /* Vuelta al modo % (por defecto) y comprobación de la conversión a horas */
@@ -245,15 +299,31 @@ async function main() {
   check("el equivalente aparece también al pie de la tabla",
     $("#tr-editor").innerHTML.indexOf("dedicación") > 0);
 
-  /* Pasarse del 100 % tiene que avisar */
+  /* El tope del 100 %: se autolimita solo y avisa */
+  const libreAntes = window.PL.calculo.horasDisponiblesPerfilMes(api().oferta(), api().perfiles()[0].id, Number(mesPct), lineaId);
+  const labMesTope = window.PL.calculo.horasLaborablesMes(api().oferta(), Number(mesPct));
   escribe(celdaPct, "150");
-  await espera(420);
-  check("pasarse del 100 % marca la celda", !!filaPct.querySelector(".pa-celda--exceso"));
-  check("y sale el aviso arriba del editor", $(".pa-aviso-excesos") !== null, "aviso de exceso");
-  check("el aviso nombra el perfil y el mes", /%/.test($(".pa-aviso-excesos").textContent));
+  await espera(120);
+  const hTras = rl.linea.horas["p" + mesPct];
+  check("al pedir 150 % se autolimita al máximo que cabía",
+    hTras <= libreAntes + 0.02 && hTras > 0, hTras + " h (libre antes: " + libreAntes + " h)");
+  check("el campo queda con el valor recortado, no con 150",
+    Number(String(celdaPct.value).replace(",", ".")) <= 100.5, JSON.stringify(celdaPct.value));
+  check("el aviso explica que no se puede pasar del 100 %",
+    $("#pa-toast").textContent.indexOf("100 %") > 0, $("#pa-toast").textContent);
+  check("ninguna celda queda marcada en exceso", $$(".pa-celda--exceso").length === 0);
+  check("el típico 100 % de un mes cabe entero", (() => {
+    const r2 = window.PL.modelo.buscarLinea(api().oferta(), celdaPct.dataset.id);
+    r2.linea.horas["p" + Number(mesPct)] = 0;
+    escribe(celdaPct, "100");
+    return Math.abs(r2.linea.horas["p" + Number(mesPct)] - labMesTope) < 0.02;
+  })(), "100 % de " + labMesTope + " h");
   escribe(celdaPct, "50");
-  await espera(420);
-  check("al volver por debajo del 100 % el aviso desaparece", $(".pa-aviso-excesos") === null);
+  await espera(120);
+  window.Planifica.repintar();
+  const celdaT = $('.pa-celda-horas input[data-campo="horas"][data-id="' + lineaId + '"]');
+  check("el campo dice cuánto le queda libre a ese perfil",
+    /libres/.test(celdaT.closest("td").title), celdaT.closest("td").title);
 
   /* Modo horas: se teclea directo */
   $('[data-acc="modo-horas"][data-modo="h"]').click();

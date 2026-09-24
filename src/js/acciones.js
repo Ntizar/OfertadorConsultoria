@@ -19,6 +19,8 @@
   const APP = () => PL.app;
 
   const o = () => APP().pr();
+  /** Importe en texto para los avisos. */
+  const r2texto = v => N().fmtNum(v) + " €";
   const pf = () => APP().pf();
   const id = b => b.dataset.id || "";
   const tarea = b => b.dataset.tarea || "";
@@ -68,6 +70,23 @@
     },
 
     /* ---------- Calendario ---------- */
+    /* Meses ⇄ semanas: se convierte el calendario entero repartiendo las horas por
+       días laborables reales. Se avisa antes y se cuenta lo que ha pasado. */
+    "cal-unidad": b => {
+      const u = (b && b.dataset && b.dataset.unidad) === "semana" ? "semana" : "mes";
+      const of = o();
+      if (P().normalizar(of.periodos).unidad === u) return;
+      if (!confirm("¿Pasar el calendario a " + (u === "semana" ? "semanas" : "meses") + "?\n\n" +
+        "Las horas se reparten por los días laborables reales de cada periodo y el total se mantiene. " +
+        "Los rótulos de periodo personalizados se pierden.")) return;
+      const r = PL.unidades.convertirOferta(of, u);
+      if (!r) return;
+      R().todo(); APP().guardar();
+      APP().toast("Calendario en " + (u === "semana" ? "semanas" : "meses") + ": " +
+        (u === "semana" ? r.nSemanas + " semanas" : r.nMesesDestino + " meses") + " · " +
+        N().fmtCampo(r.totalHoras) + " h y " + r2texto(C().importeOferta(of, pf())) + " (total sin cambios)");
+    },
+
     /* Cómo se teclean las horas: dedicación (% de jornada) u horas. */
     "modo-horas": b => {
       const m = (b && b.dataset && b.dataset.modo) === "h" ? "h" : "pct";
@@ -141,12 +160,39 @@
     },
     "elim-linea": b => {
       const r = M().buscarLinea(o(), id(b)); if (!r) return;
+      const p = C().perfilPorId(APP().ESTADO.perfiles, r.linea.perfilId);
+      const h = C().lineaHoras(r.linea);
+      /* Quitar una línea se lleva horas e importe: siempre se pregunta antes. */
+      if (!confirm("¿Quitar a " + (p ? p.nombre : "este perfil") + " de «" + r.sub.nombre + "»?\n\n" +
+        (h ? "Se van " + h.toLocaleString("es-ES") + " h y " + r2texto(C().lineaImporte(r.linea, APP().ESTADO.perfiles)) + "." : "La línea aún no tiene horas puestas."))) return;
       r.sub.lineas.splice(r.sub.lineas.indexOf(r.linea), 1);
       R().todo(); APP().guardar();
+      APP().toast("Línea eliminada");
     },
 
-    "abrir-todo": () => { N().lista(o().tareas).forEach(t => N().lista(t.subtareas).forEach(s => { s._abierta = true; })); R().todo(); },
-    "cerrar-todo": () => { N().lista(o().tareas).forEach(t => N().lista(t.subtareas).forEach(s => { s._abierta = false; })); R().todo(); },
+    /* Plegar y desplegar por niveles: es la forma rápida de ver la oferta entera. */
+    "toggle-tarea": b => {
+      const t = M().buscarTarea(o(), id(b));
+      if (!t) return;
+      t._abierta = !t._abierta;
+      R().trabajo(); APP().guardar();
+    },
+    "abrir-todo": () => {
+      N().lista(o().tareas).forEach(t => { t._abierta = true; N().lista(t.subtareas).forEach(s => { s._abierta = true; }); });
+      R().trabajo(); APP().guardar(); APP().toast("Todo desplegado");
+    },
+    "cerrar-todo": () => {
+      N().lista(o().tareas).forEach(t => N().lista(t.subtareas).forEach(s => { s._abierta = false; }));
+      R().trabajo(); APP().guardar(); APP().toast("Subtareas plegadas");
+    },
+    "solo-tareas": () => {
+      N().lista(o().tareas).forEach(t => { t._abierta = true; N().lista(t.subtareas).forEach(s => { s._abierta = false; }); });
+      R().trabajo(); APP().guardar(); APP().toast("Sólo las tareas a la vista");
+    },
+    "plegar-tareas": () => {
+      N().lista(o().tareas).forEach(t => { t._abierta = false; });
+      R().trabajo(); APP().guardar(); APP().toast("Tareas plegadas");
+    },
 
     /* ---------- Entregables ---------- */
     /* Entregable colgado de una SUBTAREA: lo habitual, se entrega al cerrar el trabajo. */

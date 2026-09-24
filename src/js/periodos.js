@@ -17,6 +17,7 @@
   const PL = (raiz.PL = raiz.PL || {});
   const N = () => PL.nucleo;
 
+  const UNIDADES = ["mes", "semana"];
   const ZOOMS = ["mes", "trimestre"];
   const MIN_PERIODOS = 1, MAX_PERIODOS = 60;
 
@@ -35,6 +36,7 @@
     const n = N().acota(q.n === undefined ? 12 : q.n, MIN_PERIODOS, MAX_PERIODOS);
     q.n = nHoras ? Math.max(n, N().acota(nHoras, MIN_PERIODOS, MAX_PERIODOS)) : n;
     q.zoom = ZOOMS.indexOf(q.zoom) >= 0 ? q.zoom : "mes";
+    q.unidad = UNIDADES.indexOf(q.unidad) >= 0 ? q.unidad : "mes";
     q.etiquetas = (q.etiquetas && typeof q.etiquetas === "object" && !Array.isArray(q.etiquetas)) ? q.etiquetas : {};
     Object.keys(q.etiquetas).forEach(k => {
       const i = parseInt(k, 10);
@@ -48,10 +50,29 @@
   /* ---------- Fechas de cada periodo ---------- */
 
   /** Primer día del periodo i (0 = el primero del calendario). */
+  /** Número de semana ISO (1..53) de una fecha. */
+  function semanaISO(d) {
+    const t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const dia = (t.getDay() + 6) % 7;                 /* 0 = lunes */
+    t.setDate(t.getDate() - dia + 3);                 /* el jueves de esa semana */
+    const primerJueves = new Date(t.getFullYear(), 0, 4);
+    const d0 = (primerJueves.getDay() + 6) % 7;
+    primerJueves.setDate(primerJueves.getDate() - d0 + 3);
+    return 1 + Math.round((t - primerJueves) / 604800000);
+  }
+
+  /** Fecha de comienzo del periodo i: el día 1 del mes, o el lunes de la semana. */
   function fecha(p, i) {
     const q = normalizar(p);
     const partes = q.inicio.split("-").map(Number);
-    return new Date(partes[0], partes[1] - 1 + Math.round(N().num(i)), 1);
+    const k = Math.round(N().num(i));
+    if (q.unidad === "semana") {
+      const primero = new Date(partes[0], partes[1] - 1, 1);
+      const dia = primero.getDay();                     /* 0 = domingo */
+      const lunes = new Date(partes[0], partes[1] - 1, 1 + (dia === 0 ? -6 : 1 - dia));
+      return new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 7 * k);
+    }
+    return new Date(partes[0], partes[1] - 1 + k, 1);
   }
 
   function meses(p) { return normalizar(p).n; }
@@ -68,10 +89,11 @@
 
   /* ---------- Etiquetas ---------- */
 
-  /** Rótulo automático del periodo: "OCT" (mes) o "T4" (trimestre). */
+  /** Rótulo automático del periodo: "OCT" (mes), "S37" (semana) o "T4" (trimestre). */
   function etiquetaAuto(p, i) {
     const q = normalizar(p);
     const d = fecha(q, i);
+    if (q.unidad === "semana") return "S" + semanaISO(d);
     if (q.zoom === "trimestre") return "T" + (Math.floor(d.getMonth() / 3) + 1);
     /* Columna estrecha del Gantt: mes corto en MAYÚSCULAS, sin el año
        (el año va en su propia banda de cabecera). */
@@ -145,6 +167,22 @@
   }
 
   /** Bandas de año que agrupan las columnas (para no repetir el año en cada una). */
+  /** Banda intermedia de trimestres: sólo con semanas, para no perderse en 52 columnas. */
+  function bandasTrimestre(p) {
+    const q = normalizar(p);
+    if (q.unidad !== "semana") return null;
+    const cols = columnas(q);
+    const out = [];
+    cols.forEach(c => {
+      const d = fecha(q, c.periodos[0]);
+      const t = (d.getFullYear() * 4) + Math.floor(d.getMonth() / 3);
+      const ult = out[out.length - 1];
+      if (ult && ult.clave === t) { ult.n++; }
+      else out.push({ clave: t, n: 1, texto: "T" + (Math.floor(d.getMonth() / 3) + 1) + " " + d.getFullYear() });
+    });
+    return out;
+  }
+
   function bandas(p) {
     const cols = columnas(p);
     const out = [];
@@ -180,6 +218,14 @@
   }
 
   /** "6 meses · octubre 2026 — marzo 2027" */
+  /** "6 meses · octubre de 2026 — marzo de 2027" o "26 semanas · …". */
+  function duracionLegibleUnidad(p) {
+    const q = normalizar(p);
+    const n = q.n;
+    if (q.unidad === "semana") return n + " " + N().plural(n, "semana") + " · " + rangoLegible(q);
+    return N().plural(n, "mes") + " · " + rangoLegible(q);
+  }
+
   function duracionLegible(p) {
     const q = normalizar(p);
     return q.n + " " + N().plural(q.n, "mes") + " · " + rangoLegible(q);
@@ -236,15 +282,17 @@
   }
 
   /** Días laborables del periodo i (los días de la semana que se trabajan). */
+  /** Días laborables del periodo: los del mes, o los de la semana (7 días desde el lunes). */
   function diasLaborables(p, i, diasSemana) {
-    const f = fecha(p, i);
+    const q = normalizar(p);
+    const f = fecha(q, i);
     const dias = (Array.isArray(diasSemana) && diasSemana.length) ? diasSemana : [1, 2, 3, 4, 5];
-    const clave = f.getFullYear() + "-" + (f.getMonth() + 1) + "|" + dias.join(",");
+    const clave = q.unidad + "|" + N().mesISO(f) + "-" + f.getDate() + "|" + dias.join(",");
     if (CACHE_LAB[clave] !== undefined) return CACHE_LAB[clave];
-    const total = new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
+    const total = q.unidad === "semana" ? 7 : new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
     let n = 0;
-    for (let d = 1; d <= total; d++) {
-      const wd = new Date(f.getFullYear(), f.getMonth(), d).getDay();   /* 0=domingo */
+    for (let d = 0; d < total; d++) {
+      const wd = new Date(f.getFullYear(), f.getMonth(), f.getDate() + d).getDay();   /* 0=domingo */
       if (dias.indexOf(wd === 0 ? 7 : wd) >= 0) n++;
     }
     CACHE_LAB[clave] = n;
@@ -258,6 +306,8 @@
   }
 
   PL.periodos = {
+    UNIDADES: UNIDADES, semanaISO: semanaISO, bandasTrimestre: bandasTrimestre,
+    duracionLegibleUnidad: duracionLegibleUnidad,
     diasDelMes: diasDelMes, diasLaborables: diasLaborables, horasLaborables: horasLaborables,
     ZOOMS: ZOOMS, MIN: MIN_PERIODOS, MAX: MAX_PERIODOS,
     porDefecto: porDefecto, normalizar: normalizar,

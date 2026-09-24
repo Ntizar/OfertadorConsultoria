@@ -25,12 +25,21 @@ Es una herramienta de **ofertas**, no de seguimiento: no hay estados de ejecuci�
 
 Los **entregables** cuelgan de cada **subtarea** (donde se entrega el trabajo de verdad), de la **tarea completa** o de la **oferta** (gestión, reuniones).
 
+### Por meses o por semanas
+
+El calendario se planifica en la unidad que te encaje: **meses** o **semanas** (40 h por semana completa). Al cambiar de unidad, las horas se reparten por los **días laborables reales** de cada periodo y **el total se mantiene** (hay un check que lo verifica). Con el calendario semanal el diagrama añade una **banda de trimestres** para no perderse entre 52 columnas.
+
+### Plegar y desplegar
+
+Cada tarea tiene su botón para plegarla. Arriba del editor hay cuatro atajos: **Desplegar todo · Sólo tareas · Plegar subtareas · Plegar tareas**. Así se ve la oferta entera de un vistazo o se baja al detalle sin perder el sitio.
+
 ### Horas por % de dedicación
 
 Las horas cambian de mes a mes y nadie sabe si «40 h» son mucho o poco. Por eso el esfuerzo se teclea en **dedicación**: escribes `50` y significa *media jornada ese mes*; la aplicación calcula las horas con la **jornada** (8 h/día de lunes a viernes, configurable en Oferta) y los días laborables reales de cada mes.
 
 - También puedes escribir `88h` o `50%` a mano: el campo entiende las dos unidades.
-- Si un perfil pasa del **100 %** en un mes, la celda se marca y sale un aviso: nadie trabaja dos jornadas a la vez.
+- **No deja pasar del 100 %**: si pides más de lo que cabe, se queda en el máximo libre de ese perfil ese mes y te dice cuánto quedaba. El campo indica siempre cuántas horas le quedan libres.
+- Cada tarea lleva un **color** (y sus subtareas y entregables lo heredan) para seguir el hilo de un vistazo.
 - Las horas siguen siendo el dato guardado, así que el contrato de exactitud no se toca.
 
 ### Un color por tarea
@@ -136,12 +145,12 @@ py -3.12 tools/compilar.py       # solo compilar
 node tools/smoke.js              # arranque en seco
 ```
 
-**317 comprobaciones** en total, todas en verde:
+**350 comprobaciones** en total, todas en verde:
 
 | Arnés | Qué cubre |
 |---|---|
-| `verificar-motor.js` (146) | cadena de totales, redondeo, periodos y rótulos, entregables en los tres niveles, **dedicación (% ↔ horas, jornada y tope del 100 %)**, escenarios y versiones, migración y normalización defensiva |
-| `verificar-dom.js` (171) | arranque sin errores, las **6 pestañas**, edición de rótulos desde el Gantt, inicio/duración/zoom, barras y rombos, **color por tarea**, el campo de esfuerzo con `%` y `h`, alta y baja de todo, **que un cambio se vea en todas las vistas**, responsive, catálogo de perfiles, exportaciones y rendimiento |
+| `verificar-motor.js` (160) | cadena de totales, redondeo, periodos y rótulos, entregables en los tres niveles, **dedicación (% ↔ horas, jornada y tope del 100 %)**, **conversión meses ⇄ semanas** (días laborables reales, total conservado), escenarios y versiones, migración y normalización defensiva |
+| `verificar-dom.js` (190) | arranque sin errores, las **6 pestañas**, edición de rótulos desde el Gantt, **calendario por meses o semanas con banda de trimestres**, **plegado por niveles**, **borrado con confirmación**, **autolímite del 100 %**, color por tarea, campo de esfuerzo con `%` y `h`, **que un cambio se vea en todas las vistas**, responsive, catálogo de perfiles, exportaciones y rendimiento |
 | `auditar-wiring.py` | todo botón tiene acción, todo nodo existe, toda clase `nz-*` es de Aurora, ningún export sin declarar |
 
 ### Contrato de exactitud

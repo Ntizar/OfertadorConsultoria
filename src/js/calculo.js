@@ -149,6 +149,23 @@
 
   function pctPerfilEnMes(o, perfilId, i) { return pctDeHoras(o, i, horasPerfilEnMes(o, perfilId, i)); }
 
+  /** Horas que le QUEDAN libres a un perfil en un mes, sin contar la línea que se
+      está editando: es el tope real que se puede teclear ahí. */
+  function horasDisponiblesPerfilMes(o, perfilId, i, lineaId) {
+    const limite = horasLaborablesMes(o, i);
+    let usado = 0;
+    lista(o && o.tareas).forEach(ta => lista(ta.subtareas).forEach(sb => lista(sb.lineas).forEach(l => {
+      if (l.id === lineaId || l.perfilId !== perfilId) return;
+      usado += N().num((l.horas || {})["p" + i]);
+    })));
+    return Math.max(0, N().r2(limite - usado));
+  }
+
+  /** Porcentaje libre de un perfil en un mes (para el tope del 100 %). */
+  function pctDisponiblePerfilMes(o, perfilId, i, lineaId) {
+    return pctDeHoras(o, i, horasDisponiblesPerfilMes(o, perfilId, i, lineaId));
+  }
+
   /** Perfiles que se pasan del 100 % en algún mes: nadie puede estar más de una
       jornada completa a la vez. Devuelve [{perfilId, periodo, horas, limite, pct}]. */
   function excesosPerfil(o) {
@@ -270,6 +287,7 @@
     jornada: jornada, horasLaborablesMes: horasLaborablesMes, horasLaborablesTotal: horasLaborablesTotal,
     pctDeHoras: pctDeHoras, horasDePct: horasDePct,
     horasPerfilEnMes: horasPerfilEnMes, pctPerfilEnMes: pctPerfilEnMes, excesosPerfil: excesosPerfil,
+    horasDisponiblesPerfilMes: horasDisponiblesPerfilMes, pctDisponiblePerfilMes: pctDisponiblePerfilMes,
     clonarTarea: clonarTarea, clonarSubtarea: clonarSubtarea
   };
 })(typeof window !== "undefined" ? window : globalThis);

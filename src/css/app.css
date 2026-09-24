@@ -273,9 +273,12 @@ body.pa-sin-importes .pa-importe { display: none; }
 .pa-tono-4 { --pa-tono: var(--nz-warning); --pa-tono-fluido: var(--nz-warning-soft); }
 .pa-tono-5 { --pa-tono: var(--nz-danger);  --pa-tono-fluido: var(--nz-danger-soft); }
 
-.pa-tarea { border-left: 4px solid var(--pa-tono, var(--nz-border)); }
-.pa-tarea .pa-sub { border-left: 3px solid var(--pa-tono-fluido, var(--nz-border)); }
-.pa-tarea .pa-hito { border-left: 3px solid var(--pa-tono, var(--nz-border)); }
+/* El color va en un punto, no en barras: marca sin ensuciar.
+   El tono se ve entero en las barras del diagrama. */
+.pa-tono-punto {
+  display: inline-block; width: 0.65rem; height: 0.65rem; border-radius: 50%;
+  background: var(--pa-tono, var(--nz-border)); flex: 0 0 auto;
+}
 
 .pa-gantt__fila--tarea .pa-barra { background: var(--pa-tono, var(--nz-brand)); }
 .pa-gantt__fila--subtarea .pa-barra { background: var(--pa-tono-fluido, var(--nz-brand)); }
@@ -297,3 +300,16 @@ body.pa-sin-importes .pa-importe { display: none; }
   .pa-gantt__celda { min-width: 2.6rem; }
 }
 
+
+
+/* ---------- Plegar y desplegar: chevron claro y el cuerpo oculto sin rastro ---------- */
+.pa-chevron {
+  flex: 0 0 auto; width: 1.9rem; height: 1.9rem; min-height: 1.9rem; padding: 0;
+  border: 0; border-radius: var(--nz-radius-md); background: transparent;
+  color: var(--nz-text-soft); font-size: var(--nz-text-md); cursor: pointer; line-height: 1;
+}
+.pa-chevron:hover { background: var(--nz-surface-2, var(--nz-surface)); color: var(--nz-text); }
+.pa-tarea--plegada > .pa-tarea__cuerpo { display: none; }
+.pa-sub--plegada > .pa-sub__cuerpo { display: none; }
+.pa-tarea__cab .pa-tono-punto { margin-right: var(--nz-space-1); }
+@media (max-width: 720px) { .pa-chevron { width: 44px; height: 44px; font-size: var(--nz-text-lg); } }

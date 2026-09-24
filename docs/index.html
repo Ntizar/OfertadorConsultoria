@@ -2688,9 +2688,12 @@ body.pa-sin-importes .pa-importe { display: none; }
 .pa-tono-4 { --pa-tono: var(--nz-warning); --pa-tono-fluido: var(--nz-warning-soft); }
 .pa-tono-5 { --pa-tono: var(--nz-danger);  --pa-tono-fluido: var(--nz-danger-soft); }
 
-.pa-tarea { border-left: 4px solid var(--pa-tono, var(--nz-border)); }
-.pa-tarea .pa-sub { border-left: 3px solid var(--pa-tono-fluido, var(--nz-border)); }
-.pa-tarea .pa-hito { border-left: 3px solid var(--pa-tono, var(--nz-border)); }
+/* El color va en un punto, no en barras: marca sin ensuciar.
+   El tono se ve entero en las barras del diagrama. */
+.pa-tono-punto {
+  display: inline-block; width: 0.65rem; height: 0.65rem; border-radius: 50%;
+  background: var(--pa-tono, var(--nz-border)); flex: 0 0 auto;
+}
 
 .pa-gantt__fila--tarea .pa-barra { background: var(--pa-tono, var(--nz-brand)); }
 .pa-gantt__fila--subtarea .pa-barra { background: var(--pa-tono-fluido, var(--nz-brand)); }
@@ -2712,6 +2715,19 @@ body.pa-sin-importes .pa-importe { display: none; }
   .pa-gantt__celda { min-width: 2.6rem; }
 }
 
+
+
+/* ---------- Plegar y desplegar: chevron claro y el cuerpo oculto sin rastro ---------- */
+.pa-chevron {
+  flex: 0 0 auto; width: 1.9rem; height: 1.9rem; min-height: 1.9rem; padding: 0;
+  border: 0; border-radius: var(--nz-radius-md); background: transparent;
+  color: var(--nz-text-soft); font-size: var(--nz-text-md); cursor: pointer; line-height: 1;
+}
+.pa-chevron:hover { background: var(--nz-surface-2, var(--nz-surface)); color: var(--nz-text); }
+.pa-tarea--plegada > .pa-tarea__cuerpo { display: none; }
+.pa-sub--plegada > .pa-sub__cuerpo { display: none; }
+.pa-tarea__cab .pa-tono-punto { margin-right: var(--nz-space-1); }
+@media (max-width: 720px) { .pa-chevron { width: 44px; height: 44px; font-size: var(--nz-text-lg); } }
 
 </style>
 
@@ -3035,6 +3051,7 @@ body.pa-sin-importes .pa-importe { display: none; }
   const PL = (raiz.PL = raiz.PL || {});
   const N = () => PL.nucleo;
 
+  const UNIDADES = ["mes", "semana"];
   const ZOOMS = ["mes", "trimestre"];
   const MIN_PERIODOS = 1, MAX_PERIODOS = 60;
 
@@ -3053,6 +3070,7 @@ body.pa-sin-importes .pa-importe { display: none; }
     const n = N().acota(q.n === undefined ? 12 : q.n, MIN_PERIODOS, MAX_PERIODOS);
     q.n = nHoras ? Math.max(n, N().acota(nHoras, MIN_PERIODOS, MAX_PERIODOS)) : n;
     q.zoom = ZOOMS.indexOf(q.zoom) >= 0 ? q.zoom : "mes";
+    q.unidad = UNIDADES.indexOf(q.unidad) >= 0 ? q.unidad : "mes";
     q.etiquetas = (q.etiquetas && typeof q.etiquetas === "object" && !Array.isArray(q.etiquetas)) ? q.etiquetas : {};
     Object.keys(q.etiquetas).forEach(k => {
       const i = parseInt(k, 10);
@@ -3066,10 +3084,29 @@ body.pa-sin-importes .pa-importe { display: none; }
   /* ---------- Fechas de cada periodo ---------- */
 
   /** Primer día del periodo i (0 = el primero del calendario). */
+  /** Número de semana ISO (1..53) de una fecha. */
+  function semanaISO(d) {
+    const t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const dia = (t.getDay() + 6) % 7;                 /* 0 = lunes */
+    t.setDate(t.getDate() - dia + 3);                 /* el jueves de esa semana */
+    const primerJueves = new Date(t.getFullYear(), 0, 4);
+    const d0 = (primerJueves.getDay() + 6) % 7;
+    primerJueves.setDate(primerJueves.getDate() - d0 + 3);
+    return 1 + Math.round((t - primerJueves) / 604800000);
+  }
+
+  /** Fecha de comienzo del periodo i: el día 1 del mes, o el lunes de la semana. */
   function fecha(p, i) {
     const q = normalizar(p);
     const partes = q.inicio.split("-").map(Number);
-    return new Date(partes[0], partes[1] - 1 + Math.round(N().num(i)), 1);
+    const k = Math.round(N().num(i));
+    if (q.unidad === "semana") {
+      const primero = new Date(partes[0], partes[1] - 1, 1);
+      const dia = primero.getDay();                     /* 0 = domingo */
+      const lunes = new Date(partes[0], partes[1] - 1, 1 + (dia === 0 ? -6 : 1 - dia));
+      return new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 7 * k);
+    }
+    return new Date(partes[0], partes[1] - 1 + k, 1);
   }
 
   function meses(p) { return normalizar(p).n; }
@@ -3086,10 +3123,11 @@ body.pa-sin-importes .pa-importe { display: none; }
 
   /* ---------- Etiquetas ---------- */
 
-  /** Rótulo automático del periodo: "OCT" (mes) o "T4" (trimestre). */
+  /** Rótulo automático del periodo: "OCT" (mes), "S37" (semana) o "T4" (trimestre). */
   function etiquetaAuto(p, i) {
     const q = normalizar(p);
     const d = fecha(q, i);
+    if (q.unidad === "semana") return "S" + semanaISO(d);
     if (q.zoom === "trimestre") return "T" + (Math.floor(d.getMonth() / 3) + 1);
     /* Columna estrecha del Gantt: mes corto en MAYÚSCULAS, sin el año
        (el año va en su propia banda de cabecera). */
@@ -3163,6 +3201,22 @@ body.pa-sin-importes .pa-importe { display: none; }
   }
 
   /** Bandas de año que agrupan las columnas (para no repetir el año en cada una). */
+  /** Banda intermedia de trimestres: sólo con semanas, para no perderse en 52 columnas. */
+  function bandasTrimestre(p) {
+    const q = normalizar(p);
+    if (q.unidad !== "semana") return null;
+    const cols = columnas(q);
+    const out = [];
+    cols.forEach(c => {
+      const d = fecha(q, c.periodos[0]);
+      const t = (d.getFullYear() * 4) + Math.floor(d.getMonth() / 3);
+      const ult = out[out.length - 1];
+      if (ult && ult.clave === t) { ult.n++; }
+      else out.push({ clave: t, n: 1, texto: "T" + (Math.floor(d.getMonth() / 3) + 1) + " " + d.getFullYear() });
+    });
+    return out;
+  }
+
   function bandas(p) {
     const cols = columnas(p);
     const out = [];
@@ -3198,6 +3252,14 @@ body.pa-sin-importes .pa-importe { display: none; }
   }
 
   /** "6 meses · octubre 2026 — marzo 2027" */
+  /** "6 meses · octubre de 2026 — marzo de 2027" o "26 semanas · …". */
+  function duracionLegibleUnidad(p) {
+    const q = normalizar(p);
+    const n = q.n;
+    if (q.unidad === "semana") return n + " " + N().plural(n, "semana") + " · " + rangoLegible(q);
+    return N().plural(n, "mes") + " · " + rangoLegible(q);
+  }
+
   function duracionLegible(p) {
     const q = normalizar(p);
     return q.n + " " + N().plural(q.n, "mes") + " · " + rangoLegible(q);
@@ -3254,15 +3316,17 @@ body.pa-sin-importes .pa-importe { display: none; }
   }
 
   /** Días laborables del periodo i (los días de la semana que se trabajan). */
+  /** Días laborables del periodo: los del mes, o los de la semana (7 días desde el lunes). */
   function diasLaborables(p, i, diasSemana) {
-    const f = fecha(p, i);
+    const q = normalizar(p);
+    const f = fecha(q, i);
     const dias = (Array.isArray(diasSemana) && diasSemana.length) ? diasSemana : [1, 2, 3, 4, 5];
-    const clave = f.getFullYear() + "-" + (f.getMonth() + 1) + "|" + dias.join(",");
+    const clave = q.unidad + "|" + N().mesISO(f) + "-" + f.getDate() + "|" + dias.join(",");
     if (CACHE_LAB[clave] !== undefined) return CACHE_LAB[clave];
-    const total = new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
+    const total = q.unidad === "semana" ? 7 : new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
     let n = 0;
-    for (let d = 1; d <= total; d++) {
-      const wd = new Date(f.getFullYear(), f.getMonth(), d).getDay();   /* 0=domingo */
+    for (let d = 0; d < total; d++) {
+      const wd = new Date(f.getFullYear(), f.getMonth(), f.getDate() + d).getDay();   /* 0=domingo */
       if (dias.indexOf(wd === 0 ? 7 : wd) >= 0) n++;
     }
     CACHE_LAB[clave] = n;
@@ -3276,6 +3340,8 @@ body.pa-sin-importes .pa-importe { display: none; }
   }
 
   PL.periodos = {
+    UNIDADES: UNIDADES, semanaISO: semanaISO, bandasTrimestre: bandasTrimestre,
+    duracionLegibleUnidad: duracionLegibleUnidad,
     diasDelMes: diasDelMes, diasLaborables: diasLaborables, horasLaborables: horasLaborables,
     ZOOMS: ZOOMS, MIN: MIN_PERIODOS, MAX: MAX_PERIODOS,
     porDefecto: porDefecto, normalizar: normalizar,
@@ -3286,6 +3352,211 @@ body.pa-sin-importes .pa-importe { display: none; }
     mesLargo: mesLargo, mesCorto: mesCorto, rango: rango, rangoLegible: rangoLegible,
     duracionLegible: duracionLegible, posicionLegible: posicionLegible,
     conInicio: conInicio, conN: conN, conZoom: conZoom, siguienteZoom: siguienteZoom, desplazar: desplazar
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+
+/* ====== MÓDULO unidades.js ====== */
+"use strict";
+/* =====================================================================
+   Planifica v4 — UNIDADES DEL CALENDARIO
+   El mismo trabajo se puede planificar por MESES o por SEMANAS. Aquí vive la
+   conversión de una a otra, que reparte las horas por días laborables reales
+   (no a partes iguales): así una semana de agosto no se lleva lo mismo que una
+   de octubre, y la dedicación no se dispara sola.
+
+   Regla: la conversión la decide el usuario y con aviso. Nada se convierte por
+   sorpresa.
+   ===================================================================== */
+(function (raiz) {
+  const PL = (raiz.PL = raiz.PL || {});
+  const N = () => PL.nucleo;
+
+  /* ---------- Semanas de un mes ---------- */
+
+  /** El lunes de la semana en la que cae una fecha. */
+  function lunes(d) {
+    const dia = d.getDay();                       /* 0 = domingo */
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + (dia === 0 ? -6 : 1 - dia));
+  }
+
+  /** Días laborables que hay entre dos fechas (ambas dentro), según los días trabajados. */
+  function diasLaborablesEntre(desde, hasta, diasSemana) {
+    const dias = (Array.isArray(diasSemana) && diasSemana.length) ? diasSemana : [1, 2, 3, 4, 5];
+    let n = 0;
+    const d = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate());
+    while (d <= hasta) {
+      const wd = d.getDay();
+      if (dias.indexOf(wd === 0 ? 7 : wd) >= 0) n++;
+      d.setDate(d.getDate() + 1);
+    }
+    return n;
+  }
+
+  /** Las semanas (por su lunes) que tocan un mes, con los días laborables que caen
+      DENTRO de ese mes. Es la clave para repartir sin inventarse jornadas. */
+  function semanasDelMes(anio, mes, jornada) {
+    const primero = new Date(anio, mes - 1, 1);
+    const ultimo = new Date(anio, mes, 0);
+    const out = [];
+    let l = lunes(primero);
+    while (l <= ultimo) {
+      const desde = l < primero ? primero : l;
+      const fin = new Date(l.getFullYear(), l.getMonth(), l.getDate() + 6);
+      const hasta = fin > ultimo ? ultimo : fin;
+      const dias = diasLaborablesEntre(desde, hasta, jornada && jornada.diasSemana);
+      if (dias > 0) out.push({ lunes: l, dias: dias });
+      l = new Date(l.getFullYear(), l.getMonth(), l.getDate() + 7);
+    }
+    return out;
+  }
+
+  /** Mes al que pertenece una semana: el del jueves (criterio ISO). */
+  function mesDeSemana(l, anioMes) {
+    const jueves = new Date(l.getFullYear(), l.getMonth(), l.getDate() + 3);
+    void anioMes;
+    return { anio: jueves.getFullYear(), mes: jueves.getMonth() + 1 };
+  }
+
+  /** Las semanas del rango del calendario, en orden y sin repetir: desde el lunes
+      de la semana del primer día hasta el último día del último mes. Cada semana
+      pertenece al mes de su jueves (criterio ISO), así que el reparto del mes entre
+      sus semanas nunca cuenta dos veces la misma. */
+  function mapaSemanas(periodos, jornada) {
+    const P = PL.periodos;
+    const p = P.normalizar(periodos);
+    const nMeses = p.n;
+    const partes = p.inicio.split("-").map(Number);
+    const mesCero = partes[0] * 12 + (partes[1] - 1);
+    const primero = new Date(partes[0], partes[1] - 1, 1);
+    const ultimo = new Date(partes[0], partes[1] - 1 + nMeses, 0);
+    const dias = (jornada && jornada.diasSemana) || [1, 2, 3, 4, 5];
+    const base = lunes(primero);
+    const semanas = [];
+    const porMes = {};
+    for (let i = 0; i < nMeses; i++) porMes[i] = [];
+    let l = base;
+    while (l <= ultimo) {
+      const fin = new Date(l.getFullYear(), l.getMonth(), l.getDate() + 6);
+      const desde = l < primero ? primero : l;
+      const hasta = fin > ultimo ? ultimo : fin;
+      const jueves = new Date(l.getFullYear(), l.getMonth(), l.getDate() + 3);
+      const mes = (jueves.getFullYear() * 12 + jueves.getMonth()) - mesCero;
+      const diasLab = diasLaborablesEntre(desde, hasta, dias);
+      const indice = semanas.push({ lunes: l, mes: mes, dias: diasLab }) - 1;
+      if (porMes[mes]) porMes[mes].push({ indice: indice, dias: diasLab });
+      l = new Date(l.getFullYear(), l.getMonth(), l.getDate() + 7);
+    }
+    return { semanas: semanas, porMes: porMes };
+  }
+
+  /* ---------- Reparto de horas ---------- */
+
+  /** Reparte `horas` entre varios tramos según su peso, cuadrando al final para no
+      perder ni ganar céntimos de hora. */
+  function reparte(horas, pesos) {
+    const total = pesos.reduce((a, b) => a + b, 0);
+    if (total <= 0 || horas <= 0) return pesos.map(() => 0);
+    const out = [];
+    let acumulado = 0;
+    pesos.forEach((peso, i) => {
+      if (i === pesos.length - 1) { out.push(N().r2(horas - acumulado)); return; }
+      const v = N().r2(horas * peso / total);
+      out.push(v);
+      acumulado = N().r2(acumulado + v);
+    });
+    return out;
+  }
+
+  /* ---------- Conversión de una oferta ---------- */
+
+  /** Pasa una oferta de meses a semanas (o al revés). Devuelve un resumen con lo que
+      ha pasado, para poder avisar de forma honesta. */
+  function convertirOferta(o, destino) {
+    const P = PL.periodos, M = PL.modelo;
+    if (!o || (destino !== "semana" && destino !== "mes")) return null;
+    if (P.normalizar(o.periodos).unidad === destino) return null;
+
+    const jornada = M.normalizarJornada(o.jornada);
+    const nMeses = P.meses(o.periodos);
+    const resumen = { de: P.normalizar(o.periodos).unidad, a: destino, nMeses: nMeses, totalHoras: 0 };
+
+    /* Se trabaja con TODAS las horas por mes, sumando todas las líneas. */
+    const horasMes = [];
+    for (let i = 0; i < nMeses; i++) horasMes.push(0);
+    N().lista(o.tareas).forEach(t => N().lista(t.subtareas).forEach(s => N().lista(s.lineas).forEach(l => {
+      for (let i = 0; i < nMeses; i++) horasMes[i] = N().r2(horasMes[i] + N().num((l.horas || {})["p" + i]));
+    })));
+    resumen.totalHoras = N().r2(horasMes.reduce((a, b) => a + b, 0));
+
+    /* --- Meses → semanas --- */
+    if (destino === "semana") {
+      const mapa = mapaSemanas(o.periodos, jornada);
+      const nSemanas = mapa.semanas.length;
+      const horasLinea = l => {
+        const out = [];
+        for (let i = 0; i < nMeses; i++) {
+          const h = N().num((l.horas || {})["p" + i]);
+          const tramos = mapa.porMes[i] || [];
+          const valores = reparte(h, tramos.map(x => x.dias));
+          tramos.forEach((x, k) => { out[x.indice] = N().r2((out[x.indice] || 0) + valores[k]); });
+        }
+        for (let k = 0; k < nSemanas; k++) if (out[k] === undefined) out[k] = 0;
+        return out;
+      };
+      N().lista(o.tareas).forEach(t => N().lista(t.subtareas).forEach(s => N().lista(s.lineas).forEach(l => {
+        const valores = horasLinea(l);
+        l.horas = {};
+        valores.forEach((v, k) => { l.horas["p" + k] = v; });
+      })));
+      /* Los entregables caen en la primera semana de su mes. */
+      N().lista(o.tareas).forEach(t => N().lista(t.entregables).forEach(e => {
+        const tramos = mapa.porMes[e.periodo];
+        e.periodo = (tramos && tramos.length) ? tramos[0].indice : 0;
+      }));
+      N().lista(o.entregables).forEach(e => {
+        const tramos = mapa.porMes[e.periodo];
+        e.periodo = (tramos && tramos.length) ? tramos[0].indice : 0;
+      });
+      o.periodos = P.normalizar({ inicio: o.periodos.inicio, n: nSemanas, zoom: "mes", unidad: "semana", etiquetas: {} }, nSemanas);
+      resumen.nSemanas = nSemanas;
+      return resumen;
+    }
+
+    /* --- Semanas → meses --- */
+    /* Cada semana se lleva sus horas al mes en el que cae (según su jueves). */
+    const partesIni = o.periodos.inicio.split("-").map(Number);
+    const mesCero = partesIni[0] * 12 + (partesIni[1] - 1);
+    const mesDe = [];
+    let mesMax = 0;
+    for (let k = 0; k < nMeses; k++) {
+      const l = P.fecha(o.periodos, k);
+      const jueves = new Date(l.getFullYear(), l.getMonth(), l.getDate() + 3);
+      const m = (jueves.getFullYear() * 12 + jueves.getMonth()) - mesCero;
+      mesDe.push(m);
+      if (m > mesMax) mesMax = m;
+    }
+    const nDestino = mesMax + 1;
+
+    N().lista(o.tareas).forEach(t => N().lista(t.subtareas).forEach(s2 => N().lista(s2.lineas).forEach(l => {
+      const nuevo = {};
+      for (let k = 0; k < nMeses; k++) {
+        const v = N().num((l.horas || {})["p" + k]);
+        if (v) nuevo["p" + mesDe[k]] = N().r2((nuevo["p" + mesDe[k]] || 0) + v);
+      }
+      l.horas = nuevo;
+    })));
+    const reubica = e => { const k = Math.round(N().acota(e.periodo, 0, nMeses - 1)); e.periodo = mesDe[k] || 0; };
+    N().lista(o.tareas).forEach(t => N().lista(t.entregables).forEach(reubica));
+    N().lista(o.entregables).forEach(reubica);
+
+    o.periodos = P.normalizar({ inicio: o.periodos.inicio, n: nDestino, zoom: "mes", unidad: "mes", etiquetas: {} }, nDestino);
+    resumen.nMesesDestino = nDestino;
+    return resumen;
+  }
+
+  PL.unidades = {
+    semanasDelMes: semanasDelMes, mapaSemanas: mapaSemanas, reparte: reparte,
+    convertirOferta: convertirOferta, lunes: lunes
   };
 })(typeof window !== "undefined" ? window : globalThis);
 
@@ -4067,6 +4338,23 @@ body.pa-sin-importes .pa-importe { display: none; }
 
   function pctPerfilEnMes(o, perfilId, i) { return pctDeHoras(o, i, horasPerfilEnMes(o, perfilId, i)); }
 
+  /** Horas que le QUEDAN libres a un perfil en un mes, sin contar la línea que se
+      está editando: es el tope real que se puede teclear ahí. */
+  function horasDisponiblesPerfilMes(o, perfilId, i, lineaId) {
+    const limite = horasLaborablesMes(o, i);
+    let usado = 0;
+    lista(o && o.tareas).forEach(ta => lista(ta.subtareas).forEach(sb => lista(sb.lineas).forEach(l => {
+      if (l.id === lineaId || l.perfilId !== perfilId) return;
+      usado += N().num((l.horas || {})["p" + i]);
+    })));
+    return Math.max(0, N().r2(limite - usado));
+  }
+
+  /** Porcentaje libre de un perfil en un mes (para el tope del 100 %). */
+  function pctDisponiblePerfilMes(o, perfilId, i, lineaId) {
+    return pctDeHoras(o, i, horasDisponiblesPerfilMes(o, perfilId, i, lineaId));
+  }
+
   /** Perfiles que se pasan del 100 % en algún mes: nadie puede estar más de una
       jornada completa a la vez. Devuelve [{perfilId, periodo, horas, limite, pct}]. */
   function excesosPerfil(o) {
@@ -4188,6 +4476,7 @@ body.pa-sin-importes .pa-importe { display: none; }
     jornada: jornada, horasLaborablesMes: horasLaborablesMes, horasLaborablesTotal: horasLaborablesTotal,
     pctDeHoras: pctDeHoras, horasDePct: horasDePct,
     horasPerfilEnMes: horasPerfilEnMes, pctPerfilEnMes: pctPerfilEnMes, excesosPerfil: excesosPerfil,
+    horasDisponiblesPerfilMes: horasDisponiblesPerfilMes, pctDisponiblePerfilMes: pctDisponiblePerfilMes,
     clonarTarea: clonarTarea, clonarSubtarea: clonarSubtarea
   };
 })(typeof window !== "undefined" ? window : globalThis);
@@ -4968,11 +5257,32 @@ body.pa-sin-importes .pa-importe { display: none; }
       '<td class="pa-gantt__total">' + (N().num(e.horas) ? N().num(e.horas).toLocaleString("es-ES") + " h" : "—") + "</td></tr>";
   }
 
+  /** Con el calendario por semanas, una banda de trimestres: 52 columnas sin
+      referencia son ilegibles. Devuelve la fila de trimestres o null. */
+  function filaTrimestres(o, etiqueta) {
+    const tri = P().bandasTrimestre(o.periodos);
+    if (!tri) return null;
+    const fila = tri.map(t => '<th colspan="' + t.n + '" scope="colgroup">' + (etiqueta ? t.texto : t.texto) + "</th>").join("");
+    return '<tr class="pa-gantt__tri">' + fila + "</tr>";
+  }
+
   /** Cabecera: banda de años + rótulos editables. */
   function cabecera(o) {
     const cols = P().columnas(o.periodos);
     const bandas = P().bandas(o.periodos);
     const filaAnios = bandas.map(b => '<th colspan="' + b.n + '" scope="colgroup">' + b.anio + "</th>").join("");
+    const tri = filaTrimestres(o, true);
+    if (tri) {
+      return "<thead>" +
+        '<tr class="pa-gantt__anios"><th class="pa-gantt__concepto" rowspan="3" scope="col">Concepto</th>' + filaAnios +
+        '<th class="pa-gantt__total" rowspan="3" scope="col">Horas</th></tr>' +
+        tri +
+        '<tr class="pa-gantt__meses">' + cols.map(c => '<th scope="col"><input class="pa-gantt__rotulo' +
+          (P().estaEditada(o.periodos, c.periodos[0]) ? " pa-gantt__rotulo--editado" : "") + '" value="' + N().esc(c.etiqueta) +
+          '" data-campo="periodo-rotulo" data-id="' + c.periodos[0] + '" title="Clic para renombrar este periodo" ' +
+          'aria-label="Nombre del periodo"></th>').join("") +
+        "</tr></thead>";
+    }
     const filaMeses = cols.map(c => {
       const idx = c.periodos[0];
       const editado = P().estaEditada(o.periodos, idx) ? " pa-gantt__rotulo--editado" : "";
@@ -5027,6 +5337,13 @@ body.pa-sin-importes .pa-importe { display: none; }
     const bandas = P().bandas(o.periodos);
     const filaAnios = bandas.map(b => '<th colspan="' + b.n + '" scope="colgroup">' + b.anio + "</th>").join("");
     const filaMeses = cols.map(c => "<th scope=\"col\">" + N().esc(c.etiqueta) + "</th>").join("");
+    const tri = filaTrimestres(o, true);
+    if (tri) {
+      return "<thead>" +
+        '<tr class="pa-gantt__anios"><th class="pa-gantt__concepto" rowspan="3" scope="col">Concepto</th>' + filaAnios +
+        '<th class="pa-gantt__total" rowspan="3" scope="col">Horas</th></tr>' +
+        tri + '<tr class="pa-gantt__meses">' + filaMeses + "</tr></thead>";
+    }
     return "<thead>" +
       '<tr class="pa-gantt__anios"><th class="pa-gantt__concepto" rowspan="2" scope="col">Concepto</th>' + filaAnios +
       '<th class="pa-gantt__total" rowspan="2" scope="col">Horas</th></tr>' +
@@ -5173,6 +5490,7 @@ body.pa-sin-importes .pa-importe { display: none; }
       ? '<span class="nz-badge nz-badge--accent">de la oferta</span>'
       : (ctx === "subtarea" ? "" : '<span class="nz-badge nz-badge--neutral">de la tarea</span>');
     return '<div class="pa-hito pa-hito--' + ctx + '" data-id="' + id + '" data-subtarea="' + sId + '">' +
+      '<span class="pa-tono-punto" title="Entregable"></span>' +
       '<span class="pa-hito__nombre"><input class="nz-input" data-campo="hito-nombre"' + at + ' value="' + N().esc(e.nombre) + '" placeholder="Nombre del entregable"></span>' +
       '<span class="pa-ahora pa-mini">◆</span>' +
       selectPeriodo(o, e.periodo, "hito-periodo", id, tId, sId) +
@@ -5269,6 +5587,7 @@ body.pa-sin-importes .pa-importe { display: none; }
     const per = o.periodos;
     const editados = P().cuantasEditadas(per);
     const enPct = APP().modoHoras() === "pct";
+    const semanal = P().normalizar(per).unidad === "semana";
     return '<div class="pa-calendario">' +
       '<span class="pa-calendario__dato"><label class="pa-mini" for="cal-inicio">Empieza en</label>' +
         '<input class="nz-input nz-input--sm pa-input-fecha" type="month" id="cal-inicio" data-campo="cal-inicio" value="' + N().esc(per.inicio) + '"></span>' +
@@ -5280,11 +5599,14 @@ body.pa-sin-importes .pa-importe { display: none; }
       '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="cal-zoom" title="Ver por meses o por trimestres">' +
         (per.zoom === "mes" ? "🗓 Ver por trimestres" : "🗓 Ver por meses") + "</button>" +
       (editados ? '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="cal-rotulos-auto" title="Devolver los rótulos automáticos">↺ ' + editados + ' rótulo(s)</button>' : "") +
+      '<span class="pa-calendario__dato"><span class="pa-mini">Planificar por</span>' +
+        '<button class="nz-btn nz-btn--sm ' + (semanal ? "nz-btn--soft" : "nz-btn--primary") + '" data-acc="cal-unidad" data-unidad="mes" title="El calendario va por meses">meses</button>' +
+        '<button class="nz-btn nz-btn--sm ' + (semanal ? "nz-btn--primary" : "nz-btn--soft") + '" data-acc="cal-unidad" data-unidad="semana" title="El calendario va por semanas (40 h por semana completa)">semanas</button></span>' +
       '<span class="pa-calendario__dato"><span class="pa-mini">Las horas se teclean en</span>' +
         '<button class="nz-btn nz-btn--sm ' + (enPct ? "nz-btn--primary" : "nz-btn--soft") + '" data-acc="modo-horas" data-modo="pct" title="Teclear dedicación: 50 = media jornada ese mes">% jornada</button>' +
         '<button class="nz-btn nz-btn--sm ' + (enPct ? "nz-btn--soft" : "nz-btn--primary") + '" data-acc="modo-horas" data-modo="h" title="Teclear horas directamente">horas</button></span>' +
       '<span class="pa-espacio"></span>' +
-      '<span class="pa-calendario__duracion pa-ahora">' + N().esc(P().duracionLegible(per)) + "</span>" +
+      '<span class="pa-calendario__duracion pa-ahora">' + N().esc(P().duracionLegibleUnidad(per)) + "</span>" +
       '<span class="pa-mini pa-ahora">' + C().ofertaHoras(o).toLocaleString("es-ES") + " h" +
         (V2.verImportes() ? " · " + V2.imp(C().importeOferta(o, APP().pf())) : "") + "</span>" +
       "</div>";
@@ -5295,6 +5617,9 @@ body.pa-sin-importes .pa-importe { display: none; }
   function cabeceraTarea(o, pf, t, i) {
     const V2 = V();
     return '<div class="pa-tarea__cab">' +
+      '<button class="pa-chevron" data-acc="toggle-tarea" data-id="' + t.id + '" aria-expanded="' + (t._abierta ? "true" : "false") + '"' +
+        ' title="' + (t._abierta ? "Plegar esta tarea" : "Desplegar esta tarea") + '">' + (t._abierta ? "▾" : "▸") + "</button>" +
+      '<span class="pa-tono-punto" title="Color de esta tarea"></span>' +
       '<input class="nz-input pa-crece2" data-campo="tarea-nombre" data-id="' + t.id + '" value="' + N().esc(t.nombre) + '" style="font-weight:700">' +
       '<span class="nz-badge nz-badge--neutral pa-ahora">' + V2.hor(C().tareaHoras(t)) + "</span>" +
       '<span class="nz-badge nz-badge--brand pa-importe pa-ahora">' + V2.imp(C().tareaImporte(t, pf)) + "</span>" +
@@ -5362,7 +5687,9 @@ body.pa-sin-importes .pa-importe { display: none; }
         const pctMax = c.periodos.reduce((mx, i) => Math.max(mx, C().pctPerfilEnMes(o, l.perfilId, i)), 0);
         const pasado = !!(l.perfilId && pctMax > 100.005);
         if (pasado) exceso = true;
+        const libre = l.perfilId ? C().horasDisponiblesPerfilMes(o, l.perfilId, idx, l.id) : lab;
         const ayuda = V2.hor(h) + " · " + N().fmtNum(pct) + " % de " + Math.round(lab) + " h laborables" +
+          (l.perfilId ? " · " + N().fmtCampo(libre) + " h libres" : "") +
           (pasado ? " — MÁS DEL 100 %" : "");
         const eq = h > 0 ? (enPct ? V2.hor(h) : N().fmtNum(pct) + " %") : "";
         const clase = "nz-table__num nz-table__right pa-celda-horas" + (pasado ? " pa-celda--exceso" : "");
@@ -5430,8 +5757,10 @@ body.pa-sin-importes .pa-importe { display: none; }
     }
     /* La tarjeta de cada tarea lleva la clase pa-tarea: la usan el CSS y los arneses. */
     return tareas.map((t, i) =>
-      '<article class="nz-article pa-tarea' + V2.claseTono(o, t.id) + '">' + cabeceraTarea(o, pf, t, i) +
-      bloqueHitos(o, pf, t) + subtareas(o, pf, t) + "</article>"
+      '<article class="nz-article pa-tarea' + V2.claseTono(o, t.id) + (t._abierta ? "" : " pa-tarea--plegada") + '">' +
+        cabeceraTarea(o, pf, t, i) +
+        '<div class="pa-tarea__cuerpo">' + bloqueHitos(o, pf, t) + subtareas(o, pf, t) + "</div>" +
+      "</article>"
     ).join("");
   }
 
@@ -5463,9 +5792,10 @@ body.pa-sin-importes .pa-importe { display: none; }
     const V2 = V(), o = APP().pr();
     if (!o) return;
     V2.escribir("tr-guia", (o.guia && !APP().ESTADO.guiaVista) ? V2.aviso("tip",
-      "<strong>Cómo funciona:</strong> arriba eliges el <em>calendario</em> (inicio, duración y nombre de cada mes, que puedes renombrar haciendo clic). " +
-      "En medio tienes el <em>diagrama</em>: las barras son meses con esfuerzo y los rombos ◆ son entregables. " +
-      "Abajo editas tareas, entregables, subtareas y horas por perfil: todo se recalcula al instante en las tres zonas y en el informe." +
+      "<strong>Cómo funciona:</strong> arriba está el <em>calendario</em> —por <em>meses</em> o por <em>semanas</em>— con el inicio, la duración y el nombre de cada periodo (haz clic en una columna para renombrarla). " +
+      "En medio, el <em>diagrama</em>: las barras son periodos con esfuerzo, los rombos ◆ los entregables y cada tarea tiene su color. " +
+      "Abajo trabajas en cuatro pasos: tareas y subtareas, sus entregables, los perfiles y las horas. " +
+      "Las horas se ponen en <em>dedicación</em> (50 = media jornada) y no dejan pasar del 100 %." +
       '<br><button class="nz-btn nz-btn--primary nz-btn--sm" style="margin-top:var(--nz-space-2)" data-acc="cerrar-guia">¡Entendido, empezar!</button>') : "");
   }
 
@@ -5531,8 +5861,10 @@ body.pa-sin-importes .pa-importe { display: none; }
           '<button class="nz-btn nz-btn--soft" data-acc="nuevo-entregable-oferta">＋ Entregable de la oferta</button>' +
           '<button class="nz-btn nz-btn--soft" data-acc="plantilla-toggle">📚 Plantillas</button>' +
           '<span class="pa-espacio"></span>' +
-          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="abrir-todo">Desplegar todo</button>' +
-          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="cerrar-todo">Plegar todo</button>' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="abrir-todo" title="Desplegar tareas, subtareas y horas">⇕ Desplegar todo</button>' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="solo-tareas" title="Dejar sólo las tareas a la vista">▸ Sólo tareas</button>' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="cerrar-todo" title="Plegar las subtareas">⇕ Plegar subtareas</button>' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="plegar-tareas" title="Plegar también las tareas">▸▸ Plegar tareas</button>' +
         "</div>"));
   }
 
@@ -6326,6 +6658,8 @@ body.pa-sin-importes .pa-importe { display: none; }
   const APP = () => PL.app;
 
   const o = () => APP().pr();
+  /** Importe en texto para los avisos. */
+  const r2texto = v => N().fmtNum(v) + " €";
   const pf = () => APP().pf();
   const id = b => b.dataset.id || "";
   const tarea = b => b.dataset.tarea || "";
@@ -6375,6 +6709,23 @@ body.pa-sin-importes .pa-importe { display: none; }
     },
 
     /* ---------- Calendario ---------- */
+    /* Meses ⇄ semanas: se convierte el calendario entero repartiendo las horas por
+       días laborables reales. Se avisa antes y se cuenta lo que ha pasado. */
+    "cal-unidad": b => {
+      const u = (b && b.dataset && b.dataset.unidad) === "semana" ? "semana" : "mes";
+      const of = o();
+      if (P().normalizar(of.periodos).unidad === u) return;
+      if (!confirm("¿Pasar el calendario a " + (u === "semana" ? "semanas" : "meses") + "?\n\n" +
+        "Las horas se reparten por los días laborables reales de cada periodo y el total se mantiene. " +
+        "Los rótulos de periodo personalizados se pierden.")) return;
+      const r = PL.unidades.convertirOferta(of, u);
+      if (!r) return;
+      R().todo(); APP().guardar();
+      APP().toast("Calendario en " + (u === "semana" ? "semanas" : "meses") + ": " +
+        (u === "semana" ? r.nSemanas + " semanas" : r.nMesesDestino + " meses") + " · " +
+        N().fmtCampo(r.totalHoras) + " h y " + r2texto(C().importeOferta(of, pf())) + " (total sin cambios)");
+    },
+
     /* Cómo se teclean las horas: dedicación (% de jornada) u horas. */
     "modo-horas": b => {
       const m = (b && b.dataset && b.dataset.modo) === "h" ? "h" : "pct";
@@ -6448,12 +6799,39 @@ body.pa-sin-importes .pa-importe { display: none; }
     },
     "elim-linea": b => {
       const r = M().buscarLinea(o(), id(b)); if (!r) return;
+      const p = C().perfilPorId(APP().ESTADO.perfiles, r.linea.perfilId);
+      const h = C().lineaHoras(r.linea);
+      /* Quitar una línea se lleva horas e importe: siempre se pregunta antes. */
+      if (!confirm("¿Quitar a " + (p ? p.nombre : "este perfil") + " de «" + r.sub.nombre + "»?\n\n" +
+        (h ? "Se van " + h.toLocaleString("es-ES") + " h y " + r2texto(C().lineaImporte(r.linea, APP().ESTADO.perfiles)) + "." : "La línea aún no tiene horas puestas."))) return;
       r.sub.lineas.splice(r.sub.lineas.indexOf(r.linea), 1);
       R().todo(); APP().guardar();
+      APP().toast("Línea eliminada");
     },
 
-    "abrir-todo": () => { N().lista(o().tareas).forEach(t => N().lista(t.subtareas).forEach(s => { s._abierta = true; })); R().todo(); },
-    "cerrar-todo": () => { N().lista(o().tareas).forEach(t => N().lista(t.subtareas).forEach(s => { s._abierta = false; })); R().todo(); },
+    /* Plegar y desplegar por niveles: es la forma rápida de ver la oferta entera. */
+    "toggle-tarea": b => {
+      const t = M().buscarTarea(o(), id(b));
+      if (!t) return;
+      t._abierta = !t._abierta;
+      R().trabajo(); APP().guardar();
+    },
+    "abrir-todo": () => {
+      N().lista(o().tareas).forEach(t => { t._abierta = true; N().lista(t.subtareas).forEach(s => { s._abierta = true; }); });
+      R().trabajo(); APP().guardar(); APP().toast("Todo desplegado");
+    },
+    "cerrar-todo": () => {
+      N().lista(o().tareas).forEach(t => N().lista(t.subtareas).forEach(s => { s._abierta = false; }));
+      R().trabajo(); APP().guardar(); APP().toast("Subtareas plegadas");
+    },
+    "solo-tareas": () => {
+      N().lista(o().tareas).forEach(t => { t._abierta = true; N().lista(t.subtareas).forEach(s => { s._abierta = false; }); });
+      R().trabajo(); APP().guardar(); APP().toast("Sólo las tareas a la vista");
+    },
+    "plegar-tareas": () => {
+      N().lista(o().tareas).forEach(t => { t._abierta = false; });
+      R().trabajo(); APP().guardar(); APP().toast("Tareas plegadas");
+    },
 
     /* ---------- Entregables ---------- */
     /* Entregable colgado de una SUBTAREA: lo habitual, se entrega al cerrar el trabajo. */
@@ -6824,7 +7202,22 @@ body.pa-sin-importes .pa-importe { display: none; }
         const leido = N().parseaCantidad(el.value);
         if (!leido) return;
         const esPct = leido.unidad === "%" || (leido.unidad === "" && el.dataset.modo === "pct");
-        const horas = esPct ? C().horasDePct(of, i, leido.valor) : leido.valor;
+        let horas = esPct ? C().horasDePct(of, i, leido.valor) : leido.valor;
+
+        /* TOPE: nadie puede pasar del 100 % de jornada en un mes. Si no cabe, se
+           deja en el máximo libre y se explica por qué. */
+        const disponible = r.linea.perfilId
+          ? C().horasDisponiblesPerfilMes(of, r.linea.perfilId, i, r.linea.id)
+          : C().horasLaborablesMes(of, i);
+        if (horas > disponible + 0.005) {
+          const p = C().perfilPorId(pf(), r.linea.perfilId);
+          const pctDisp = C().pctDeHoras(of, i, disponible);
+          APP().toast("⛔ " + (p ? p.nombre : "Ese perfil") + " sólo tiene " + N().fmtCampo(disponible) +
+            " h libres en " + P().mesCorto(of.periodos, i) + " (" + N().fmtCampo(pctDisp) +
+            " %). Se deja en el máximo: no se puede pasar del 100 %.");
+          horas = disponible;
+          el.value = N().fmtCampo(esPct ? pctDisp : disponible);
+        }
         r.linea.horas = r.linea.horas || {};
         r.linea.horas["p" + i] = N().acota(horas, 0, 1e6);
         V().trabajo.actualizarFilaHoras(of, pf(), r.linea, el.closest("tr"));

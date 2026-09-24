@@ -88,11 +88,32 @@
       '<td class="pa-gantt__total">' + (N().num(e.horas) ? N().num(e.horas).toLocaleString("es-ES") + " h" : "—") + "</td></tr>";
   }
 
+  /** Con el calendario por semanas, una banda de trimestres: 52 columnas sin
+      referencia son ilegibles. Devuelve la fila de trimestres o null. */
+  function filaTrimestres(o, etiqueta) {
+    const tri = P().bandasTrimestre(o.periodos);
+    if (!tri) return null;
+    const fila = tri.map(t => '<th colspan="' + t.n + '" scope="colgroup">' + (etiqueta ? t.texto : t.texto) + "</th>").join("");
+    return '<tr class="pa-gantt__tri">' + fila + "</tr>";
+  }
+
   /** Cabecera: banda de años + rótulos editables. */
   function cabecera(o) {
     const cols = P().columnas(o.periodos);
     const bandas = P().bandas(o.periodos);
     const filaAnios = bandas.map(b => '<th colspan="' + b.n + '" scope="colgroup">' + b.anio + "</th>").join("");
+    const tri = filaTrimestres(o, true);
+    if (tri) {
+      return "<thead>" +
+        '<tr class="pa-gantt__anios"><th class="pa-gantt__concepto" rowspan="3" scope="col">Concepto</th>' + filaAnios +
+        '<th class="pa-gantt__total" rowspan="3" scope="col">Horas</th></tr>' +
+        tri +
+        '<tr class="pa-gantt__meses">' + cols.map(c => '<th scope="col"><input class="pa-gantt__rotulo' +
+          (P().estaEditada(o.periodos, c.periodos[0]) ? " pa-gantt__rotulo--editado" : "") + '" value="' + N().esc(c.etiqueta) +
+          '" data-campo="periodo-rotulo" data-id="' + c.periodos[0] + '" title="Clic para renombrar este periodo" ' +
+          'aria-label="Nombre del periodo"></th>').join("") +
+        "</tr></thead>";
+    }
     const filaMeses = cols.map(c => {
       const idx = c.periodos[0];
       const editado = P().estaEditada(o.periodos, idx) ? " pa-gantt__rotulo--editado" : "";
@@ -147,6 +168,13 @@
     const bandas = P().bandas(o.periodos);
     const filaAnios = bandas.map(b => '<th colspan="' + b.n + '" scope="colgroup">' + b.anio + "</th>").join("");
     const filaMeses = cols.map(c => "<th scope=\"col\">" + N().esc(c.etiqueta) + "</th>").join("");
+    const tri = filaTrimestres(o, true);
+    if (tri) {
+      return "<thead>" +
+        '<tr class="pa-gantt__anios"><th class="pa-gantt__concepto" rowspan="3" scope="col">Concepto</th>' + filaAnios +
+        '<th class="pa-gantt__total" rowspan="3" scope="col">Horas</th></tr>' +
+        tri + '<tr class="pa-gantt__meses">' + filaMeses + "</tr></thead>";
+    }
     return "<thead>" +
       '<tr class="pa-gantt__anios"><th class="pa-gantt__concepto" rowspan="2" scope="col">Concepto</th>' + filaAnios +
       '<th class="pa-gantt__total" rowspan="2" scope="col">Horas</th></tr>' +

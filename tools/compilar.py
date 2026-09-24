@@ -34,6 +34,7 @@ PACKS = [
 MODULOS_JS = [
     "nucleo.js",
     "periodos.js",
+    "unidades.js",
     "modelo.js",
     "ejemplo.js",
     "calculo.js",

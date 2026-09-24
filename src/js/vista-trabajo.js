@@ -25,6 +25,7 @@
     const per = o.periodos;
     const editados = P().cuantasEditadas(per);
     const enPct = APP().modoHoras() === "pct";
+    const semanal = P().normalizar(per).unidad === "semana";
     return '<div class="pa-calendario">' +
       '<span class="pa-calendario__dato"><label class="pa-mini" for="cal-inicio">Empieza en</label>' +
         '<input class="nz-input nz-input--sm pa-input-fecha" type="month" id="cal-inicio" data-campo="cal-inicio" value="' + N().esc(per.inicio) + '"></span>' +
@@ -36,11 +37,14 @@
       '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="cal-zoom" title="Ver por meses o por trimestres">' +
         (per.zoom === "mes" ? "🗓 Ver por trimestres" : "🗓 Ver por meses") + "</button>" +
       (editados ? '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="cal-rotulos-auto" title="Devolver los rótulos automáticos">↺ ' + editados + ' rótulo(s)</button>' : "") +
+      '<span class="pa-calendario__dato"><span class="pa-mini">Planificar por</span>' +
+        '<button class="nz-btn nz-btn--sm ' + (semanal ? "nz-btn--soft" : "nz-btn--primary") + '" data-acc="cal-unidad" data-unidad="mes" title="El calendario va por meses">meses</button>' +
+        '<button class="nz-btn nz-btn--sm ' + (semanal ? "nz-btn--primary" : "nz-btn--soft") + '" data-acc="cal-unidad" data-unidad="semana" title="El calendario va por semanas (40 h por semana completa)">semanas</button></span>' +
       '<span class="pa-calendario__dato"><span class="pa-mini">Las horas se teclean en</span>' +
         '<button class="nz-btn nz-btn--sm ' + (enPct ? "nz-btn--primary" : "nz-btn--soft") + '" data-acc="modo-horas" data-modo="pct" title="Teclear dedicación: 50 = media jornada ese mes">% jornada</button>' +
         '<button class="nz-btn nz-btn--sm ' + (enPct ? "nz-btn--soft" : "nz-btn--primary") + '" data-acc="modo-horas" data-modo="h" title="Teclear horas directamente">horas</button></span>' +
       '<span class="pa-espacio"></span>' +
-      '<span class="pa-calendario__duracion pa-ahora">' + N().esc(P().duracionLegible(per)) + "</span>" +
+      '<span class="pa-calendario__duracion pa-ahora">' + N().esc(P().duracionLegibleUnidad(per)) + "</span>" +
       '<span class="pa-mini pa-ahora">' + C().ofertaHoras(o).toLocaleString("es-ES") + " h" +
         (V2.verImportes() ? " · " + V2.imp(C().importeOferta(o, APP().pf())) : "") + "</span>" +
       "</div>";
@@ -51,6 +55,9 @@
   function cabeceraTarea(o, pf, t, i) {
     const V2 = V();
     return '<div class="pa-tarea__cab">' +
+      '<button class="pa-chevron" data-acc="toggle-tarea" data-id="' + t.id + '" aria-expanded="' + (t._abierta ? "true" : "false") + '"' +
+        ' title="' + (t._abierta ? "Plegar esta tarea" : "Desplegar esta tarea") + '">' + (t._abierta ? "▾" : "▸") + "</button>" +
+      '<span class="pa-tono-punto" title="Color de esta tarea"></span>' +
       '<input class="nz-input pa-crece2" data-campo="tarea-nombre" data-id="' + t.id + '" value="' + N().esc(t.nombre) + '" style="font-weight:700">' +
       '<span class="nz-badge nz-badge--neutral pa-ahora">' + V2.hor(C().tareaHoras(t)) + "</span>" +
       '<span class="nz-badge nz-badge--brand pa-importe pa-ahora">' + V2.imp(C().tareaImporte(t, pf)) + "</span>" +
@@ -118,7 +125,9 @@
         const pctMax = c.periodos.reduce((mx, i) => Math.max(mx, C().pctPerfilEnMes(o, l.perfilId, i)), 0);
         const pasado = !!(l.perfilId && pctMax > 100.005);
         if (pasado) exceso = true;
+        const libre = l.perfilId ? C().horasDisponiblesPerfilMes(o, l.perfilId, idx, l.id) : lab;
         const ayuda = V2.hor(h) + " · " + N().fmtNum(pct) + " % de " + Math.round(lab) + " h laborables" +
+          (l.perfilId ? " · " + N().fmtCampo(libre) + " h libres" : "") +
           (pasado ? " — MÁS DEL 100 %" : "");
         const eq = h > 0 ? (enPct ? V2.hor(h) : N().fmtNum(pct) + " %") : "";
         const clase = "nz-table__num nz-table__right pa-celda-horas" + (pasado ? " pa-celda--exceso" : "");
@@ -186,8 +195,10 @@
     }
     /* La tarjeta de cada tarea lleva la clase pa-tarea: la usan el CSS y los arneses. */
     return tareas.map((t, i) =>
-      '<article class="nz-article pa-tarea' + V2.claseTono(o, t.id) + '">' + cabeceraTarea(o, pf, t, i) +
-      bloqueHitos(o, pf, t) + subtareas(o, pf, t) + "</article>"
+      '<article class="nz-article pa-tarea' + V2.claseTono(o, t.id) + (t._abierta ? "" : " pa-tarea--plegada") + '">' +
+        cabeceraTarea(o, pf, t, i) +
+        '<div class="pa-tarea__cuerpo">' + bloqueHitos(o, pf, t) + subtareas(o, pf, t) + "</div>" +
+      "</article>"
     ).join("");
   }
 
@@ -219,9 +230,10 @@
     const V2 = V(), o = APP().pr();
     if (!o) return;
     V2.escribir("tr-guia", (o.guia && !APP().ESTADO.guiaVista) ? V2.aviso("tip",
-      "<strong>Cómo funciona:</strong> arriba eliges el <em>calendario</em> (inicio, duración y nombre de cada mes, que puedes renombrar haciendo clic). " +
-      "En medio tienes el <em>diagrama</em>: las barras son meses con esfuerzo y los rombos ◆ son entregables. " +
-      "Abajo editas tareas, entregables, subtareas y horas por perfil: todo se recalcula al instante en las tres zonas y en el informe." +
+      "<strong>Cómo funciona:</strong> arriba está el <em>calendario</em> —por <em>meses</em> o por <em>semanas</em>— con el inicio, la duración y el nombre de cada periodo (haz clic en una columna para renombrarla). " +
+      "En medio, el <em>diagrama</em>: las barras son periodos con esfuerzo, los rombos ◆ los entregables y cada tarea tiene su color. " +
+      "Abajo trabajas en cuatro pasos: tareas y subtareas, sus entregables, los perfiles y las horas. " +
+      "Las horas se ponen en <em>dedicación</em> (50 = media jornada) y no dejan pasar del 100 %." +
       '<br><button class="nz-btn nz-btn--primary nz-btn--sm" style="margin-top:var(--nz-space-2)" data-acc="cerrar-guia">¡Entendido, empezar!</button>') : "");
   }
 
@@ -287,8 +299,10 @@
           '<button class="nz-btn nz-btn--soft" data-acc="nuevo-entregable-oferta">＋ Entregable de la oferta</button>' +
           '<button class="nz-btn nz-btn--soft" data-acc="plantilla-toggle">📚 Plantillas</button>' +
           '<span class="pa-espacio"></span>' +
-          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="abrir-todo">Desplegar todo</button>' +
-          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="cerrar-todo">Plegar todo</button>' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="abrir-todo" title="Desplegar tareas, subtareas y horas">⇕ Desplegar todo</button>' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="solo-tareas" title="Dejar sólo las tareas a la vista">▸ Sólo tareas</button>' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="cerrar-todo" title="Plegar las subtareas">⇕ Plegar subtareas</button>' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="plegar-tareas" title="Plegar también las tareas">▸▸ Plegar tareas</button>' +
         "</div>"));
   }
 

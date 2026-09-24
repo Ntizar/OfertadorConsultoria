@@ -15,7 +15,7 @@ const check = t.check;
 if (CARGADO.faltan.length) {
   console.log("  ⚠ módulos que faltan: " + CARGADO.faltan.join(", "));
 }
-check("los 8 módulos del motor se cargan", CARGADO.cargados.length === 8, CARGADO.cargados.join(", "));
+check("los 9 módulos del motor se cargan", CARGADO.cargados.length === 9, CARGADO.cargados.join(", "));
 
 const N = PL.nucleo, P = PL.periodos, M = PL.modelo, C = PL.calculo, E = PL.entregables, X = PL.comparar, EJ = PL.ejemplo;
 const ESTADO = M.estadoInicial();
@@ -375,6 +375,36 @@ check("y en la tarea completa", (() => {
 })());
 check("la migración de datos antiguos deja los entregables en la tarea",
   N.lista(M.migrar({ version: 1, perfiles: [], proyectos: [{ id: "p", nombre: "P", tareas: [{ id: "t", nombre: "T", entregables: [{ id: "e", nombre: "E" }] }] }] }).estado.ofertas[0].tareas[0].entregables).length === 1);
+
+/* ---------- 14. Calendario por semanas (y conversión) ---------- */
+t.grupo("14. Calendario por semanas y conversión meses ⇄ semanas");
+const U = PL.unidades;
+check("el calendario arranca por meses", P.normalizar(OF.periodos).unidad === "mes");
+check("semana ISO correcta (1-ene-2026 es S1, 28-dic-2026 es S53)",
+  P.semanaISO(new Date(2026, 0, 1)) === 1 && P.semanaISO(new Date(2026, 11, 28)) === 53,
+  P.semanaISO(new Date(2026, 0, 1)) + "/" + P.semanaISO(new Date(2026, 11, 28)));
+
+const ofSem = EJ.ofertaEjemplo(PF);
+const hAntes = C.ofertaHoras(ofSem), iAntes = C.importeOferta(ofSem, PF);
+const rConv = U.convertirOferta(ofSem, "semana");
+check("la conversión devuelve el resumen", !!rConv && rConv.a === "semana" && rConv.nSemanas > 20, JSON.stringify(rConv));
+check("6 meses de octubre a marzo son 27 semanas", rConv.nSemanas === 27, rConv.nSemanas);
+check("las horas se conservan al pasar a semanas", Math.abs(C.ofertaHoras(ofSem) - hAntes) < 0.02, C.ofertaHoras(ofSem) + " vs " + hAntes);
+check("y el importe también", Math.abs(C.importeOferta(ofSem, PF) - iAntes) < 0.02, C.importeOferta(ofSem, PF) + " vs " + iAntes);
+check("una semana completa tiene 40 h laborables (8 h × 5 días)", C.horasLaborablesMes(ofSem, 1) === 40, C.horasLaborablesMes(ofSem, 1));
+check("las etiquetas son S##", /^S\d{1,2}$/.test(P.etiqueta(ofSem.periodos, 3)), P.etiqueta(ofSem.periodos, 3));
+check("la duración se cuenta en semanas", P.duracionLegibleUnidad(ofSem.periodos).indexOf("27 semanas") === 0,
+  P.duracionLegibleUnidad(ofSem.periodos));
+check("los entregables caen dentro del calendario semanal",
+  E.todos(ofSem).every(e => e.periodo >= 0 && e.periodo < P.meses(ofSem.periodos)));
+check("nadie pasa del 100 % por el simple hecho de convertir",
+  C.excesosPerfil(ofSem).length === 0, JSON.stringify(C.excesosPerfil(ofSem).slice(0, 3)));
+const rVuelta = U.convertirOferta(ofSem, "mes");
+check("la vuelta a meses también conserva el total",
+  Math.abs(C.ofertaHoras(ofSem) - hAntes) < 0.02 && Math.abs(C.importeOferta(ofSem, PF) - iAntes) < 0.02,
+  C.ofertaHoras(ofSem) + " h · " + C.importeOferta(ofSem, PF) + " €");
+check("el rango de vuelta cubre septiembre a marzo (7 meses)", rVuelta.nMesesDestino === 7, rVuelta.nMesesDestino);
+check("no se convierte a la unidad que ya está puesta", U.convertirOferta(ofSem, "mes") === null);
 
 t.resumen();
 process.exit(t.ko ? 1 : 0);
