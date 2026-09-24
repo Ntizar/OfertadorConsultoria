@@ -302,15 +302,25 @@ async function main() {
   const t = nuevaDom(w => w.localStorage.setItem("planifica:estado:v1", v1));
   await espera(600);
   check("arranca sin errores migrando", t.errores.length === 0, t.errores.join(" | "));
-  check("avisa de los datos migrados", t.document.getElementById("pa-herederos").innerHTML.indexOf("Datos migrados") > 0);
-  check("la oferta migrada está activa", t.window.Planifica.oferta().id === "pr_ineco-abono2", t.window.Planifica.oferta().id);
-  const subtotal = t.window.PL.calculo.subtotalOferta(t.window.Planifica.oferta(), t.window.Planifica.perfiles());
+  check("avisa de los datos antiguos", t.document.getElementById("pa-herederos").innerHTML.indexOf("Datos de versiones anteriores") > 0);
+  check("arranca con el ejemplo, NO con los datos antiguos", t.window.Planifica.oferta().id !== "pr_ineco-abono2", t.window.Planifica.oferta().id);
+  check("los datos antiguos NO se han tocado", t.document.getElementById("pa-herederos").innerHTML.indexOf("intactos") > 0);
+  check("ofrece traer, copiar y descartar", ["traer-heredados", "descargar-heredados", "limpiar-heredados"]
+    .every(a => !!t.document.querySelector('[data-acc="' + a + '"]')));
+
+  /* El usuario trae sus ofertas antiguas de un clic */
+  let descargasHered = 0;
+  t.window.URL.createObjectURL = () => { descargasHered++; return "blob:x"; };
+  t.document.querySelector('[data-acc="traer-heredados"]').click();
+  await espera(120);
+  const ofIn = t.window.Planifica.oferta();
+  check("traer los datos antiguos añade sus ofertas", t.document.querySelectorAll("#pa-sel-oferta option").length >= 2, t.document.querySelectorAll("#pa-sel-oferta option").length);
+  check("la oferta del encargo real queda activa", ofIn.id === "pr_ineco-abono2", ofIn.id);
+  check("antes de traer se descargó una copia de seguridad", descargasHered === 1, descargasHered);
+  const subtotal = t.window.PL.calculo.subtotalOferta(ofIn, t.window.Planifica.perfiles());
   check("el encargo real cuadra al céntimo (587.009,36)", Math.abs(subtotal - 587009.36) < 0.005, subtotal);
   check("el Gantt del encargo tiene 4 tareas y 14 columnas", t.document.querySelectorAll(".pa-gantt__fila--tarea").length === 4 && t.document.querySelectorAll(".pa-gantt__rotulo").length === 14);
-  check("el aviso se puede limpiar", (() => {
-    t.document.querySelector('[data-acc="limpiar-heredados"]').click();
-    return t.document.getElementById("pa-herederos").innerHTML.length === 0;
-  })());
+  check("al traerlos, el aviso desaparece solo", t.document.getElementById("pa-herederos").innerHTML.length === 0);
 
   console.log("\n13. Rendimiento con el encargo real (1.700 líneas)");
   const d = t.document;

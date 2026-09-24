@@ -4274,17 +4274,37 @@ body.pa-sin-importes .pa-importe { display: none; }
         const d = JSON.parse(viejo);
         const ofertas = d && (d.ofertas || d.proyectos);
         if (Array.isArray(ofertas)) {
+          /* Hay datos de una versión anterior y todavía no hay datos v4: NO se
+             imponen. La aplicación arranca con la oferta de ejemplo y los datos
+             antiguos quedan disponibles para traerlos, copiarlos o descartarlos
+             (así se empieza limpio sin perder nada). */
           const r = M2.migrar(d);
           return {
-            estado: M2.normalizarEstado(r.estado), origen: r.origen, heredado: true,
-            aviso: "Se han migrado las ofertas guardadas con la versión " + r.origen + " (" +
-              r.estado.ofertas.length + " oferta(s), " + r.estado.perfiles.length + " perfil(es))."
+            estado: null, migrado: M2.normalizarEstado(r.estado), origen: r.origen, heredado: true,
+            aviso: ""   /* el aviso (con sus tres salidas) lo pinta el arranque */
           };
         }
       } catch (e) { /* se prueba con la siguiente clave */ }
     }
 
     return { estado: M2.estadoInicial(), origen: 0, heredado: false, aviso: "" };
+  }
+
+  /** Los datos de versiones anteriores, migrados a la versión actual, o null.
+      No toca nada: sólo lee y traduce. */
+  function leerHeredado() {
+    const M2 = M();
+    if (!tieneLS()) return null;
+    for (let i = 0; i < M2.CLAVES_ANTIGUAS.length; i++) {
+      let viejo = null;
+      try { viejo = localStorage.getItem(M2.CLAVES_ANTIGUAS[i]); } catch (e) { viejo = null; }
+      if (!viejo) continue;
+      try {
+        const d = JSON.parse(viejo);
+        if (d && Array.isArray(d.ofertas || d.proyectos)) return M2.normalizarEstado(M2.migrar(d).estado);
+      } catch (e) { /* se prueba con la siguiente clave */ }
+    }
+    return null;
   }
 
   function datosHeredados() {
@@ -4486,14 +4506,18 @@ body.pa-sin-importes .pa-importe { display: none; }
         if (i >= 0) estado.ofertas[i] = of; else estado.ofertas.push(of);
         r.ofertas++;
       });
-      if (!estado.ofertas.some(x => x.id === estado.activa)) estado.activa = estado.ofertas[0].id;
+      /* Al fusionar, se activa la última oferta importada: el usuario quiere ver
+         sus datos, no seguir mirando el ejemplo. */
+      const importadas = N().lista(nuevo.ofertas);
+      if (importadas.length) estado.activa = importadas[importadas.length - 1].id;
+      else if (!estado.ofertas.some(x => x.id === estado.activa)) estado.activa = estado.ofertas[0].id;
       r.mensaje = "Fusionado: " + r.ofertas + " oferta(s) y " + r.perfiles + " perfil(es) nuevo(s).";
     }
     return r;
   }
 
   PL.almacen = {
-    tieneLS: tieneLS, cargar: cargar, guardar: guardar, datosHeredados: datosHeredados,
+    tieneLS: tieneLS, cargar: cargar, guardar: guardar, datosHeredados: datosHeredados, leerHeredado: leerHeredado,
     olvidarHeredados: olvidarHeredados, descargar: descargar, nombreFichero: nombreFichero,
     exportarOferta: exportarOferta, exportarTodo: exportarTodo, exportarBiblioteca: exportarBiblioteca,
     csvOferta: csvOferta, analizarImportacion: analizarImportacion, aplicarImportacion: aplicarImportacion
@@ -5631,8 +5655,12 @@ body.pa-sin-importes .pa-importe { display: none; }
       "Si importas una oferta o una copia, se descarga antes una copia de seguridad de lo que tenías.</p>" +
       (heredados.length
         ? '<div class="nz-callout nz-callout--warning" style="margin-top:var(--nz-space-2)"><p><strong>Hay datos de versiones anteriores</strong> en este navegador (' +
-          heredados.map(N().esc).join(", ") + "). Ya se han migrado a la versión actual; puedes borrarlos sin miedo.</p>" +
-          '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="limpiar-heredados">Borrar los datos antiguos</button></div>'
+          heredados.map(N().esc).join(", ") + "). No se han tocado: puedes traerlos, descargar una copia o descartarlos.</p>" +
+          '<div class="pa-fila">' +
+          '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="traer-heredados">📥 Traer mis ofertas antiguas</button>' +
+          '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="descargar-heredados">⬇ Descargar copia</button>' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="limpiar-heredados">Descartar</button>' +
+          "</div></div>" 
         : "") +
       '<div class="pa-fila" style="margin-top:var(--nz-space-3)">' +
         '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-ejemplo">Volver al ejemplo de inicio</button>' +
@@ -5982,6 +6010,28 @@ body.pa-sin-importes .pa-importe { display: none; }
     },
 
     /* ---------- Datos ---------- */
+    /* Traer las ofertas de versiones anteriores (se añaden a las actuales). */
+    "traer-heredados": () => {
+      const migrado = A().leerHeredado();
+      if (!migrado) { APP().toast("Ya no quedan datos de versiones anteriores"); return; }
+      if (!confirm("Se van a AÑADIR " + migrado.ofertas.length + " oferta(s) de versiones anteriores a las que tienes ahora y se activará la última.\n\nAntes se descarga una copia de seguridad de tus datos actuales.")) return;
+      A().descargar("planifica-copia-antes-de-traer-" + N().hoyISO() + ".json", JSON.stringify(APP().ESTADO, null, 2), "application/json");
+      const r = A().aplicarImportacion(APP().ESTADO,
+        { ok: true, tipo: "estado", datos: migrado, origen: 1 },
+        { reemplazar: false, aplicarMarca: false });
+      A().olvidarHeredados();
+      R().todo(); APP().guardar();
+      APP().toast(r.mensaje || "Datos antiguos traídos");
+    },
+
+    /* Descargar una copia de los datos antiguos sin tocarlos. */
+    "descargar-heredados": () => {
+      const migrado = A().leerHeredado();
+      if (!migrado) { APP().toast("Ya no quedan datos de versiones anteriores"); return; }
+      A().descargar("planifica-datos-antiguos-" + N().hoyISO() + ".json", JSON.stringify(migrado, null, 2), "application/json");
+      APP().toast("Copia de los datos antiguos descargada");
+    },
+
     "limpiar-heredados": () => {
       if (!confirm("¿Borrar los datos de versiones anteriores guardados en este navegador? La app seguirá con los actuales.")) return;
       A().olvidarHeredados();
@@ -6554,21 +6604,27 @@ body.pa-sin-importes .pa-importe { display: none; }
 
   /* ---------- Aviso de datos heredados ---------- */
 
-  /** Refresca el aviso según lo que haya ahora mismo en el navegador. */
+  /** Aviso de que hay datos de versiones anteriores, con las TRES salidas
+      posibles: traerlos, descargar una copia o descartarlos. Nunca se borra
+      nada sin que el usuario lo decida. */
   function refrescarHeredados() {
     const hay = A().datosHeredados();
-    avisoHeredados(hay.length
-      ? "Se han encontrado datos de versiones anteriores de la aplicación (" + hay.join(", ") +
-        ") y se han traído a la versión actual. Tus ofertas están completas."
-      : null);
+    if (!hay.length) { V().vaciar("pa-herederos"); return; }
+    V().escribir("pa-herederos", V().aviso("warning",
+      "<strong>Datos de versiones anteriores.</strong> Este navegador guarda datos de " + N().esc(hay.join(", ")) +
+      ". La aplicación ha arrancado con una <strong>oferta de ejemplo</strong> para que veas cómo funciona; " +
+      "tus datos antiguos siguen intactos. ¿Qué hacemos con ellos?" +
+      '<div class="pa-fila" style="margin-top:var(--nz-space-2)">' +
+        '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="traer-heredados">📥 Traer mis ofertas antiguas</button>' +
+        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="descargar-heredados">⬇ Descargar una copia</button>' +
+        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="limpiar-heredados">Descartarlos</button>' +
+      "</div>"));
   }
 
+  /** Aviso suelto (por ejemplo, si falló la lectura de los datos guardados). */
   function avisoHeredados(aviso) {
     if (!aviso) { V().vaciar("pa-herederos"); return; }
-    V().escribir("pa-herederos", V().aviso("warning",
-      "<strong>Datos migrados.</strong> " + N().esc(aviso) +
-      ' <button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="limpiar-heredados">Borrar los datos antiguos</button>' +
-      ' <span class="pa-mini">(los datos actuales no se tocan)</span>'));
+    V().escribir("pa-herederos", V().aviso("warning", "<strong>Aviso.</strong> " + N().esc(aviso)));
   }
 
   function errorVisible(mensaje) {
@@ -6588,6 +6644,8 @@ body.pa-sin-importes .pa-importe { display: none; }
     try { lectura = A().cargar(); }
     catch (e) { lectura = { estado: M().estadoInicial(), heredado: false, aviso: "No se pudieron leer los datos guardados (" + e.message + "): se empieza de cero." }; }
 
+    /* Arranque limpio: si sólo había datos de versiones anteriores, se empieza con
+       el ejemplo (los antiguos quedan a un clic, no se tocan). */
     app.ESTADO = lectura.estado || M().estadoInicial();
     if (!app.ESTADO.ofertas.length) app.ESTADO = M().estadoInicial();
     if (!app.pr()) app.ESTADO.activa = app.ESTADO.ofertas[0].id;

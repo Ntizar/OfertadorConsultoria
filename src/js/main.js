@@ -199,21 +199,27 @@
 
   /* ---------- Aviso de datos heredados ---------- */
 
-  /** Refresca el aviso según lo que haya ahora mismo en el navegador. */
+  /** Aviso de que hay datos de versiones anteriores, con las TRES salidas
+      posibles: traerlos, descargar una copia o descartarlos. Nunca se borra
+      nada sin que el usuario lo decida. */
   function refrescarHeredados() {
     const hay = A().datosHeredados();
-    avisoHeredados(hay.length
-      ? "Se han encontrado datos de versiones anteriores de la aplicación (" + hay.join(", ") +
-        ") y se han traído a la versión actual. Tus ofertas están completas."
-      : null);
+    if (!hay.length) { V().vaciar("pa-herederos"); return; }
+    V().escribir("pa-herederos", V().aviso("warning",
+      "<strong>Datos de versiones anteriores.</strong> Este navegador guarda datos de " + N().esc(hay.join(", ")) +
+      ". La aplicación ha arrancado con una <strong>oferta de ejemplo</strong> para que veas cómo funciona; " +
+      "tus datos antiguos siguen intactos. ¿Qué hacemos con ellos?" +
+      '<div class="pa-fila" style="margin-top:var(--nz-space-2)">' +
+        '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="traer-heredados">📥 Traer mis ofertas antiguas</button>' +
+        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="descargar-heredados">⬇ Descargar una copia</button>' +
+        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="limpiar-heredados">Descartarlos</button>' +
+      "</div>"));
   }
 
+  /** Aviso suelto (por ejemplo, si falló la lectura de los datos guardados). */
   function avisoHeredados(aviso) {
     if (!aviso) { V().vaciar("pa-herederos"); return; }
-    V().escribir("pa-herederos", V().aviso("warning",
-      "<strong>Datos migrados.</strong> " + N().esc(aviso) +
-      ' <button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="limpiar-heredados">Borrar los datos antiguos</button>' +
-      ' <span class="pa-mini">(los datos actuales no se tocan)</span>'));
+    V().escribir("pa-herederos", V().aviso("warning", "<strong>Aviso.</strong> " + N().esc(aviso)));
   }
 
   function errorVisible(mensaje) {
@@ -233,6 +239,8 @@
     try { lectura = A().cargar(); }
     catch (e) { lectura = { estado: M().estadoInicial(), heredado: false, aviso: "No se pudieron leer los datos guardados (" + e.message + "): se empieza de cero." }; }
 
+    /* Arranque limpio: si sólo había datos de versiones anteriores, se empieza con
+       el ejemplo (los antiguos quedan a un clic, no se tocan). */
     app.ESTADO = lectura.estado || M().estadoInicial();
     if (!app.ESTADO.ofertas.length) app.ESTADO = M().estadoInicial();
     if (!app.pr()) app.ESTADO.activa = app.ESTADO.ofertas[0].id;

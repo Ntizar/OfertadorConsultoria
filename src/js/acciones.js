@@ -328,6 +328,28 @@
     },
 
     /* ---------- Datos ---------- */
+    /* Traer las ofertas de versiones anteriores (se añaden a las actuales). */
+    "traer-heredados": () => {
+      const migrado = A().leerHeredado();
+      if (!migrado) { APP().toast("Ya no quedan datos de versiones anteriores"); return; }
+      if (!confirm("Se van a AÑADIR " + migrado.ofertas.length + " oferta(s) de versiones anteriores a las que tienes ahora y se activará la última.\n\nAntes se descarga una copia de seguridad de tus datos actuales.")) return;
+      A().descargar("planifica-copia-antes-de-traer-" + N().hoyISO() + ".json", JSON.stringify(APP().ESTADO, null, 2), "application/json");
+      const r = A().aplicarImportacion(APP().ESTADO,
+        { ok: true, tipo: "estado", datos: migrado, origen: 1 },
+        { reemplazar: false, aplicarMarca: false });
+      A().olvidarHeredados();
+      R().todo(); APP().guardar();
+      APP().toast(r.mensaje || "Datos antiguos traídos");
+    },
+
+    /* Descargar una copia de los datos antiguos sin tocarlos. */
+    "descargar-heredados": () => {
+      const migrado = A().leerHeredado();
+      if (!migrado) { APP().toast("Ya no quedan datos de versiones anteriores"); return; }
+      A().descargar("planifica-datos-antiguos-" + N().hoyISO() + ".json", JSON.stringify(migrado, null, 2), "application/json");
+      APP().toast("Copia de los datos antiguos descargada");
+    },
+
     "limpiar-heredados": () => {
       if (!confirm("¿Borrar los datos de versiones anteriores guardados en este navegador? La app seguirá con los actuales.")) return;
       A().olvidarHeredados();

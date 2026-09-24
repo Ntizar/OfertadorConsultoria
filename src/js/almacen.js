@@ -49,17 +49,37 @@
         const d = JSON.parse(viejo);
         const ofertas = d && (d.ofertas || d.proyectos);
         if (Array.isArray(ofertas)) {
+          /* Hay datos de una versión anterior y todavía no hay datos v4: NO se
+             imponen. La aplicación arranca con la oferta de ejemplo y los datos
+             antiguos quedan disponibles para traerlos, copiarlos o descartarlos
+             (así se empieza limpio sin perder nada). */
           const r = M2.migrar(d);
           return {
-            estado: M2.normalizarEstado(r.estado), origen: r.origen, heredado: true,
-            aviso: "Se han migrado las ofertas guardadas con la versión " + r.origen + " (" +
-              r.estado.ofertas.length + " oferta(s), " + r.estado.perfiles.length + " perfil(es))."
+            estado: null, migrado: M2.normalizarEstado(r.estado), origen: r.origen, heredado: true,
+            aviso: ""   /* el aviso (con sus tres salidas) lo pinta el arranque */
           };
         }
       } catch (e) { /* se prueba con la siguiente clave */ }
     }
 
     return { estado: M2.estadoInicial(), origen: 0, heredado: false, aviso: "" };
+  }
+
+  /** Los datos de versiones anteriores, migrados a la versión actual, o null.
+      No toca nada: sólo lee y traduce. */
+  function leerHeredado() {
+    const M2 = M();
+    if (!tieneLS()) return null;
+    for (let i = 0; i < M2.CLAVES_ANTIGUAS.length; i++) {
+      let viejo = null;
+      try { viejo = localStorage.getItem(M2.CLAVES_ANTIGUAS[i]); } catch (e) { viejo = null; }
+      if (!viejo) continue;
+      try {
+        const d = JSON.parse(viejo);
+        if (d && Array.isArray(d.ofertas || d.proyectos)) return M2.normalizarEstado(M2.migrar(d).estado);
+      } catch (e) { /* se prueba con la siguiente clave */ }
+    }
+    return null;
   }
 
   function datosHeredados() {
@@ -261,14 +281,18 @@
         if (i >= 0) estado.ofertas[i] = of; else estado.ofertas.push(of);
         r.ofertas++;
       });
-      if (!estado.ofertas.some(x => x.id === estado.activa)) estado.activa = estado.ofertas[0].id;
+      /* Al fusionar, se activa la última oferta importada: el usuario quiere ver
+         sus datos, no seguir mirando el ejemplo. */
+      const importadas = N().lista(nuevo.ofertas);
+      if (importadas.length) estado.activa = importadas[importadas.length - 1].id;
+      else if (!estado.ofertas.some(x => x.id === estado.activa)) estado.activa = estado.ofertas[0].id;
       r.mensaje = "Fusionado: " + r.ofertas + " oferta(s) y " + r.perfiles + " perfil(es) nuevo(s).";
     }
     return r;
   }
 
   PL.almacen = {
-    tieneLS: tieneLS, cargar: cargar, guardar: guardar, datosHeredados: datosHeredados,
+    tieneLS: tieneLS, cargar: cargar, guardar: guardar, datosHeredados: datosHeredados, leerHeredado: leerHeredado,
     olvidarHeredados: olvidarHeredados, descargar: descargar, nombreFichero: nombreFichero,
     exportarOferta: exportarOferta, exportarTodo: exportarTodo, exportarBiblioteca: exportarBiblioteca,
     csvOferta: csvOferta, analizarImportacion: analizarImportacion, aplicarImportacion: aplicarImportacion

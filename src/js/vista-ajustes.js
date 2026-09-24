@@ -81,8 +81,12 @@
       "Si importas una oferta o una copia, se descarga antes una copia de seguridad de lo que tenías.</p>" +
       (heredados.length
         ? '<div class="nz-callout nz-callout--warning" style="margin-top:var(--nz-space-2)"><p><strong>Hay datos de versiones anteriores</strong> en este navegador (' +
-          heredados.map(N().esc).join(", ") + "). Ya se han migrado a la versión actual; puedes borrarlos sin miedo.</p>" +
-          '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="limpiar-heredados">Borrar los datos antiguos</button></div>'
+          heredados.map(N().esc).join(", ") + "). No se han tocado: puedes traerlos, descargar una copia o descartarlos.</p>" +
+          '<div class="pa-fila">' +
+          '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="traer-heredados">📥 Traer mis ofertas antiguas</button>' +
+          '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="descargar-heredados">⬇ Descargar copia</button>' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="limpiar-heredados">Descartar</button>' +
+          "</div></div>" 
         : "") +
       '<div class="pa-fila" style="margin-top:var(--nz-space-3)">' +
         '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-ejemplo">Volver al ejemplo de inicio</button>' +

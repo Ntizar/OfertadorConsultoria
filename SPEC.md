@@ -1,140 +1,103 @@
-# Planifica v3 — SPEC
+# SPEC — Planifica v4 «solo ofertas»
 
-> Ofertas y planificación de proyectos con **tareas, subtareas y entregables**.
-> Reescritura completa sobre motor nuevo, conservando la exactitud de cálculo como contrato.
-> Estado: **APROBADA** por David Antizar el 24-sep-2026. Extras confirmados: escenarios comparados + historial de versiones.
+> Contrato de trabajo. Aprobado por David el 24-sep-2026.
+> Si algo del código contradice esta spec, manda la spec: o se corrige el código o se actualiza la spec, pero no se avanza con la duda.
 
 ## 1. Visión
 
-Un único HTML autocontenido (se abre con doble clic, funciona offline, sin CDN ni servidor) que permita a un consultor montar una **oferta profesional completa** —alcance, tareas, entregables, esfuerzo por perfil y mes, economía y plan de facturación— en minutos, y sacarla en PDF/CSV/JSON.
+Planifica es una herramienta para **crear ofertas de consultoría**, no para gestionar proyectos. Escribe una oferta con sus tareas, perfiles, horas y entregables, la ve en un diagrama de Gantt, la cierra económicamente y la imprime con su marca. Nada de seguimiento ni facturación.
+
+La versión anterior arrastraba el formato de la v2 (8 pestañas, tres ventanas emergentes, meses «oct 26 · nov 26 · dic 26» y un módulo de seguimiento-facturación que no aportaba). Decisión del usuario: **reescribir desde cero con lo aprendido**, incluido el motor, conservando el contrato de exactitud como criterio de aceptación.
 
 ## 2. Alcance
 
-### Sí hace
-- Oferta con cliente, referencia, estado (borrador → enviada → aprobada/descartada), fecha y validez, condiciones de pago.
-- **Tareas → Subtareas → Líneas (perfil × mes con horas)**.
-- **Entregables nuevos**, en dos niveles:
-  - **Entregables de tarea**: nombre, descripción, mes de entrega, fecha exacta (opcional), estado (pendiente / en curso / entregado / aceptado), criterio de aceptación, responsable (perfil) y **% de facturación**.
-  - **Entregables de oferta** (hitos sueltos: gestión, reuniones, informes): mismos campos, sin tarea asociada.
-- **Plan de facturación por hitos**: importe facturable por entregable y acumulado, aviso si los porcentajes no cierran al 100 %, en la oferta y en el informe.
-- **Escenarios comparados**: guardar la oferta como escenario con nombre (base / recortada / ampliada), compararlos con **deltas** (importe, horas, meses, gastos, total, tareas, entregables, importe por mes, horas por perfil) y aplicar cualquiera a la oferta activa.
-- **Historial de versiones**: congelar versiones de la oferta con etiqueta, fecha y nota («v1 enviada al cliente»), y ver **qué cambió** respecto a hoy (mismo comparador que los escenarios).
-- Economía: perfiles con tarifa y categoría, gastos generales, descuento (% o fijo), IVA/IRPF (añadido o incluido) → de subtotal a TOTAL.
-- Vistas (8): Estructura · Entregables · Escenarios · Resumen · Cronograma (marcadores de entregable) · Gastos · Informe · Ajustes.
-- Marca blanca (nombre, lema, logo, moneda) y modo «solo tiempos» (oculta importes en pantalla, informe y CSV).
-- Persistencia en localStorage con versión de datos; exportar/importar JSON de oferta, biblioteca, escenarios y copia completa; CSV (`;`, coma decimal, BOM); informe imprimible a PDF.
-- Migración automática de datos v1/v2 → v3 y **aviso claro** si hay datos heredados de versiones antiguas.
+### Sí
+- Cinco pestañas: **Trabajo, Oferta, Resumen, Informe, Ajustes**.
+- Tareas → subtareas → líneas **perfil × mes** (horas por mes).
+- **Entregables en dos niveles**: dentro de una tarea y sueltos en la oferta (gestión, reuniones, informes). Con nombre, descripción, criterio de aceptación, responsable (perfil), mes de entrega, fecha exacta opcional y horas estimadas (orientativas: **no** suman al total).
+- **Calendario editable**: mes de inicio, duración, desplazamiento, zoom meses/trimestres y **rótulos de periodo renombrables a mano** desde el propio cronograma, con vuelta al automático.
+- **Diagrama de Gantt**: banda de año, columnas de periodo, barras por tarea y subtarea, rombo por entregable, horas por fila, clic para ir a la tarea.
+- Economía: gastos generales, descuento (porcentaje o fijo), impuestos (IVA/IRPF/ninguno, incluido o no) y cadena de totales.
+- **Escenarios** (alternativas con nombre) y **versiones** (copias congeladas) con comparación contra la oferta actual.
+- Marca blanca, modo «solo tiempos» (oculta importes), plantillas de tareas, perfiles con tarifa y categoría, exportación JSON/CSV e importación.
+- Todo en castellano, un solo fichero autocontenido, abrible con doble clic, sin conexión, datos en el navegador.
 
-### NO hace (non-goals)
-- Sin backend, sin login, sin cuentas, sin sincronización en nube.
-- Sin colaboración multiusuario ni comentarios.
-- Sin facturación real (no emite facturas; planifica pagos).
-- Sin deshacer/rehacer y sin pegado desde Excel: descartados por el usuario en esta versión.
-- Sin integración con ERP, Contrat@, PLACSP ni firma electrónica.
-- Sin dependencias externas ni CDN: todo incrustado.
+### No
+- Seguimiento de ejecución: estados de entregable, avance, vencimientos.
+- Facturación: porcentaje por hito, plan de facturación, cobrado/pendiente.
+- Deshacer/rehacer y pegar horas desde Excel (descartados explícitamente).
+- Servidor, cuentas, nube, CDN y dependencias en tiempo de ejecución.
 
-## 3. Modelo de datos v3
+## 3. Arquitectura
+
+Módulos **concatenados** (no módulos ES: `file://` no los permite) y **ensamblados** por `tools/compilar.py` en `docs/index.html`, junto a Aurora 7 v7.2.0 (10 packs) y el CSS propio.
 
 ```
-ESTADO (localStorage: planifica:estado:v3)
-├── version: 3
-├── marca { nombre, sub, moneda, logo }
-├── mostrarImportes, guiaVista
-├── perfiles[]            { id, nombre, unidades, tarifa, categoria, esDefecto }
-├── perfilesInactivos[], plantillas[], plantillasOferta[]
-└── proyectos[]  ← OFERTA
-    ├── id, nombre, guia
-    ├── cliente { nombre, contacto, ref }
-    ├── estado, fecha, validezDias, fechaInicio, meses, descripcion, condicionesPago
-    ├── impuestos { tipo: iva|irpf|ninguno, tasa, incluido }
-    ├── descuento { tipo: ''|'%'|'fijo', valor }
-    ├── gastos[]          { id, nombre, unidades, precio }
-    ├── entregables[]     ← hitos a nivel de oferta
-    ├── tareas[]
-    │   ├── id, nombre
-    │   ├── entregables[] ← hitos de la tarea
-    │   └── subtareas[]
-    │       └── lineas[]  { id, perfilId, horas{ m0..mN } }
-    ├── escenarios[]      { id, nombre, etiqueta, creado, snapshot }
-    └── versiones[]       { id, etiqueta, fecha, nota, snapshot, resumen }
-
-ENTREGABLE  { id, nombre, descripcion, mes, fecha, estado, criterio,
-              responsablePerfilId, facturacionPct, baseFacturacion: 'tarea'|'oferta' }
-estado ∈ { pendiente, encurso, entregado, aceptado }
-
-SNAPSHOT  (lo que se congela en escenarios y versiones)
-          { tareas, entregables, gastos, meses, fechaInicio, impuestos, descuento,
-            condicionesPago, descripcion, estado }
+nucleo → periodos → modelo → ejemplo → calculo → entregables → comparar → almacen
+      → gantt → vistas → vista-{trabajo,oferta,resumen,informe,ajustes}
+      → acciones → eventos → main
 ```
 
-### Reglas de facturación (motor)
-- `importeFacturable(entregable)` = `facturacionPct/100 × base`, donde `base` es el importe de su tarea (baseFacturacion `tarea`) o la base imponible de la oferta (`oferta`).
-- `facturado` = estado `entregado` o `aceptado`; `cobrado` = solo `aceptado`.
-- Aviso (no error) si la suma de porcentajes por base no es 100 %: se muestra el pendiente de asignar.
+Reglas:
+1. **El motor es puro**: recibe `(oferta, perfiles)` y no toca el DOM.
+2. **Las vistas no rompen la aplicación**: si falta un nodo, no pasa nada; y no repintan si el HTML generado no ha cambiado (así no se pierde el foco).
+3. **Todo cambio con cifras repinta todas las vistas.** Mientras se escriben horas se repinta todo menos el editor; al renombrar un mes, todo menos el Gantt.
+4. **Cero ventanas emergentes**: plantillas, escenarios y versiones viven en línea. Solo se usa `confirm()` para operaciones destructivas o masivas.
+5. **Diseño**: la aplicación solo aporta clases `.pa-*`; toda clase `nz-*` usada debe existir en Aurora (lo auditía `tools/auditar-wiring.py`). **Acento naranja** de Aurora (`--nz-accent`), un solo acento.
+6. **Fechas siempre en hora local**: prohibido `toISOString()` sobre fechas locales (en UTC+1/+2 devuelve el día anterior). Se usan `nucleo.mesISO` / `nucleo.diaISO`.
 
-## 4. Arquitectura modular
+## 4. Modelo de datos (v4)
 
-**Restricción dura:** debe seguir siendo **un solo HTML abrible con `file://`** → `file://` no permite módulos ES, así que los ficheros se **concatenan** y cada uno expone su API en un namespace único (`PL.nucleo`, `PL.modelo`, …) dentro de un IIFE. Nada de variables globales sueltas (el bug `horasMes` sombreada nace de eso).
+```
+ESTADO { version:4, marca{nombre,sub,moneda,logo}, mostrarImportes, guiaVista,
+         perfiles[], perfilesInactivos[], plantillas[], ofertas[], activa, ui{pestana} }
 
-| Capa | Fichero | Responsabilidad | No hace |
-|---|---|---|---|
-| Shell | `src/index.html` | Estructura DOM + placeholders de build | Nada de CSS propio ni JS |
-| Estilo | `src/css/app.css` | Solo estructura y layout propio (`.pa-*`) | Colores/formas (tokens Aurora) |
-| Núcleo | `src/js/nucleo.js` | `num`, `r2` (redondeo Excel), `esc`, formato, fechas, ids | Nada de DOM |
-| Modelo | `src/js/modelo.js` | Esquema v3, normalización defensiva, migración v1/v2→v3, estado inicial, ejemplo-guía, plantillas | Nada de DOM |
-| Cálculo | `src/js/calculo.js` | Motor **puro**: línea/subtarea/tarea, totales, impuestos, descuento, mensual, anualidades, entregables, facturación por hito | Nada de DOM |
-| Comparar | `src/js/comparar.js` | Snapshots, escenarios, versiones y deltas entre dos estados | Nada de DOM |
-| Almacén | `src/js/almacen.js` | localStorage versionado, import/export JSON, CSV, copias de seguridad, datos heredados | Nada de pintar |
-| Vistas | `src/js/vista-*.js` (8) | Una por pestaña: pinta **solo su nodo** | Nada de estado ni cálculos |
-| Eventos | `src/js/eventos.js` | Delegación `data-acc` / `data-campo`, teclado | Nada de lógica de negocio |
-| Arranque | `src/js/main.js` | Wiring: carga → migra → primer render → pestaña activa | Nada de cálculo |
+OFERTA { id, nombre, guia, cliente{nombre,contacto,ref}, estado, fecha, validezDias,
+         periodos{inicio:"aaaa-mm", n, zoom:"mes"|"trimestre", etiquetas{}},
+         descripcion, condicionesPago, impuestos{tipo,tasa,incluido}, descuento{tipo,valor},
+         gastos[], entregables[], tareas[], fotos[] }
 
-**Repintado por partes (rendimiento):** al teclear horas se recalcula y repinta solo KPIs + Resumen + Cronograma (con *debounce* de 120 ms); el Informe se repinta **solo si su pestaña está visible**. Hoy se repinta todo en cada tecla (197 ms medidos con el encargo real).
+TAREA      { id, nombre, entregables[], subtareas[] }
+SUBTAREA   { id, nombre, _abierta, lineas[] }
+LINEA      { id, perfilId, horas{p0..pN} }
+ENTREGABLE { id, nombre, descripcion, criterio, periodo, fecha, responsablePerfilId, horas }
+FOTO       { id, tipo:"escenario"|"version", nombre, etiqueta, nota, fecha, snapshot }
+```
 
-## 5. Contrato de verificación (no negociable)
+- Las horas viven en `horas.p{i}` por mes; el prefijo `p` es deliberado (antes `m`) para que la migración sea explícita.
+- La migración lee `version` 1/2/3 y traduce: `proyectos`→`ofertas`, `meses`+`fechaInicio`→`periodos`, `m#`→`p#`, entregables sin estado ni facturación.
 
-1. **Los 47 checks del motor actual deben seguir en verde** sobre el motor nuevo.
-2. **Total del encargo real (Ineco, abono único fase 2) = 587.009,36 € al céntimo** y cada tarea cuadra con su Excel.
-3. `tools/verificar-motor.js` — motor puro, ≥ 70 checks (incluye entregables, facturación por hito, escenarios/versiones, migraciones v1/v2→v3, normalización defensiva).
-4. `tools/verificar-dom.js` — **DOM real con jsdom** sobre `docs/index.html` compilado, ≥ 60 checks: las 8 pestañas, todos los botones `data-acc`, escenarios, versiones, round-trip de import/export, migración real y umbrales de rendimiento.
-5. `tools/compilar.py` falla (exit ≠ 0) si tras ensamblar queda algún placeholder o falta alguna sección.
-6. Ningún check puede pasar por "el elemento no existe": el arnés verifica primero que el selector encuentra algo.
+## 5. Arranque y datos heredados
 
-## 6. Anti-patrones (los fallos que ya nos han costado caro)
+- Si hay datos v4, se cargan.
+- Si **no** hay datos v4 pero sí de versiones anteriores: la aplicación **arranca con la oferta de ejemplo** y el aviso ofrece tres salidas — **traer** las ofertas antiguas (descargando antes una copia de seguridad y activando la última traída), **descargar una copia** o **descartarlas**. Nunca se borra nada sin decidirlo el usuario.
+- `Ctrl+S` descarga una copia completa; Ajustes ofrece copia, importación y borrado total.
 
-- ❌ Selectores de estructura frágiles (`main>section` cuando las secciones van dos niveles abajo) → **siempre por id o por `data-*` estable**.
-- ❌ Arneses con DOM falso que devuelven `[]` y dan **falso verde** → todo lo interactivo se prueba en DOM real.
-- ❌ CSS duplicado o heredado (`src/style.css` de la v1 con clases muertas `.pa-cab/.pa-card` que pisaban al CSS nuevo) → **una sola fuente de CSS propio**.
-- ❌ Clases del sistema inventadas (`.nz-field--wide`) → solo clases existentes en los packs de Aurora 7.
-- ❌ Repintado global en cada pulsación de tecla.
-- ❌ Variables que sombrean funciones del mismo nombre.
-- ❌ `file://` + modos ES, CDN o `fetch` de ficheros locales.
+## 6. Criterios de éxito
 
-## 7. Criterios de éxito
+1. **250 comprobaciones en verde**: motor 127, DOM real 123 y la auditoría de conexiones sin fallos.
+2. **Contrato de exactitud**: el encargo de referencia cuadra **587.009,36 €** al céntimo y el reparto por tarea coincide con el Excel (verificado por dos vías independientes).
+3. **Rendimiento**: menos de 30 ms por pulsación con el encargo real de 1.700 líneas (medido: 10 ms).
+4. **Cero botones muertos**: todo `data-acc` tiene acción y todo nodo que pide el JS existe.
+5. **Cero clases inventadas**: toda clase `nz-*` está definida en un pack de Aurora.
+6. Los meses se pueden renombrar desde el cronograma y el cambio se ve en el editor, el resumen y el informe.
 
-| Métrica | Objetivo |
-|---|---|
-| Abrir `docs/index.html` con doble clic | Todo funciona, sin errores de consola |
-| Cambio de pestaña | Pinta en < 100 ms |
-| Teclear una hora | < 30 ms (hoy 197 ms) |
-| Crear oferta completa desde plantilla | < 2 minutos |
-| Cargar el encargo real (1.700 líneas JSON) | < 1 s |
-| Checks automáticos | ≥ 130 en verde (motor + DOM) |
-| Tamaño del HTML final | < 350 KB |
+## 7. Anti-patrones (prohibido)
 
-## 8. Fases (cada una con su ✅)
+- Repintar solo la pestaña activa dejando las demás desfasadas.
+- Ventanas emergentes propias para pedir datos.
+- Clases `nz-*` que no existan en Aurora, o colores a mano en vez de tokens.
+- Funciones del motor que dependan del DOM o del estado global.
+- `toISOString()` sobre fechas locales.
+- Arnés de verificación con DOM simulado que devuelve listas vacías (falso verde: así se colaron 47 comprobaciones en verde con la aplicación rota).
+- Añadir seguimiento o facturación: no es el objeto de esta herramienta.
 
-1. **F1 · Andamiaje y motor** — núcleo + modelo v3 + cálculo puro + migraciones. Verde: verificar-motor ≥ 70 checks y 587.009,36 € al céntimo.
-2. **F2 · Entregables y comparador** — entregables (2 niveles), facturación por hito, snapshots, escenarios, versiones y deltas.
-3. **F3 · Vistas y UX** — las 8 pestañas nuevas, repintado por partes, cronograma con marcadores, informe con plan de entregas y facturación.
-4. **F4 · Verificación y publicación** — ambos arneses ≥ 130 checks, compilación con guardas, README + SPEC al día, verificación visual y publicación en OfertadorConsultoria.
+## 8. Fases
 
-## 9. Plan de datos del usuario
-
-El navegador tiene ofertas heredadas de una build antigua (*«Mi primer proyecto» / «Cliente de muestra»*). Decisión aprobada: **arrancar limpio con el ejemplo nuevo**, con **descarga automática de copia de seguridad** del estado anterior antes de reemplazarlo. Las herramientas de importación siguen aceptando los JSON antiguos v1/v2 y migrándolos.
-
-## 10. Referencias
-
-- Aurora 7 v7.2.0 (design system, packs incrustados) — `~/Projects/Aurora-7`.
-- Encargo real de contraste: `datos/carga-ineco-abono-unico.json` (totales Excel).
-- Informe de auditoría previo: sesión de 24-sep-2026 (chat de Mastermind).
+| Fase | Contenido | Estado |
+|---|---|---|
+| F1 | Modelo v4, migración y ejemplo | ✅ |
+| F2 | Motor de cálculo + periodos + entregables + fotos | ✅ |
+| F3 | Gantt, vistas, acciones y repintado conectado | ✅ |
+| F4 | Arneses (motor, DOM, conexiones) y contrato de exactitud | ✅ |
+| F5 | Publicación y verificación visual | ⏳ |
