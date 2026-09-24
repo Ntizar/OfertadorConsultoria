@@ -53,16 +53,62 @@
      la oferta para que cada oferta sea autocontenida y exportable. */
   const JORNADA_DEFECTO = { horasDia: 8, diasSemana: [1, 2, 3, 4, 5] };   /* 1=lunes … 7=domingo */
 
+  /** Festivos: [{fecha:"aaaa-mm-dd", nombre, ambito}] sin duplicados y ordenados. */
+  function normalizarFestivos(l) {
+    const N2 = N();
+    const vistos = {};
+    const salida = [];
+    N2.lista(l).forEach(f => {
+      const fecha = String(f && f.fecha ? f.fecha : "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || vistos[fecha]) return;
+      const d = new Date(Number(fecha.slice(0, 4)), Number(fecha.slice(5, 7)) - 1, Number(fecha.slice(8, 10)));
+      if (isNaN(d.getTime()) || N2.diaISO(d) !== fecha) return;
+      vistos[fecha] = true;
+      salida.push({
+        fecha: fecha,
+        nombre: String((f && f.nombre) || "Festivo").slice(0, 80),
+        ambito: String((f && f.ambito) || "Propio").slice(0, 24)
+      });
+    });
+    return salida.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+  }
+
+  /* Memo: normalizar la jornada en cada consulta multiplicaba por miles las
+     llamadas por repintado (ahora se recorre día a día y con festivos). */
+  const CACHE_JORNADA = new WeakMap();
+
   function normalizarJornada(j) {
+    if (j && typeof j === "object" && CACHE_JORNADA.has(j)) return CACHE_JORNADA.get(j);
+    const salida = normalizarJornadaCruda(j);
+    if (j && typeof j === "object") CACHE_JORNADA.set(j, salida);
+    return salida;
+  }
+
+  function normalizarJornadaCruda(j) {
     const u = N();
     const q = (j && typeof j === "object") ? j : {};
     let dias = Array.isArray(q.diasSemana)
       ? q.diasSemana.map(d => Math.round(u.acota(d, 1, 7))).filter(d => d >= 1 && d <= 7)
       : [];
     dias = Array.from(new Set(dias)).sort((a, b) => a - b);
+    if (!dias.length) dias = JORNADA_DEFECTO.diasSemana.slice();
+    const horasDia = u.acota(q.horasDia === undefined ? JORNADA_DEFECTO.horasDia : q.horasDia, 0.5, 24);
+    /* Horas de cada día de la semana: así el viernes puede ser más corto sin dejar
+       de ser laborable. Lo que no venga, se hereda de horasDia. */
+    const porDia = {};
+    for (let d = 1; d <= 7; d++) {
+      const propio = (q.horasPorDia && typeof q.horasPorDia === "object") ? q.horasPorDia[d] : undefined;
+      if (dias.indexOf(d) < 0) { porDia[d] = 0; continue; }
+      const v = (propio === undefined || propio === null) ? horasDia : u.acota(propio, 0, 24);
+      /* Un día marcado como laborable con 0 horas no tiene sentido: manda la casilla,
+         así al activar el sábado aparece con las horas generales y no con un cero. */
+      porDia[d] = u.r2(v > 0 ? v : horasDia);
+    }
     return {
-      horasDia: u.acota(q.horasDia === undefined ? JORNADA_DEFECTO.horasDia : q.horasDia, 0.5, 24),
-      diasSemana: dias.length ? dias : JORNADA_DEFECTO.diasSemana.slice()
+      horasDia: horasDia,
+      diasSemana: dias.filter(d => porDia[d] > 0),
+      horasPorDia: porDia,
+      festivos: normalizarFestivos(q.festivos)
     };
   }
 
@@ -135,7 +181,8 @@
     q.periodo = Math.round(N().acota(per === undefined ? 0 : per, 0, Math.max(0, nPeriodos - 1)));
     q.fecha = N().texto(q.fecha, "");
     q.responsablePerfilId = N().texto(q.responsablePerfilId, "");
-    q.horas = N().acota(q.horas, 0, 1e6);
+    /* Un entregable no lleva horas: el esfuerzo lo ponen las líneas de su subtarea. */
+    delete q.horas;
     delete q.mes; delete q.estado; delete q.facturacionPct; delete q.baseFacturacion;
     return q;
   }
@@ -206,6 +253,12 @@
     q.periodos = P().normalizar(q.periodos);
     delete q.fechaInicio; delete q.meses;
     q.jornada = normalizarJornada(q.jornada);
+    /* Si la oferta no trae festivos, se cargan los de España y Madrid de los años
+       que abarca el calendario. Son editables: los locales cambian cada año. */
+    if (!q.jornada.festivos.length && PL.festivos) {
+      q.jornada.festivos = normalizarFestivos(
+        PL.festivos.paraRango(q.periodos.inicio, P().meses(q.periodos), q.periodos.unidad));
+    }
 
     if (esMigracion && !q.impuestos) {
       q.impuestos = { tipo: "ninguno", tasa: 0, incluido: false };
@@ -261,7 +314,6 @@
         descripcion: N().texto(e && e.descripcion, ""),
         criterio: N().texto(e && e.criterio, ""),
         periodo: Math.round(N().acota(e && e.periodo, 0, P().MAX - 1)),
-        horas: N().acota(e && e.horas, 0, 1e6)
       }))
     }));
     return q;
@@ -443,6 +495,7 @@
     normalizarOferta: normalizarOferta, normalizarFoto: normalizarFoto,
     normalizarEstado: normalizarEstado, migrar: migrar, estadoInicial: estadoInicial,
     JORNADA_DEFECTO: JORNADA_DEFECTO, normalizarJornada: normalizarJornada,
+    normalizarFestivos: normalizarFestivos,
     buscarTarea: buscarTarea, buscarSubtarea: buscarSubtarea, buscarLinea: buscarLinea,
     buscarEntregable: buscarEntregable, buscarFoto: buscarFoto, colgarEntregable: colgarEntregable
   };

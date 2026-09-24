@@ -35,29 +35,29 @@
           nombre: "1. Análisis y planificación",
           subtareas: ["1.1 Reunión de arranque", "1.2 Análisis de requisitos", "1.3 Plan de trabajo"],
           entregables: [
-            { nombre: "Informe de requisitos validado", descripcion: "Alcance cerrado y firmado por el cliente.", criterio: "Acta de reunión con el alcance aprobado", periodo: 0, horas: 40 },
-            { nombre: "Plan de trabajo detallado", descripcion: "Cronograma y reparto de esfuerzo.", criterio: "Cronograma aceptado por el cliente", periodo: 1, horas: 24 }
+            { nombre: "Informe de requisitos validado", descripcion: "Alcance cerrado y firmado por el cliente.", criterio: "Acta de reunión con el alcance aprobado", periodo: 0 },
+            { nombre: "Plan de trabajo detallado", descripcion: "Cronograma y reparto de esfuerzo.", criterio: "Cronograma aceptado por el cliente", periodo: 1 }
           ]
         },
         {
           nombre: "2. Diseño de la solución",
           subtareas: ["2.1 Arquitectura de la solución", "2.2 Diseño funcional"],
           entregables: [
-            { nombre: "Diseño funcional aprobado", descripcion: "Documento de diseño de la solución.", criterio: "Aprobación formal del cliente", periodo: 2, horas: 60 }
+            { nombre: "Diseño funcional aprobado", descripcion: "Documento de diseño de la solución.", criterio: "Aprobación formal del cliente", periodo: 2 }
           ]
         },
         {
           nombre: "3. Ejecución",
           subtareas: ["3.1 Desarrollo / ejecución", "3.2 Revisiones de calidad"],
           entregables: [
-            { nombre: "Solución en preproducción", descripcion: "Versión completa en entorno de pruebas.", criterio: "Pruebas de aceptación superadas", periodo: 4, horas: 120 }
+            { nombre: "Solución en preproducción", descripcion: "Versión completa en entorno de pruebas.", criterio: "Pruebas de aceptación superadas", periodo: 4 }
           ]
         },
         {
           nombre: "4. Pruebas y entrega",
           subtareas: ["4.1 Pruebas y validación", "4.2 Documentación y entrega"],
           entregables: [
-            { nombre: "Entrega final y documentación", descripcion: "Puesta en producción y manual de uso.", criterio: "Acta de entrega firmada", periodo: 5, horas: 40 }
+            { nombre: "Entrega final y documentación", descripcion: "Puesta en producción y manual de uso.", criterio: "Acta de entrega firmada", periodo: 5 }
           ]
         },
         { nombre: "5. Gestión de proyecto", subtareas: ["5.1 Seguimiento y coordinación"], entregables: [] }
@@ -105,14 +105,14 @@
       Object.assign(M2.nuevoEntregable("1.1 Informe de requisitos", "subtarea", 0), {
         descripcion: "Análisis de la web actual, usuarios y contenidos.",
         criterio: "Validado por el cliente en la reunión de alcance",
-        responsablePerfilId: jp.id, horas: 32
+        responsablePerfilId: jp.id
       })
     ];
     s2.entregables = [
       Object.assign(M2.nuevoEntregable("1.2 Prototipo UX navegable", "subtarea", 2), {
         descripcion: "Prototipo de las 8 pantallas principales.",
         criterio: "Prototipo revisado y aprobado en Figma",
-        responsablePerfilId: med.id, horas: 54
+        responsablePerfilId: med.id
       })
     ];
     /* Y uno a nivel de la TAREA COMPLETA, porque también se entregan cosas así. */
@@ -120,7 +120,7 @@
       Object.assign(M2.nuevoEntregable("1.3 Manual de estilo", "tarea", 3), {
         descripcion: "Guía de estilo para que el cliente mantenga la web.",
         criterio: "Manual entregado y explicado al equipo del cliente",
-        responsablePerfilId: med.id, horas: 12
+        responsablePerfilId: med.id
       })
     ];
 
@@ -141,28 +141,22 @@
       Object.assign(M2.nuevoEntregable("2.1 Web en preproducción", "subtarea", 4), {
         descripcion: "Sitio completo funcionando en entorno de pruebas.",
         criterio: "Checklist de pruebas funcionales superado",
-        responsablePerfilId: jru.id, horas: 76
+        responsablePerfilId: jru.id
       })
     ];
     s4.entregables = [
       Object.assign(M2.nuevoEntregable("2.2 Puesta en producción", "subtarea", 5), {
         descripcion: "Publicación, dominios y formación al equipo.",
         criterio: "Acta de entrega y formación realizada",
-        responsablePerfilId: sen.id, horas: 30
+        responsablePerfilId: sen.id
       })
     ];
 
     o.tareas = [t1, t2];
 
-    /* ---- Entregable suelto de la oferta ---- */
-    o.entregables = [
-      Object.assign(M2.nuevoEntregable("Documentación de traspaso", "oferta", 5), {
-        descripcion: "Manual de uso y traspaso de conocimiento al equipo del cliente.",
-        criterio: "Sesión de traspaso realizada", responsablePerfilId: med.id, horas: 16
-      })
-    ];
-
-    return o;
+    /* Pasa por la normalización como cualquier oferta: así llegan los festivos del
+       calendario, la jornada queda completa y no hay dos caminos distintos. */
+    return M2.normalizarOferta(o);
   }
 
   PL.ejemplo = {

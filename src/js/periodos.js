@@ -274,6 +274,7 @@
   /* Caché: el cálculo de días laborables se pide una vez por celda y no cambia
      mientras no cambien el mes ni la jornada. */
   const CACHE_LAB = {};
+  const CACHE_HORAS = {};
 
   /** Días del mes del periodo i. */
   function diasDelMes(p, i) {
@@ -300,9 +301,34 @@
   }
 
   /** Horas laborables del periodo i: días laborables × horas por día. */
+  /** Horas laborables de un periodo: cada día con SUS horas, y los festivos fuera.
+      El viernes puede ser más corto y el 12 de octubre no cuenta. */
   function horasLaborables(p, i, jornada) {
-    const j = jornada || { horasDia: 8, diasSemana: [1, 2, 3, 4, 5] };
-    return N().r2(diasLaborables(p, i, j.diasSemana) * N().acota(j.horasDia === undefined ? 8 : j.horasDia, 0, 24));
+    const j = jornada || {};
+    const dias = (Array.isArray(j.diasSemana) && j.diasSemana.length) ? j.diasSemana : [1, 2, 3, 4, 5];
+    const horasDia = N().acota(j.horasDia === undefined ? 8 : j.horasDia, 0, 24);
+    const porDia = (j.horasPorDia && typeof j.horasPorDia === "object") ? j.horasPorDia : null;
+    const festivos = Array.isArray(j.festivos) ? j.festivos : [];
+    const q = normalizar(p);
+    const f = fecha(q, i);
+    const anio = f.getFullYear();
+    const huella = dias.join(",") + "|" + horasDia + "|" +
+      (porDia ? [1, 2, 3, 4, 5, 6, 7].map(d => N().num(porDia[d])).join(",") : "") + "|" +
+      festivos.filter(x => x && String(x.fecha).slice(0, 4) === String(anio)).map(x => String(x.fecha).slice(5)).join(",");
+    const clave = q.unidad + "|" + N().mesISO(f) + "-" + f.getDate() + "|" + huella;
+    if (CACHE_HORAS[clave] !== undefined) return CACHE_HORAS[clave];
+    const total = q.unidad === "semana" ? 7 : new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
+    const esFiesta = (PL.festivos && PL.festivos.esFestivo) ? PL.festivos.esFestivo : function () { return false; };
+    let h = 0;
+    for (let d = 0; d < total; d++) {
+      const dd = new Date(f.getFullYear(), f.getMonth(), f.getDate() + d);
+      const wd = dd.getDay() === 0 ? 7 : dd.getDay();
+      if (dias.indexOf(wd) < 0) continue;
+      if (esFiesta(festivos, dd)) continue;
+      h += porDia ? N().num(porDia[wd]) : horasDia;
+    }
+    CACHE_HORAS[clave] = N().r2(h);
+    return CACHE_HORAS[clave];
   }
 
   PL.periodos = {

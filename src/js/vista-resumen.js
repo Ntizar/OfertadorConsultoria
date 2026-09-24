@@ -143,9 +143,9 @@
     ])).join("");
     const filasEst = cmp.estructura.map(l => V2.fila([
       { html: l.texto },
-      { html: l.clave === "horas" || l.clave === "horasEntregables" ? V2.hor(l.a) : N().fmtNum(l.a), clase: "nz-table__right" },
-      { html: l.clave === "horas" || l.clave === "horasEntregables" ? V2.hor(l.b) : N().fmtNum(l.b), clase: "nz-table__right" },
-      { html: Math.abs(l.d) > 0.005 ? V2.delta(l.d, (l.clave === "horas" || l.clave === "horasEntregables") ? "horas" : "numero") : '<span class="pa-mini">igual</span>', clase: "nz-table__right" }
+      { html: l.clave === "horas" ? V2.hor(l.a) : N().fmtNum(l.a), clase: "nz-table__right" },
+      { html: l.clave === "horas" ? V2.hor(l.b) : N().fmtNum(l.b), clase: "nz-table__right" },
+      { html: Math.abs(l.d) > 0.005 ? V2.delta(l.d, (l.clave === "horas") ? "horas" : "numero") : '<span class="pa-mini">igual</span>', clase: "nz-table__right" }
     ])).join("");
     const filasPerf = cmp.porPerfil.map(x => V2.fila([
       { html: N().esc(x.nombre) },

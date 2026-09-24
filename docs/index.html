@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Planifica — Ofertas y planificación</title>
+<title>Oferta — del encargo a la oferta</title>
 <!-- Aurora 7 v7.2.0 — packs incrustados por tools/compilar.py. App autocontenida: sin CDN, sin servidor. -->
 <style>
 /* ====== Aurora 7 v7.2.0 incrustado (10 packs) ====== */
@@ -2695,6 +2695,14 @@ body.pa-sin-importes .pa-importe { display: none; }
   background: var(--pa-tono, var(--nz-border)); flex: 0 0 auto;
 }
 
+/* El entregable se marca con un rombo del mismo color naranja, nunca con un punto. */
+.pa-tono-rombo {
+  display: inline-block; width: 0.6rem; height: 0.6rem; flex: 0 0 auto;
+  background: var(--pa-tono, var(--nz-accent)); transform: rotate(45deg); border-radius: 1px;
+}
+.pa-hito .pa-tono-rombo { margin-right: var(--nz-space-1); }
+
+/* Las tareas: barras con su color; los entregables: el rombo en naranja. */
 .pa-gantt__fila--tarea .pa-barra { background: var(--pa-tono, var(--nz-brand)); }
 .pa-gantt__fila--subtarea .pa-barra { background: var(--pa-tono-fluido, var(--nz-brand)); }
 .pa-gantt__fila--entregable .pa-barra--hito { color: var(--pa-tono, var(--nz-accent)); }
@@ -2775,6 +2783,38 @@ span.pa-carga {
   border: 1px solid var(--nz-border); border-radius: 3px; vertical-align: -2px;
 }
 
+
+/* ---------- FULL RESPONSIVE ----------
+   La app se usa en móvil: nada se aplasta, nada se sale. Las tablas anchas hacen su
+   propio scroll (con la columna del concepto pegada) en vez de romper la página. */
+.pa-tabla-horas { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.pa-tabla-horas > table { min-width: 100%; }
+.pa-jornada { display: grid; grid-template-columns: minmax(15rem, 1fr) minmax(18rem, 1.4fr); gap: var(--nz-space-4); align-items: start; }
+.pa-select-pct { min-width: 5.4rem; }
+
+#pa-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+
+@media (max-width: 900px) {
+  .pa-jornada { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  /* Nada de columnas apretadas: scroll propio y tipografía legible */
+  .pa-tabla-horas > table { min-width: 44rem; }
+  .pa-carga { min-width: 2.5rem; font-size: 0.66rem; padding: 0.12rem 0.18rem; }
+  .pa-jornada { display: block; }
+  .pa-jornada > div + div { margin-top: var(--nz-space-4); }
+  .pa-fila { flex-wrap: wrap; }
+  .pa-fila > .nz-input, .pa-fila > .nz-btn, .pa-fila > label { min-height: 44px; }
+  .pa-hito { flex-wrap: wrap; row-gap: var(--nz-space-1); }
+  .pa-hito .nz-input, .pa-hito .nz-btn { min-height: 44px; }
+  .pa-hito__nombre { flex: 1 1 100%; }
+  .pa-select-pct, .pa-input-horas, .pa-input-num { min-height: 44px; font-size: var(--nz-text-md); }
+  .pa-select-pct { width: 100%; }
+  .pa-calendario .pa-ancho-medio { width: 100%; }
+  .nz-table--compact td, .nz-table--compact th { padding: 0.2rem 0.3rem; }
+}
+
 </style>
 
 </head>
@@ -2782,7 +2822,7 @@ span.pa-carga {
 <div id="pa-error" role="alert"></div>
 
 <header class="nz-navbar">
-  <span class="nz-navbar__brand"><img id="pa-logo" class="pa-logo" alt="" hidden> <span id="pa-marca-nombre">Planifica</span></span>
+  <span class="nz-navbar__brand"><img id="pa-logo" class="pa-logo" alt="" hidden> <span id="pa-marca-nombre">Oferta</span></span>
   <span class="nz-navbar__links">
     <select id="pa-sel-oferta" class="nz-input nz-input--sm" aria-label="Oferta activa"></select>
     <button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="nueva-oferta">＋ Oferta</button>
@@ -2879,7 +2919,7 @@ span.pa-carga {
 <div id="pa-toast" role="status"></div>
 
 <footer class="nz-statusbar pa-pie">
-  <span id="pa-pie-marca">Planifica</span><span class="nz-statusbar__spacer"></span>
+  <span id="pa-pie-marca">Oferta</span><span class="nz-statusbar__spacer"></span>
   <span>Hecho con ❤️ por David Antizar</span>
 </footer>
 
@@ -3359,6 +3399,7 @@ span.pa-carga {
   /* Caché: el cálculo de días laborables se pide una vez por celda y no cambia
      mientras no cambien el mes ni la jornada. */
   const CACHE_LAB = {};
+  const CACHE_HORAS = {};
 
   /** Días del mes del periodo i. */
   function diasDelMes(p, i) {
@@ -3385,9 +3426,34 @@ span.pa-carga {
   }
 
   /** Horas laborables del periodo i: días laborables × horas por día. */
+  /** Horas laborables de un periodo: cada día con SUS horas, y los festivos fuera.
+      El viernes puede ser más corto y el 12 de octubre no cuenta. */
   function horasLaborables(p, i, jornada) {
-    const j = jornada || { horasDia: 8, diasSemana: [1, 2, 3, 4, 5] };
-    return N().r2(diasLaborables(p, i, j.diasSemana) * N().acota(j.horasDia === undefined ? 8 : j.horasDia, 0, 24));
+    const j = jornada || {};
+    const dias = (Array.isArray(j.diasSemana) && j.diasSemana.length) ? j.diasSemana : [1, 2, 3, 4, 5];
+    const horasDia = N().acota(j.horasDia === undefined ? 8 : j.horasDia, 0, 24);
+    const porDia = (j.horasPorDia && typeof j.horasPorDia === "object") ? j.horasPorDia : null;
+    const festivos = Array.isArray(j.festivos) ? j.festivos : [];
+    const q = normalizar(p);
+    const f = fecha(q, i);
+    const anio = f.getFullYear();
+    const huella = dias.join(",") + "|" + horasDia + "|" +
+      (porDia ? [1, 2, 3, 4, 5, 6, 7].map(d => N().num(porDia[d])).join(",") : "") + "|" +
+      festivos.filter(x => x && String(x.fecha).slice(0, 4) === String(anio)).map(x => String(x.fecha).slice(5)).join(",");
+    const clave = q.unidad + "|" + N().mesISO(f) + "-" + f.getDate() + "|" + huella;
+    if (CACHE_HORAS[clave] !== undefined) return CACHE_HORAS[clave];
+    const total = q.unidad === "semana" ? 7 : new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
+    const esFiesta = (PL.festivos && PL.festivos.esFestivo) ? PL.festivos.esFestivo : function () { return false; };
+    let h = 0;
+    for (let d = 0; d < total; d++) {
+      const dd = new Date(f.getFullYear(), f.getMonth(), f.getDate() + d);
+      const wd = dd.getDay() === 0 ? 7 : dd.getDay();
+      if (dias.indexOf(wd) < 0) continue;
+      if (esFiesta(festivos, dd)) continue;
+      h += porDia ? N().num(porDia[wd]) : horasDia;
+    }
+    CACHE_HORAS[clave] = N().r2(h);
+    return CACHE_HORAS[clave];
   }
 
   PL.periodos = {
@@ -3611,6 +3677,121 @@ span.pa-carga {
   };
 })(typeof window !== "undefined" ? window : globalThis);
 
+/* ====== MÓDULO festivos.js ====== */
+"use strict";
+/* =====================================================================
+   Planifica v4 — FESTIVOS
+   Los días que no se trabaja aunque caigan en día de diario. Se precargan los
+   de España, la Comunidad de Madrid y los locales de Madrid capital, y todos se
+   pueden editar: los locales cambian de año en año y cada empresa tiene los suyos.
+
+   El Viernes Santo no se copia de ninguna lista: se CALCULA a partir del domingo
+   de Pascua (algoritmo de Gauss/Meeus), así que vale para cualquier año sin
+   depender de tener la lista a mano. Comprobado: Pascua 2026 = 5 de abril →
+   Viernes Santo 3 de abril, que es lo que publica el calendario oficial.
+   ===================================================================== */
+(function (raiz) {
+  const PL = (raiz.PL = raiz.PL || {});
+  const N = () => PL.nucleo;
+
+  /** Domingo de Pascua de un año (algoritmo de Gauss/Meeus, calendario gregoriano). */
+  function pascua(anio) {
+    const a = anio % 19;
+    const b = Math.floor(anio / 100);
+    const c = anio % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const mes = Math.floor((h + l - 7 * m + 114) / 31);
+    const dia = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(anio, mes - 1, dia);
+  }
+
+  function iso(f) {
+    return N().diaISO ? N().diaISO(f) : f.toISOString().slice(0, 10);
+  }
+
+  /** Viernes Santo: dos días antes del domingo de Pascua. */
+  function viernesSanto(anio) {
+    const p = pascua(anio);
+    return new Date(p.getFullYear(), p.getMonth(), p.getDate() - 2);
+  }
+
+  /* Fijos, iguales todos los años. */
+  const FIJOS = [
+    { mes: 1, dia: 1, nombre: "Año Nuevo", ambito: "España" },
+    { mes: 1, dia: 6, nombre: "Epifanía del Señor", ambito: "España" },
+    { mes: 5, dia: 1, nombre: "Fiesta del Trabajo", ambito: "España" },
+    { mes: 8, dia: 15, nombre: "Asunción de la Virgen", ambito: "España" },
+    { mes: 10, dia: 12, nombre: "Fiesta Nacional de España", ambito: "España" },
+    { mes: 11, dia: 1, nombre: "Todos los Santos", ambito: "España" },
+    { mes: 12, dia: 6, nombre: "Día de la Constitución", ambito: "España" },
+    { mes: 12, dia: 8, nombre: "Inmaculada Concepción", ambito: "España" },
+    { mes: 12, dia: 25, nombre: "Natividad del Señor", ambito: "España" },
+    { mes: 5, dia: 2, nombre: "Fiesta de la Comunidad de Madrid", ambito: "Madrid" },
+    { mes: 5, dia: 15, nombre: "San Isidro (Madrid capital)", ambito: "Local" },
+    { mes: 11, dia: 9, nombre: "La Almudena (Madrid capital)", ambito: "Local" }
+  ];
+
+  /** Festivos de España + Comunidad de Madrid + Madrid capital para un año. */
+  function deEspanaMadrid(anio) {
+    const a = Math.round(N().acota(anio, 1900, 2200));
+    const lista = FIJOS.map(f => ({
+      fecha: a + "-" + (f.mes < 10 ? "0" : "") + f.mes + "-" + (f.dia < 10 ? "0" : "") + f.dia,
+      nombre: f.nombre,
+      ambito: f.ambito
+    }));
+    const vs = viernesSanto(a);
+    lista.push({ fecha: iso(vs), nombre: "Viernes Santo", ambito: "España" });
+    return lista.sort((x, y) => (x.fecha < y.fecha ? -1 : x.fecha > y.fecha ? 1 : 0));
+  }
+
+  /** Todos los años que abarca un rango de periodos (año de inicio … año de fin). */
+  function aniosDe(inicio, nPeriodos, unidad) {
+    const partes = String(inicio || "").split("-").map(Number);
+    if (!partes[0]) return [];
+    const n = Math.max(0, Math.round(N().num(nPeriodos)));
+    const fin = (unidad === "semana")
+      ? new Date(partes[0], partes[1] - 1, 1 + 7 * n)
+      : new Date(partes[0], partes[1] - 1 + n, 0);
+    const a1 = partes[0], a2 = fin.getFullYear();
+    const salida = [];
+    for (let a = a1; a <= a2; a++) salida.push(a);
+    return salida;
+  }
+
+  /** Festivos para todos los años de un rango, sin repetir fechas. */
+  function paraRango(inicio, nPeriodos, unidad) {
+    const vistos = {};
+    const salida = [];
+    aniosDe(inicio, nPeriodos, unidad).forEach(a => {
+      deEspanaMadrid(a).forEach(f => {
+        if (!vistos[f.fecha]) { vistos[f.fecha] = true; salida.push(f); }
+      });
+    });
+    return salida.sort((x, y) => (x.fecha < y.fecha ? -1 : x.fecha > y.fecha ? 1 : 0));
+  }
+
+  /** ¿Es festivo ese día? */
+  function esFestivo(festivos, fecha) {
+    if (!Array.isArray(festivos) || !festivos.length) return false;
+    const f = iso(fecha);
+    for (let i = 0; i < festivos.length; i++) if (festivos[i] && festivos[i].fecha === f) return true;
+    return false;
+  }
+
+  PL.festivos = {
+    pascua: pascua, viernesSanto: viernesSanto, deEspanaMadrid: deEspanaMadrid,
+    aniosDe: aniosDe, paraRango: paraRango, esFestivo: esFestivo, FIJOS: FIJOS
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+
 /* ====== MÓDULO modelo.js ====== */
 "use strict";
 /* =====================================================================
@@ -3667,16 +3848,62 @@ span.pa-carga {
      la oferta para que cada oferta sea autocontenida y exportable. */
   const JORNADA_DEFECTO = { horasDia: 8, diasSemana: [1, 2, 3, 4, 5] };   /* 1=lunes … 7=domingo */
 
+  /** Festivos: [{fecha:"aaaa-mm-dd", nombre, ambito}] sin duplicados y ordenados. */
+  function normalizarFestivos(l) {
+    const N2 = N();
+    const vistos = {};
+    const salida = [];
+    N2.lista(l).forEach(f => {
+      const fecha = String(f && f.fecha ? f.fecha : "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || vistos[fecha]) return;
+      const d = new Date(Number(fecha.slice(0, 4)), Number(fecha.slice(5, 7)) - 1, Number(fecha.slice(8, 10)));
+      if (isNaN(d.getTime()) || N2.diaISO(d) !== fecha) return;
+      vistos[fecha] = true;
+      salida.push({
+        fecha: fecha,
+        nombre: String((f && f.nombre) || "Festivo").slice(0, 80),
+        ambito: String((f && f.ambito) || "Propio").slice(0, 24)
+      });
+    });
+    return salida.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+  }
+
+  /* Memo: normalizar la jornada en cada consulta multiplicaba por miles las
+     llamadas por repintado (ahora se recorre día a día y con festivos). */
+  const CACHE_JORNADA = new WeakMap();
+
   function normalizarJornada(j) {
+    if (j && typeof j === "object" && CACHE_JORNADA.has(j)) return CACHE_JORNADA.get(j);
+    const salida = normalizarJornadaCruda(j);
+    if (j && typeof j === "object") CACHE_JORNADA.set(j, salida);
+    return salida;
+  }
+
+  function normalizarJornadaCruda(j) {
     const u = N();
     const q = (j && typeof j === "object") ? j : {};
     let dias = Array.isArray(q.diasSemana)
       ? q.diasSemana.map(d => Math.round(u.acota(d, 1, 7))).filter(d => d >= 1 && d <= 7)
       : [];
     dias = Array.from(new Set(dias)).sort((a, b) => a - b);
+    if (!dias.length) dias = JORNADA_DEFECTO.diasSemana.slice();
+    const horasDia = u.acota(q.horasDia === undefined ? JORNADA_DEFECTO.horasDia : q.horasDia, 0.5, 24);
+    /* Horas de cada día de la semana: así el viernes puede ser más corto sin dejar
+       de ser laborable. Lo que no venga, se hereda de horasDia. */
+    const porDia = {};
+    for (let d = 1; d <= 7; d++) {
+      const propio = (q.horasPorDia && typeof q.horasPorDia === "object") ? q.horasPorDia[d] : undefined;
+      if (dias.indexOf(d) < 0) { porDia[d] = 0; continue; }
+      const v = (propio === undefined || propio === null) ? horasDia : u.acota(propio, 0, 24);
+      /* Un día marcado como laborable con 0 horas no tiene sentido: manda la casilla,
+         así al activar el sábado aparece con las horas generales y no con un cero. */
+      porDia[d] = u.r2(v > 0 ? v : horasDia);
+    }
     return {
-      horasDia: u.acota(q.horasDia === undefined ? JORNADA_DEFECTO.horasDia : q.horasDia, 0.5, 24),
-      diasSemana: dias.length ? dias : JORNADA_DEFECTO.diasSemana.slice()
+      horasDia: horasDia,
+      diasSemana: dias.filter(d => porDia[d] > 0),
+      horasPorDia: porDia,
+      festivos: normalizarFestivos(q.festivos)
     };
   }
 
@@ -3749,7 +3976,8 @@ span.pa-carga {
     q.periodo = Math.round(N().acota(per === undefined ? 0 : per, 0, Math.max(0, nPeriodos - 1)));
     q.fecha = N().texto(q.fecha, "");
     q.responsablePerfilId = N().texto(q.responsablePerfilId, "");
-    q.horas = N().acota(q.horas, 0, 1e6);
+    /* Un entregable no lleva horas: el esfuerzo lo ponen las líneas de su subtarea. */
+    delete q.horas;
     delete q.mes; delete q.estado; delete q.facturacionPct; delete q.baseFacturacion;
     return q;
   }
@@ -3820,6 +4048,12 @@ span.pa-carga {
     q.periodos = P().normalizar(q.periodos);
     delete q.fechaInicio; delete q.meses;
     q.jornada = normalizarJornada(q.jornada);
+    /* Si la oferta no trae festivos, se cargan los de España y Madrid de los años
+       que abarca el calendario. Son editables: los locales cambian cada año. */
+    if (!q.jornada.festivos.length && PL.festivos) {
+      q.jornada.festivos = normalizarFestivos(
+        PL.festivos.paraRango(q.periodos.inicio, P().meses(q.periodos), q.periodos.unidad));
+    }
 
     if (esMigracion && !q.impuestos) {
       q.impuestos = { tipo: "ninguno", tasa: 0, incluido: false };
@@ -3875,7 +4109,6 @@ span.pa-carga {
         descripcion: N().texto(e && e.descripcion, ""),
         criterio: N().texto(e && e.criterio, ""),
         periodo: Math.round(N().acota(e && e.periodo, 0, P().MAX - 1)),
-        horas: N().acota(e && e.horas, 0, 1e6)
       }))
     }));
     return q;
@@ -4057,6 +4290,7 @@ span.pa-carga {
     normalizarOferta: normalizarOferta, normalizarFoto: normalizarFoto,
     normalizarEstado: normalizarEstado, migrar: migrar, estadoInicial: estadoInicial,
     JORNADA_DEFECTO: JORNADA_DEFECTO, normalizarJornada: normalizarJornada,
+    normalizarFestivos: normalizarFestivos,
     buscarTarea: buscarTarea, buscarSubtarea: buscarSubtarea, buscarLinea: buscarLinea,
     buscarEntregable: buscarEntregable, buscarFoto: buscarFoto, colgarEntregable: colgarEntregable
   };
@@ -4100,29 +4334,29 @@ span.pa-carga {
           nombre: "1. Análisis y planificación",
           subtareas: ["1.1 Reunión de arranque", "1.2 Análisis de requisitos", "1.3 Plan de trabajo"],
           entregables: [
-            { nombre: "Informe de requisitos validado", descripcion: "Alcance cerrado y firmado por el cliente.", criterio: "Acta de reunión con el alcance aprobado", periodo: 0, horas: 40 },
-            { nombre: "Plan de trabajo detallado", descripcion: "Cronograma y reparto de esfuerzo.", criterio: "Cronograma aceptado por el cliente", periodo: 1, horas: 24 }
+            { nombre: "Informe de requisitos validado", descripcion: "Alcance cerrado y firmado por el cliente.", criterio: "Acta de reunión con el alcance aprobado", periodo: 0 },
+            { nombre: "Plan de trabajo detallado", descripcion: "Cronograma y reparto de esfuerzo.", criterio: "Cronograma aceptado por el cliente", periodo: 1 }
           ]
         },
         {
           nombre: "2. Diseño de la solución",
           subtareas: ["2.1 Arquitectura de la solución", "2.2 Diseño funcional"],
           entregables: [
-            { nombre: "Diseño funcional aprobado", descripcion: "Documento de diseño de la solución.", criterio: "Aprobación formal del cliente", periodo: 2, horas: 60 }
+            { nombre: "Diseño funcional aprobado", descripcion: "Documento de diseño de la solución.", criterio: "Aprobación formal del cliente", periodo: 2 }
           ]
         },
         {
           nombre: "3. Ejecución",
           subtareas: ["3.1 Desarrollo / ejecución", "3.2 Revisiones de calidad"],
           entregables: [
-            { nombre: "Solución en preproducción", descripcion: "Versión completa en entorno de pruebas.", criterio: "Pruebas de aceptación superadas", periodo: 4, horas: 120 }
+            { nombre: "Solución en preproducción", descripcion: "Versión completa en entorno de pruebas.", criterio: "Pruebas de aceptación superadas", periodo: 4 }
           ]
         },
         {
           nombre: "4. Pruebas y entrega",
           subtareas: ["4.1 Pruebas y validación", "4.2 Documentación y entrega"],
           entregables: [
-            { nombre: "Entrega final y documentación", descripcion: "Puesta en producción y manual de uso.", criterio: "Acta de entrega firmada", periodo: 5, horas: 40 }
+            { nombre: "Entrega final y documentación", descripcion: "Puesta en producción y manual de uso.", criterio: "Acta de entrega firmada", periodo: 5 }
           ]
         },
         { nombre: "5. Gestión de proyecto", subtareas: ["5.1 Seguimiento y coordinación"], entregables: [] }
@@ -4170,14 +4404,14 @@ span.pa-carga {
       Object.assign(M2.nuevoEntregable("1.1 Informe de requisitos", "subtarea", 0), {
         descripcion: "Análisis de la web actual, usuarios y contenidos.",
         criterio: "Validado por el cliente en la reunión de alcance",
-        responsablePerfilId: jp.id, horas: 32
+        responsablePerfilId: jp.id
       })
     ];
     s2.entregables = [
       Object.assign(M2.nuevoEntregable("1.2 Prototipo UX navegable", "subtarea", 2), {
         descripcion: "Prototipo de las 8 pantallas principales.",
         criterio: "Prototipo revisado y aprobado en Figma",
-        responsablePerfilId: med.id, horas: 54
+        responsablePerfilId: med.id
       })
     ];
     /* Y uno a nivel de la TAREA COMPLETA, porque también se entregan cosas así. */
@@ -4185,7 +4419,7 @@ span.pa-carga {
       Object.assign(M2.nuevoEntregable("1.3 Manual de estilo", "tarea", 3), {
         descripcion: "Guía de estilo para que el cliente mantenga la web.",
         criterio: "Manual entregado y explicado al equipo del cliente",
-        responsablePerfilId: med.id, horas: 12
+        responsablePerfilId: med.id
       })
     ];
 
@@ -4206,28 +4440,22 @@ span.pa-carga {
       Object.assign(M2.nuevoEntregable("2.1 Web en preproducción", "subtarea", 4), {
         descripcion: "Sitio completo funcionando en entorno de pruebas.",
         criterio: "Checklist de pruebas funcionales superado",
-        responsablePerfilId: jru.id, horas: 76
+        responsablePerfilId: jru.id
       })
     ];
     s4.entregables = [
       Object.assign(M2.nuevoEntregable("2.2 Puesta en producción", "subtarea", 5), {
         descripcion: "Publicación, dominios y formación al equipo.",
         criterio: "Acta de entrega y formación realizada",
-        responsablePerfilId: sen.id, horas: 30
+        responsablePerfilId: sen.id
       })
     ];
 
     o.tareas = [t1, t2];
 
-    /* ---- Entregable suelto de la oferta ---- */
-    o.entregables = [
-      Object.assign(M2.nuevoEntregable("Documentación de traspaso", "oferta", 5), {
-        descripcion: "Manual de uso y traspaso de conocimiento al equipo del cliente.",
-        criterio: "Sesión de traspaso realizada", responsablePerfilId: med.id, horas: 16
-      })
-    ];
-
-    return o;
+    /* Pasa por la normalización como cualquier oferta: así llegan los festivos del
+       calendario, la jornada queda completa y no hay dos caminos distintos. */
+    return M2.normalizarOferta(o);
   }
 
   PL.ejemplo = {
@@ -4637,10 +4865,6 @@ span.pa-carga {
 
   /* ---------- Cifras de apoyo (estimaciones, NO suman al total) ---------- */
 
-  function horasEstimadas(o) { return N().suma(todos(o), e => N().num(e.horas)); }
-
-  function conHorasEstimadas(o) { return todos(o).filter(e => N().num(e.horas) > 0).length; }
-
   function porContexto(o) {
     const l = todos(o);
     return {
@@ -4699,7 +4923,7 @@ span.pa-carga {
     todos: todos, deTarea: deTarea, deSubtarea: deSubtarea, deTareaCompleta: deTareaCompleta,
     porPeriodo: porPeriodo, dePeriodo: dePeriodo,
     cuentaPorPeriodo: cuentaPorPeriodo, proximo: proximo, ultimo: ultimo,
-    horasEstimadas: horasEstimadas, conHorasEstimadas: conHorasEstimadas, porContexto: porContexto,
+    porContexto: porContexto,
     responsable: responsable, etiquetaEntrega: etiquetaEntrega, posicion: posicion,
     dentroDeCalendario: dentroDeCalendario, moverAPeriodo: moverAPeriodo,
     marcadoresPorPeriodo: marcadoresPorPeriodo, esfuerzoEnPeriodo: esfuerzoEnPeriodo
@@ -4762,7 +4986,6 @@ span.pa-carga {
       tareas: N().lista(of.tareas).length,
       subtareas: N().suma(of.tareas, t => N().lista(t.subtareas).length),
       entregables: conteo.total,
-      horasEntregables: E().horasEstimadas(of)
     };
   }
 
@@ -4781,7 +5004,6 @@ span.pa-carga {
     ];
     const estructura = [
       linea("periodos", "Periodos"), linea("tareas", "Tareas"), linea("subtareas", "Subtareas"),
-      linea("entregables", "Entregables"), linea("horas", "Horas"), linea("horasEntregables", "Horas estimadas en entregables")
     ];
 
     const oA = comoOferta(fA, o), oB = comoOferta(fB, o);
@@ -5101,11 +5323,11 @@ span.pa-carga {
     /* Entregables */
     const ents = E().todos(o);
     if (ents.length) {
-      f.push(["ENTREGABLES", "Entregable", "Origen", "Entrega", "Fecha", "Responsable", "Criterio de aceptación", "Horas estimadas"]);
+      f.push(["ENTREGABLES", "Entregable", "Origen", "Entrega", "Fecha", "Responsable", "Criterio de aceptación"]);
       ents.forEach(e => {
         const r = E().responsable(pf, e);
         f.push(["Entregable", e.nombre, e._contexto === "oferta" ? "Oferta" : e._tareaNombre,
-          P().mesCorto(o.periodos, e.periodo), e.fecha || "", r ? r.nombre : "", e.criterio || "", numES(e.horas)]);
+          P().mesCorto(o.periodos, e.periodo), e.fecha || "", r ? r.nombre : "", e.criterio || ""]);
       });
       f.push([]);
     }
@@ -5301,11 +5523,15 @@ span.pa-carga {
     const cols = P().columnas(o.periodos);
     const r = E().responsable(pf, e);
     const nivel = e._contexto === "subtarea" ? " · de la subtarea" : (e._contexto === "tarea" ? " · de la tarea" : " · de la oferta");
-    const titulo = e.nombre + " · entrega " + P().mesCorto(o.periodos, e.periodo) + (r ? " · " + r.nombre : "") + nivel;
-    return '<tr class="pa-gantt__fila pa-gantt__fila--entregable' + PL.vistas.claseTono(o, tareaId) + '">' +
+    const titulo = e.nombre + " · entrega " + P().mesCorto(o.periodos, e.periodo) + (r ? " · responsable: " + r.nombre : "") + nivel +
+      (e._subtareaId ? " · las horas las marca su subtarea" : "");
+    /* Un entregable no lleva horas: se muestran las de su subtarea, como referencia. */
+    const sub = e._subtareaId ? M.buscarSubtarea(o, e._subtareaId) : null;
+    const horas = sub ? C().subtareaHoras(sub.sub) : 0;
+    return '<tr class="pa-gantt__fila pa-gantt__fila--entregable' + PL.vistas.claseTonoEntregable(o, tareaId) + '">' +
       '<th class="pa-gantt__concepto" scope="row" title="' + N().esc(titulo) + '">' + N().esc(e.nombre) + "</th>" +
       celdasHito(cols, e.periodo) +
-      '<td class="pa-gantt__total">' + (N().num(e.horas) ? N().num(e.horas).toLocaleString("es-ES") + " h" : "—") + "</td></tr>";
+      '<td class="pa-gantt__total">' + (horas ? '<span class="pa-mini">(' + N().fmtNum(horas, 0) + " h)</span>" : "—") + "</td></tr>";
   }
 
   /** Con el calendario por semanas, una banda de trimestres: 52 columnas sin
@@ -5328,18 +5554,13 @@ span.pa-carga {
         '<tr class="pa-gantt__anios"><th class="pa-gantt__concepto" rowspan="3" scope="col">Concepto</th>' + filaAnios +
         '<th class="pa-gantt__total" rowspan="3" scope="col">Horas</th></tr>' +
         tri +
-        '<tr class="pa-gantt__meses">' + cols.map(c => '<th scope="col"><input class="pa-gantt__rotulo' +
-          (P().estaEditada(o.periodos, c.periodos[0]) ? " pa-gantt__rotulo--editado" : "") + '" value="' + N().esc(c.etiqueta) +
-          '" data-campo="periodo-rotulo" data-id="' + c.periodos[0] + '" title="Clic para renombrar este periodo" ' +
-          'aria-label="Nombre del periodo"></th>').join("") +
+        '<tr class="pa-gantt__meses">' + cols.map(c => '<th scope="col">' +
+          N().esc(c.etiqueta) + "</th>").join("") +
         "</tr></thead>";
     }
     const filaMeses = cols.map(c => {
       const idx = c.periodos[0];
-      const editado = P().estaEditada(o.periodos, idx) ? " pa-gantt__rotulo--editado" : "";
-      return '<th scope="col"><input class="pa-gantt__rotulo' + editado + '" value="' + N().esc(c.etiqueta) + '" ' +
-        'data-campo="periodo-rotulo" data-id="' + idx + '" title="Clic para renombrar este periodo (' + N().esc(P().mesCorto(o.periodos, idx)) + ')" ' +
-        'aria-label="Nombre del periodo ' + (idx + 1) + '"></th>';
+      return '<th scope="col">' + N().esc(c.etiqueta) + "</th>";
     }).join("");
     return "<thead>" +
       '<tr class="pa-gantt__anios"><th class="pa-gantt__concepto" rowspan="2" scope="col">Concepto</th>' + filaAnios +
@@ -5362,11 +5583,6 @@ span.pa-carga {
         N().lista(s.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "subtarea" }), t.id)));
       });
     });
-    const hitosOferta = N().lista(o.entregables);
-    if (hitosOferta.length) {
-      filas.push('<tr class="pa-gantt__fila"><th class="pa-gantt__concepto pa-mini pa-mini--fuerte" colspan="' + (cols.length + 2) + '" scope="row">Hitos de la oferta</th></tr>');
-      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }), null)));
-    }
 
     const totalHitos = E().todos(o).length;
     const nota = '<tr><td class="pa-gantt__nota pa-mini" colspan="' + (cols.length + 2) + '">' +
@@ -5414,11 +5630,6 @@ span.pa-carga {
         N().lista(s.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "subtarea" }), t.id)));
       });
     });
-    const hitosOferta = N().lista(o.entregables);
-    if (hitosOferta.length) {
-      filas.push('<tr class="pa-gantt__fila"><th class="pa-gantt__concepto pa-mini pa-mini--fuerte" colspan="' + (cols.length + 2) + '" scope="row">Hitos de la oferta</th></tr>');
-      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }), null)));
-    }
     const colgroup = '<colgroup><col class="pa-gantt__col-concepto">' +
       cols.map(() => '<col style="width:2.6rem">').join("") + '<col class="pa-gantt__col-total"></colgroup>';
     return '<div class="pa-gantt-scroll pa-gantt--informe"><table class="pa-gantt">' + colgroup + cabeceraInforme(o) +
@@ -5516,15 +5727,33 @@ span.pa-carga {
   const TONOS = 5;
 
   /** 1..5, estable mientras no cambie el orden de las tareas (0 = sin tono). */
+  /* Cada TAREA lleva un color del sistema, ciclando entre cuatro. El naranja se reserva
+     para los entregables, así que una tarea nunca se pinta del color de un entregable. */
+  const TONOS_TAREA = [1, 3, 4, 5];
+
   function tonoDe(o, tareaId) {
-    if (!tareaId) return 0;
     const tareas = N().lista(o && o.tareas);
-    for (let i = 0; i < tareas.length; i++) if (tareas[i].id === tareaId) return (i % TONOS) + 1;
+    for (let i = 0; i < tareas.length; i++) if (tareas[i].id === tareaId) return TONOS_TAREA[i % TONOS_TAREA.length];
     return 0;
   }
 
   function claseTono(o, tareaId) {
     const t = tonoDe(o, tareaId);
+    return t ? " pa-tono-" + t : "";
+  }
+
+  /** Tono de un ENTREGABLE: desplazado dos puestos respecto al de su tarea, así que
+      nunca es del mismo color que la tarea a la que cuelga. El marcador además es un
+      rombo, no un punto, para que se distinga aunque se imprima en blanco y negro. */
+  /** Tono de un ENTREGABLE: siempre el naranja del sistema (el mismo para todos).
+      Los entregables van en un color que ninguna tarea usa, y con rombo en vez de
+      punto: se distinguen de un vistazo y también impresos en blanco y negro. */
+  function tonoEntregable(o, tareaId) {
+    return 2;
+  }
+
+  function claseTonoEntregable(o, tareaId) {
+    const t = tonoEntregable(o, tareaId);
     return t ? " pa-tono-" + t : "";
   }
 
@@ -5537,17 +5766,18 @@ span.pa-carga {
     const sId = (subtareaId !== undefined) ? subtareaId : (e._subtareaId || "");
     const ctx = contexto || e._contexto || "tarea";
     const at = ' data-id="' + id + '" data-tarea="' + tId + '" data-subtarea="' + sId + '"';
-    const etiqueta = ctx === "oferta"
-      ? '<span class="nz-badge nz-badge--accent">de la oferta</span>'
-      : (ctx === "subtarea" ? "" : '<span class="nz-badge nz-badge--neutral">de la tarea</span>');
-    return '<div class="pa-hito pa-hito--' + ctx + '" data-id="' + id + '" data-subtarea="' + sId + '">' +
-      '<span class="pa-tono-punto" title="Entregable"></span>' +
+    const etiqueta = ctx === "oferta" ? '<span class="nz-badge nz-badge--accent">de la oferta</span>' : "";
+    /* El color del entregable es el de su tarea desplazado: nunca coincide con ella,
+       y el marcador es un rombo (no un punto) para distinguirlo hasta en blanco y negro. */
+    const claseTono = (ctx !== "oferta" && PL.vistas.claseTonoEntregable)
+      ? PL.vistas.claseTonoEntregable(o, tId) : "";
+    return '<div class="pa-hito pa-hito--' + ctx + claseTono + '" data-id="' + id + '" data-subtarea="' + sId + '">' +
+      '<span class="pa-tono-rombo" title="Entregable"></span>' +
       '<span class="pa-hito__nombre"><input class="nz-input" data-campo="hito-nombre"' + at + ' value="' + N().esc(e.nombre) + '" placeholder="Nombre del entregable"></span>' +
       '<span class="pa-ahora pa-mini">◆</span>' +
       selectPeriodo(o, e.periodo, "hito-periodo", id, tId, sId) +
       etiqueta +
       selectPerfil(pf, e.responsablePerfilId, "hito-responsable", id, tId, "", sId) +
-      '<label class="pa-mini pa-ahora">horas <input class="nz-input nz-input--sm pa-input-corto" type="number" min="0" step="1" data-campo="hito-horas"' + at + ' value="' + (N().num(e.horas) || "") + '" title="Estimación orientativa: no suma al total"></label>' +
       '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="dup-entregable"' + at + ' title="Duplicar entregable">⧉</button>' +
       '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-entregable"' + at + ' title="Eliminar entregable">✕</button>' +
       '<span class="pa-hito__detalle">' +
@@ -5606,7 +5836,7 @@ span.pa-carga {
     moneda: moneda, verImportes: verImportes, imp: imp, impSi: impSi, hor: hor,
     badgeOferta: badgeOferta, selectPeriodo: selectPeriodo, selectPerfil: selectPerfil, htmlEntregable: htmlEntregable,
     articulo: articulo, tabla: tabla, fila: fila, filaDato: filaDato, aviso: aviso, vacio: vacio, delta: delta,
-    tonoDe: tonoDe, claseTono: claseTono, TONOS: TONOS
+    tonoDe: tonoDe, claseTono: claseTono, tonoEntregable: tonoEntregable, claseTonoEntregable: claseTonoEntregable, TONOS: TONOS
   };
 })(typeof window !== "undefined" ? window : globalThis);
 
@@ -5689,9 +5919,8 @@ span.pa-carga {
     if (!hitos.length) {
       return '<p class="pa-mini">Sin entregables en esta tarea: añade el primero con «＋ Entregable».</p>';
     }
-    const horas = N().suma(hitos, e => N().num(e.horas));
     return '<p class="pa-mini pa-mini--fuerte">Entregables de la TAREA completa · ' + hitos.length +
-      (horas ? " · " + V2.hor(horas) + " estimadas" : "") + "</p>" +
+      ' · <span class="pa-mini">las horas las marcan las subtareas</span></p>' +
       E().deTarea(o, t).map(e => V2.htmlEntregable(o, pf, e, "tarea", t.id)).join("");
   }
 
@@ -5705,12 +5934,13 @@ span.pa-carga {
     const hHoras = N().suma(lista, e => N().num(e.horas));
     return '<div class="pa-hitos pa-hitos--sub">' +
       (lista.length
-        ? '<p class="pa-mini pa-mini--fuerte">Se entrega aquí · ' + lista.length + (hHoras ? " · " + V2.hor(hHoras) + " estimadas" : "") + "</p>" +
+        ? '<p class="pa-mini pa-mini--fuerte">Se entrega aquí · ' + lista.length + "" + "</p>" +
           lista.map(e => V2.htmlEntregable(o, pf, e, "subtarea", "", s.id)).join("")
         : "") +
       '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="nuevo-entregable-sub" data-id="' + s.id + '">＋ Entregable de esta subtarea</button>' +
       "</div>";
   }
+
 
   function tablaLineas(o, pf, s) {
     const V2 = V();
@@ -5774,11 +6004,19 @@ span.pa-carga {
         const marcador = sombra ? '<span class="pa-celda__marca">' + N().fmtNum(pctMax, 0) + "%</span>" : "";
         if (c.periodos.length === 1) {
           return "<td class=\"" + clase + "\"" + eti + ">" + sombra + marcador +
-            '<input class="nz-input nz-input--sm pa-input-horas" type="text" inputmode="decimal" autocomplete="off" ' +
-            'value="' + N().fmtCampo(enPct ? pct : h) + '" placeholder="' +
-              (l.perfilId ? (sinHueco ? "sin hueco" : dicho) : (enPct ? "% de jornada" : "0")) + '" data-campo="horas" ' +
-            'data-modo="' + (enPct ? "pct" : "h") + '" data-id="' + l.id + '" data-mes="' + idx + '" ' +
-            'aria-label="' + N().esc("Horas en " + c.etiqueta) + '">' +
+            (enPct
+              /* De 5 en 5 y con tope 100: las flechas suben/bajan de cinco en cinco y no
+                 se puede pedir más de una jornada. El hueco libre se ve en el propio campo. */
+              ? '<input class="nz-input nz-input--sm pa-input-pct" type="number" inputmode="numeric" ' +
+                'min="0" max="100" step="5" value="' + (h > 0 ? N().fmtCampo(pct, 1) : "") +
+                '" placeholder="' + (l.perfilId ? (sinHueco ? "sin hueco" : "0") : "%") +
+                '" data-campo="horas" data-modo="pct" data-id="' + l.id + '" data-mes="' + idx + '" ' +
+                'aria-label="' + N().esc("Dedicación en " + c.etiqueta) + '" title="' + N().esc(dicho) + '">'
+              : '<input class="nz-input nz-input--sm pa-input-horas" type="text" inputmode="decimal" autocomplete="off" ' +
+                'value="' + (h > 0 ? N().fmtCampo(h) : "") + '" placeholder="' + (l.perfilId ? (sinHueco ? "sin hueco" : "0") : "0") +
+                '" data-campo="horas" data-modo="h" data-id="' + l.id + '" data-mes="' + idx + '" ' +
+                'aria-label="' + N().esc("Horas en " + c.etiqueta) + '" title="' + N().esc(dicho) + '">') +
+            '<span class="pa-celda__eq">' + eq + "</span></td>";
             '<span class="pa-celda__eq">' + eq + "</span></td>";
         }
         return "<td class=\"" + clase + "\"" + eti + ">" + (h > 0 ? "<span>" + N().fmtNum(pct) + " %</span>" : "") + "</td>";
@@ -5937,7 +6175,6 @@ span.pa-carga {
       V2.articulo("Estructura de la oferta", editor(o, pf),
         '<div class="pa-fila" style="margin-bottom:var(--nz-space-3)">' +
           '<button class="nz-btn nz-btn--primary" data-acc="nueva-tarea">＋ Añadir tarea</button>' +
-          '<button class="nz-btn nz-btn--soft" data-acc="nuevo-entregable-oferta">＋ Entregable de la oferta</button>' +
           '<button class="nz-btn nz-btn--soft" data-acc="plantilla-toggle">📚 Plantillas</button>' +
           '<span class="pa-espacio"></span>' +
           '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="abrir-todo" title="Desplegar tareas, subtareas y horas">⇕ Desplegar todo</button>' +
@@ -6248,19 +6485,69 @@ span.pa-carga {
   function bloqueJornada(o) {
     const V2 = V();
     const j = C().jornada(o);
-    const DIAS = [[1, "L"], [2, "M"], [3, "X"], [4, "J"], [5, "V"], [6, "S"], [7, "D"]];
-    return V2.articulo("Jornada de trabajo",
-      '<div class="pa-fila">' +
-        '<label class="pa-mini pa-ahora">Horas por día ' +
-          '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0.5" max="24" step="0.5" ' +
-          'data-campo="jornada-horas" value="' + N().fmtNum(j.horasDia) + '"></label>' +
-        '<span class="pa-mini">Días que se trabaja</span>' +
-        DIAS.map(d => '<label class="pa-mini pa-ahora"><input type="checkbox" data-campo="jornada-dia" data-dia="' + d[0] + '"' +
-          (j.diasSemana.indexOf(d[0]) >= 0 ? " checked" : "") + "> " + d[1] + "</label>").join("") +
+    const DIAS = [[1, "lunes"], [2, "martes"], [3, "miércoles"], [4, "jueves"], [5, "viernes"], [6, "sábado"], [7, "domingo"]];
+    const festivos = N().lista(j.festivos);
+
+    /* Un día: casilla de laborable y sus horas. El viernes puede ser más corto. */
+    const filasDias = DIAS.map(d => {
+      const dia = d[0];
+      const laborable = j.diasSemana.indexOf(dia) >= 0;
+      const horas = N().num((j.horasPorDia || {})[dia]);
+      return "<tr>" +
+        '<td><label class="pa-ahora"><input type="checkbox" data-campo="jornada-dia" data-dia="' + dia + '"' +
+          (laborable ? " checked" : "") + "> " + d[1] + "</label></td>" +
+        '<td class="nz-table__right">' + (laborable
+          ? '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0" max="24" step="0.5" ' +
+            'data-campo="jornada-horas-dia" data-dia="' + dia + '" value="' + N().fmtNum(horas) + '" aria-label="Horas del ' + d[1] + '"> h'
+          : '<span class="pa-mini">no se trabaja</span>') + "</td></tr>";
+    }).join("");
+
+    const hFestivo = f => {
+      const partes = f.fecha.split("-");
+      return N().fechaCorta(new Date(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2])));
+    };
+
+    const listaFestivos = festivos.length
+      ? '<table class="nz-table nz-table--compact"><thead><tr><th>Día</th><th>Festivo</th><th></th><th></th></tr></thead><tbody>' +
+        festivos.map(f => "<tr><td>" + N().esc(hFestivo(f)) + "</td><td>" + N().esc(f.nombre) +
+          '</td><td><span class="nz-badge nz-badge--neutral">' + N().esc(f.ambito || "Propio") + "</span></td>" +
+          '<td><button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="quitar-festivo" data-id="' + N().esc(f.fecha) +
+          '" title="Quitar este festivo">✕</button></td></tr>').join("") +
+        "</tbody></table>"
+      : '<p class="pa-mini">No hay festivos: todos los días de diario cuentan como laborables.</p>';
+
+    return V2.articulo("Jornada y festivos",
+      '<p class="pa-mini">Marca los días que se trabaja y <strong>cuántas horas cada uno</strong> (si el viernes es más corto, ' +
+      "se pone aquí). Los festivos no cuentan como laborables, así que bajan las horas del mes y suben el % de dedicación " +
+      "de lo mismo: con esto la dedicación se calcula sobre días reales de trabajo.</p>" +
+      '<div class="pa-jornada">' +
+        '<div>' +
+          '<table class="nz-table nz-table--compact"><thead><tr><th>Día</th><th class="nz-table__right">Horas</th></tr></thead>' +
+          "<tbody>" + filasDias + "</tbody></table>" +
+          '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Horas al día por omisión: ' +
+            '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0.5" max="24" step="0.5" ' +
+            'data-campo="jornada-horas" value="' + N().fmtNum(j.horasDia) + '" aria-label="Horas al día por omisión"> ' +
+            "(al cambiarlo se aplica a todos los días).</p>" +
+        "</div>" +
+        '<div>' +
+          '<div class="pa-fila">' +
+            '<strong class="pa-mini">Festivos del calendario</strong>' +
+            '<input class="nz-input nz-input--sm" type="date" data-campo="festivo-fecha" aria-label="Fecha del festivo">' +
+            '<input class="nz-input nz-input--sm pa-ancho-medio" type="text" data-campo="festivo-nombre" ' +
+              'placeholder="Nombre (opcional)" aria-label="Nombre del festivo">' +
+            '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="nuevo-festivo">＋ Añadir</button>' +
+            '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="festivos-espana" ' +
+              'title="Carga los festivos de España, la Comunidad de Madrid y Madrid capital de los años del calendario">' +
+              "Cargar los de España y Madrid</button>" +
+          "</div>" +
+          '<div class="pa-tabla-horas">' + listaFestivos + "</div>" +
+          '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Van precargados los de España y Madrid, pero ' +
+          "<strong>son editables</strong>: los locales cambian cada año y cada empresa tiene los suyos.</p>" +
+        "</div>" +
       "</div>" +
-      '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Con esto se calculan las horas laborables de cada mes (' +
-        Math.round(C().horasLaborablesTotal(o)).toLocaleString("es-ES") + " h en el calendario actual) y, por tanto, " +
-        "lo que significa una dedicación del 50 % o del 100 %.</p>");
+      '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Con esta jornada el calendario tiene <strong>' +
+        N().fmtNum(C().horasLaborablesTotal(o), 0) + " h laborables</strong>, y eso es lo que significa una dedicación " +
+        "del 50 % o del 100 % de cada periodo.</p>");
   }
 
   PL.vistas.oferta = { render: render, bloqueJornada: bloqueJornada };
@@ -6715,9 +7002,9 @@ span.pa-carga {
     ])).join("");
     const filasEst = cmp.estructura.map(l => V2.fila([
       { html: l.texto },
-      { html: l.clave === "horas" || l.clave === "horasEntregables" ? V2.hor(l.a) : N().fmtNum(l.a), clase: "nz-table__right" },
-      { html: l.clave === "horas" || l.clave === "horasEntregables" ? V2.hor(l.b) : N().fmtNum(l.b), clase: "nz-table__right" },
-      { html: Math.abs(l.d) > 0.005 ? V2.delta(l.d, (l.clave === "horas" || l.clave === "horasEntregables") ? "horas" : "numero") : '<span class="pa-mini">igual</span>', clase: "nz-table__right" }
+      { html: l.clave === "horas" ? V2.hor(l.a) : N().fmtNum(l.a), clase: "nz-table__right" },
+      { html: l.clave === "horas" ? V2.hor(l.b) : N().fmtNum(l.b), clase: "nz-table__right" },
+      { html: Math.abs(l.d) > 0.005 ? V2.delta(l.d, (l.clave === "horas") ? "horas" : "numero") : '<span class="pa-mini">igual</span>', clase: "nz-table__right" }
     ])).join("");
     const filasPerf = cmp.porPerfil.map(x => V2.fila([
       { html: N().esc(x.nombre) },
@@ -7205,6 +7492,47 @@ span.pa-carga {
       r.sub._abierta = true;
       R().todo(); APP().guardar();
     },
+    /* --- Festivos: se añaden, se quitan y se recargan los de España y Madrid --- */
+    "nuevo-festivo": () => {
+      const of = o(); if (!of) return;
+      const fEl = document.querySelector('[data-campo="festivo-fecha"]');
+      const nEl = document.querySelector('[data-campo="festivo-nombre"]');
+      const fecha = fEl ? String(fEl.value || "").trim() : "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { APP().toast("Elige primero el día del festivo"); return; }
+      const j = M().normalizarJornada(of.jornada);
+      const lista = j.festivos.filter(x => x.fecha !== fecha);
+      const nombre = (nEl && nEl.value ? String(nEl.value).trim() : "") || "Festivo propio";
+      lista.push({ fecha: fecha, nombre: nombre, ambito: "Propio" });
+      j.festivos = M().normalizarFestivos(lista);
+      of.jornada = j;
+      R().todo(); APP().guardar();
+      APP().toast("Festivo añadido: " + N().fechaCorta(fecha) + " · " + nombre);
+    },
+
+    "quitar-festivo": b => {
+      const of = o(); if (!of) return;
+      const fecha = id(b);
+      const j = M().normalizarJornada(of.jornada);
+      j.festivos = j.festivos.filter(x => x.fecha !== fecha);
+      of.jornada = j;
+      R().todo(); APP().guardar();
+      APP().toast("Festivo quitado del calendario");
+    },
+
+    "festivos-espana": () => {
+      const of = o(); if (!of || !PL.festivos) return;
+      const j = M().normalizarJornada(of.jornada);
+      const carga = PL.festivos.paraRango(of.periodos.inicio, P().meses(of.periodos), of.periodos.unidad);
+      const porFecha = {};
+      j.festivos.forEach(f => { porFecha[f.fecha] = f; });
+      let nuevos = 0;
+      carga.forEach(f => { if (!porFecha[f.fecha]) { porFecha[f.fecha] = f; nuevos++; } });
+      j.festivos = M().normalizarFestivos(Object.keys(porFecha).map(k => porFecha[k]));
+      of.jornada = j;
+      R().todo(); APP().guardar();
+      APP().toast("Festivos de España y Madrid cargados (" + nuevos + " nuevos, " + j.festivos.length + " en total)");
+    },
+
     "elim-linea": b => {
       const r = M().buscarLinea(o(), id(b)); if (!r) return;
       const p = C().perfilPorId(APP().ESTADO.perfiles, r.linea.perfilId);
@@ -7256,10 +7584,6 @@ span.pa-carga {
       M().colgarEntregable(o(), "Entregable " + (N().lista(t.entregables).length + 1), "tarea", 0, t.id);
       R().todo(); APP().guardar(); APP().toast("Entregable añadido a la tarea");
     },
-    "nuevo-entregable-oferta": () => {
-      M().colgarEntregable(o(), "Hito de la oferta " + (N().lista(o().entregables).length + 1), "oferta", 0, null);
-      R().todo(); APP().guardar(); APP().toast("Entregable de la oferta añadido");
-    },
     "dup-entregable": b => {
       const r = M().buscarEntregable(o(), id(b), tarea(b), b.dataset.subtarea || ""); if (!r) return;
       const copia = N().clonar(r.entregable);
@@ -7302,7 +7626,7 @@ span.pa-carga {
         const ta = M().nuevaTarea(t.nombre);
         ta.subtareas = N().lista(t.subtareas).map(s => M().nuevaSubtarea(s));
         ta.entregables = N().lista(t.entregables).map(e => Object.assign(M().nuevoEntregable(e.nombre, "tarea", e.periodo), {
-          descripcion: e.descripcion || "", criterio: e.criterio || "", horas: N().num(e.horas)
+          descripcion: e.descripcion || "", criterio: e.criterio || ""
         }));
         return ta;
       });
@@ -7321,7 +7645,7 @@ span.pa-carga {
           nombre: t.nombre,
           subtareas: N().lista(t.subtareas).map(s => s.nombre),
           entregables: N().lista(t.entregables).map(e => ({
-            nombre: e.nombre, descripcion: e.descripcion, criterio: e.criterio, periodo: e.periodo, horas: e.horas
+            nombre: e.nombre, descripcion: e.descripcion, criterio: e.criterio, periodo: e.periodo
           }))
         }))
       }));
@@ -7638,13 +7962,6 @@ span.pa-carga {
 
       /* Rótulo de un periodo: se aplica en vivo sin repintar el Gantt (el campo
          es el propio input que se está editando). */
-      case "periodo-rotulo": {
-        P().editar(of.periodos, el.dataset.id, el.value);
-        el.classList.toggle("pa-gantt__rotulo--editado", !!el.value.trim());
-        R().rotulo();   /* el resto de la app se actualiza sin tocar el campo que se edita */
-        APP().guardar();
-        return;
-      }
 
       /* Texto libre: no hace falta repintar nada, el campo ya muestra lo escrito. */
       case "tarea-nombre": { const t = M().buscarTarea(of, el.dataset.id); if (t) { t.nombre = el.value; } APP().guardar(); return; }
@@ -7670,13 +7987,6 @@ span.pa-carga {
         const mapa = { "hito-nombre": "nombre", "hito-desc": "descripcion", "hito-criterio": "criterio" };
         r.entregable[mapa[campo]] = el.value;
         APP().guardar();
-        return;
-      }
-      case "hito-horas": {
-        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "", el.dataset.subtarea || "");
-        if (!r) return;
-        r.entregable.horas = N().acota(el.value, 0, 1e6);
-        R().datos(); APP().guardar();
         return;
       }
       case "hito-fecha": {
@@ -7710,12 +8020,31 @@ span.pa-carga {
 
       /* Números de la oferta */
       case "jornada-horas": {
+        /* El valor general: se aplica a todos los días y se olvidan las
+           excepciones, que es lo que se espera al tocar «horas por día». */
         const j = PL.modelo.normalizarJornada(of.jornada);
         j.horasDia = N().acota(el.value, 0.5, 24);
+        j.horasPorDia = null;
         of.jornada = j;
         R().todo(); APP().guardar();
         return;
       }
+
+      case "jornada-horas-dia": {
+        /* Horas de un día concreto: el viernes puede ser más corto. */
+        const j = PL.modelo.normalizarJornada(of.jornada);
+        const d = N().num(el.dataset.dia);
+        const porDia = Object.assign({}, j.horasPorDia);
+        const horas = N().acota(el.value, 0, 24);
+        porDia[d] = horas;
+        j.horasPorDia = porDia;
+        if (horas <= 0) j.diasSemana = N().lista(j.diasSemana).filter(x => x !== d);
+        of.jornada = j;
+        R().todo(); APP().guardar();
+        return;
+      }
+
+      case "festivo-fecha": case "festivo-nombre": return;   /* los lee el botón de añadir */
 
       case "oferta-validez": of.validezDias = N().acota(el.value, 0, 3650); R().datos(); APP().guardar(); return;
       case "oferta-fecha": of.fecha = el.value; R().datos(); APP().guardar(); return;
@@ -7992,9 +8321,9 @@ span.pa-carga {
       const e = app.ESTADO, o = app.pr();
       if (!e) return;
       const marca = e.marca || {};
-      V().texto("pa-marca-nombre", marca.nombre || "Planifica");
-      V().texto("pa-pie-marca", marca.nombre || "Planifica");
-      document.title = (marca.nombre || "Planifica") + " — Ofertas y planificación";
+      V().texto("pa-marca-nombre", marca.nombre || "Oferta");
+      V().texto("pa-pie-marca", marca.nombre || "Oferta");
+      document.title = (marca.nombre || "Oferta") + " — del encargo a la oferta";
 
       const img = V().nodo("pa-logo");
       if (img) { if (marca.logo) { img.src = marca.logo; img.hidden = false; } else { img.hidden = true; } }

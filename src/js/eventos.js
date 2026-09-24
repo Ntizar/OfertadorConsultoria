@@ -99,13 +99,6 @@
 
       /* Rótulo de un periodo: se aplica en vivo sin repintar el Gantt (el campo
          es el propio input que se está editando). */
-      case "periodo-rotulo": {
-        P().editar(of.periodos, el.dataset.id, el.value);
-        el.classList.toggle("pa-gantt__rotulo--editado", !!el.value.trim());
-        R().rotulo();   /* el resto de la app se actualiza sin tocar el campo que se edita */
-        APP().guardar();
-        return;
-      }
 
       /* Texto libre: no hace falta repintar nada, el campo ya muestra lo escrito. */
       case "tarea-nombre": { const t = M().buscarTarea(of, el.dataset.id); if (t) { t.nombre = el.value; } APP().guardar(); return; }
@@ -131,13 +124,6 @@
         const mapa = { "hito-nombre": "nombre", "hito-desc": "descripcion", "hito-criterio": "criterio" };
         r.entregable[mapa[campo]] = el.value;
         APP().guardar();
-        return;
-      }
-      case "hito-horas": {
-        const r = M().buscarEntregable(of, el.dataset.id, el.dataset.tarea || "", el.dataset.subtarea || "");
-        if (!r) return;
-        r.entregable.horas = N().acota(el.value, 0, 1e6);
-        R().datos(); APP().guardar();
         return;
       }
       case "hito-fecha": {
@@ -171,12 +157,31 @@
 
       /* Números de la oferta */
       case "jornada-horas": {
+        /* El valor general: se aplica a todos los días y se olvidan las
+           excepciones, que es lo que se espera al tocar «horas por día». */
         const j = PL.modelo.normalizarJornada(of.jornada);
         j.horasDia = N().acota(el.value, 0.5, 24);
+        j.horasPorDia = null;
         of.jornada = j;
         R().todo(); APP().guardar();
         return;
       }
+
+      case "jornada-horas-dia": {
+        /* Horas de un día concreto: el viernes puede ser más corto. */
+        const j = PL.modelo.normalizarJornada(of.jornada);
+        const d = N().num(el.dataset.dia);
+        const porDia = Object.assign({}, j.horasPorDia);
+        const horas = N().acota(el.value, 0, 24);
+        porDia[d] = horas;
+        j.horasPorDia = porDia;
+        if (horas <= 0) j.diasSemana = N().lista(j.diasSemana).filter(x => x !== d);
+        of.jornada = j;
+        R().todo(); APP().guardar();
+        return;
+      }
+
+      case "festivo-fecha": case "festivo-nombre": return;   /* los lee el botón de añadir */
 
       case "oferta-validez": of.validezDias = N().acota(el.value, 0, 3650); R().datos(); APP().guardar(); return;
       case "oferta-fecha": of.fecha = el.value; R().datos(); APP().guardar(); return;

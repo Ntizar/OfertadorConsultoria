@@ -96,9 +96,9 @@
       const e = app.ESTADO, o = app.pr();
       if (!e) return;
       const marca = e.marca || {};
-      V().texto("pa-marca-nombre", marca.nombre || "Planifica");
-      V().texto("pa-pie-marca", marca.nombre || "Planifica");
-      document.title = (marca.nombre || "Planifica") + " — Ofertas y planificación";
+      V().texto("pa-marca-nombre", marca.nombre || "Oferta");
+      V().texto("pa-pie-marca", marca.nombre || "Oferta");
+      document.title = (marca.nombre || "Oferta") + " — del encargo a la oferta";
 
       const img = V().nodo("pa-logo");
       if (img) { if (marca.logo) { img.src = marca.logo; img.hidden = false; } else { img.hidden = true; } }

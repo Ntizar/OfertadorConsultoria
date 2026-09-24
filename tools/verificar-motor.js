@@ -11,13 +11,15 @@ const CARGADO = cargarPL();
 const { sandbox, PL } = CARGADO;
 const t = contador("Planifica v4 — motor (sin DOM)");
 const check = t.check;
+const grupo = t.grupo;
 
 if (CARGADO.faltan.length) {
   console.log("  ⚠ módulos que faltan: " + CARGADO.faltan.join(", "));
 }
-check("los 9 módulos del motor se cargan", CARGADO.cargados.length === 9, CARGADO.cargados.join(", "));
+check("los 10 módulos del motor se cargan", CARGADO.cargados.length === 10, CARGADO.cargados.join(", "));
 
 const N = PL.nucleo, P = PL.periodos, M = PL.modelo, C = PL.calculo, E = PL.entregables, X = PL.comparar, EJ = PL.ejemplo;
+const F = PL.festivos;
 const ESTADO = M.estadoInicial();
 const OF = ESTADO.ofertas[0];
 const PF = ESTADO.perfiles;
@@ -33,7 +35,8 @@ check("1 oferta de ejemplo", ESTADO.ofertas.length === 1);
 check("la oferta activa es el ejemplo", ESTADO.activa === OF.id && OF.guia === true);
 check("cliente estructurado", !!OF.cliente.nombre && !!OF.cliente.ref);
 check("calendario de 6 periodos", P.meses(OF.periodos) === 6, P.meses(OF.periodos));
-check("hay entregables en tareas y en la oferta", E.todos(OF).some(e => e._contexto === "tarea") && E.todos(OF).some(e => e._contexto === "oferta"));
+check("hay entregables en subtareas y en la tarea completa",
+  E.todos(OF).some(e => e._contexto === "subtarea") && E.todos(OF).some(e => e._contexto === "tarea"));
 check("el importe del ejemplo es > 0", C.importeOferta(OF, PF) > 0, C.importeOferta(OF, PF));
 
 /* ---------- 2. Cadena de totales ---------- */
@@ -158,9 +161,9 @@ check("normalizar rechaza basura y cae al mes actual", P.normalizar({ inicio: "l
 /* ---------- 5. Entregables ---------- */
 t.grupo("\n5. Entregables (compromisos de entrega)");
 const ents = E.todos(OF);
-check("6 entregables en el ejemplo", ents.length === 6, ents.length);
-check("4 cuelgan de subtareas, 1 de la tarea completa y 1 de la oferta",
-  E.porContexto(OF).deSubtarea === 4 && E.porContexto(OF).deTarea === 1 && E.porContexto(OF).deOferta === 1,
+check("5 entregables en el ejemplo", ents.length === 5, ents.length);
+check("4 cuelgan de subtareas y 1 de la tarea completa (nada suelto de la oferta)",
+  E.porContexto(OF).deSubtarea === 4 && E.porContexto(OF).deTarea === 1 && E.porContexto(OF).deOferta === 0,
   JSON.stringify(E.porContexto(OF)));
 check("los entregables de subtarea saben de qué subtarea son",
   ents.filter(e => e._contexto === "subtarea").every(e => !!e._subtareaId && !!e._subtareaNombre),
@@ -182,14 +185,14 @@ check("agrupación por periodo", (() => {
 check("marcadores por periodo (para el Gantt)", E.marcadoresPorPeriodo(OF).length === P.meses(OF.periodos));
 check("el último entregable del ejemplo cae en el mes 6", E.ultimo(OF).periodo === 5, E.ultimo(OF).periodo);
 check("el próximo es el primero del calendario", E.proximo(OF).periodo === 0);
-check("horas estimadas suman y son informativas", E.horasEstimadas(OF) > 0, E.horasEstimadas(OF));
-check("las horas de los entregables NO tocan el importe de la oferta", (() => {
+/* Los entregables ya NO llevan horas: las pone la subtarea con sus líneas. */
+check("los entregables no guardan horas propias", E.todos(OF).every(e => e.horas === undefined), JSON.stringify(E.todos(OF).map(e => e.horas)));
+check("las horas del entregable no son las que cuentan, sino las de su subtarea", (() => {
+  const sub = OF.tareas[0].subtareas[0];
   const antes = C.importeOferta(OF, PF);
-  OF.tareas[0].entregables[0].horas = 9999;
-  const despues = C.importeOferta(OF, PF);
-  OF.tareas[0].entregables[0].horas = 32;
-  return antes === despues;
-})());
+  const horasSub = N.r2(N.suma(sub.lineas || [], l => C.lineaHoras(l)));
+  return antes > 0 && horasSub >= 0 && C.subtareaHoras(sub) === horasSub;
+})(), C.subtareaHoras(OF.tareas[0].subtareas[0]) + " h");
 check("etiqueta de entrega legible", /^\S+ \d{4}/.test(E.etiquetaEntrega(OF, ents[0])), E.etiquetaEntrega(OF, ents[0]));
 check("moverAPeriodo cambia el mes del entregable", (() => {
   const e = E.todos(OF)[0];
@@ -227,7 +230,9 @@ const lineaTotal = cmp.economia.filter(l => l.clave === "total")[0];
 check("el delta del TOTAL es la resta", Math.abs(lineaTotal.d - N.r2(recortada.total - base.total)) < 0.005);
 check("delta negativo al recortar", lineaTotal.d < 0);
 check("economía con 6 líneas", cmp.economia.length === 6);
-check("estructura con 6 líneas", cmp.estructura.length === 6);
+check("estructura con periodos, tareas y subtareas",
+  cmp.estructura.length === 3 && cmp.estructura.map(l => l.clave).join(",") === "periodos,tareas,subtareas",
+  JSON.stringify(cmp.estructura.map(l => l.clave + "=" + l.a + "→" + l.b)));
 check("horas por perfil con deltas", cmp.porPerfil.length > 0 && cmp.porPerfil.some(x => x.d !== 0));
 check("importe por periodo con etiquetas", cmp.porPeriodo.length === 6 && cmp.porPeriodo.every(m => !!m.etiqueta));
 check("detecta el cambio de horas de una tarea", cmp.cambios.some(c => /Horas en/.test(c.texto)), JSON.stringify(cmp.cambios.map(c => c.texto)));
@@ -317,18 +322,19 @@ t.grupo("12. Dedicación (% ↔ horas) y control del 100 %");
 
 /* Las horas laborables de cada mes se contrastan contra un cálculo independiente
    (Python: calendar + weekday < 5, jornada de 8 h). */
-const LAB_ESPERADO = [176, 168, 184, 168, 160, 184];
+const LAB_ESPERADO = [168, 160, 168, 152, 160, 176];   /* con festivos de España y Madrid */
 const LAB_MOTOR = [0, 1, 2, 3, 4, 5].map(i => C.horasLaborablesMes(OF, i));
 check("horas laborables de los 6 meses coinciden con el cálculo independiente",
   LAB_MOTOR.join(",") === LAB_ESPERADO.join(","), "motor " + LAB_MOTOR.join(",") + " vs esperado " + LAB_ESPERADO.join(","));
-check("total de horas laborables del calendario = 1.040 h", C.horasLaborablesTotal(OF) === 1040, C.horasLaborablesTotal(OF));
+check("total de horas laborables del calendario = 984 h", C.horasLaborablesTotal(OF) === 984, C.horasLaborablesTotal(OF));
 check("jornada de fábrica: 8 h al día de lunes a viernes",
   OF.jornada.horasDia === 8 && OF.jornada.diasSemana.join(",") === "1,2,3,4,5", JSON.stringify(OF.jornada));
-check("88 h en octubre (176 h laborables) son el 50 %", C.pctDeHoras(OF, 0, 88) === 50, C.pctDeHoras(OF, 0, 88));
-check("el 50 % de octubre son 88 h", C.horasDePct(OF, 0, 50) === 88, C.horasDePct(OF, 0, 50));
+check("84 h en octubre (168 h laborables, con el 12 de octubre festivo) son el 50 %",
+  C.pctDeHoras(OF, 0, 84) === 50, C.pctDeHoras(OF, 0, 84));
+check("el 50 % de octubre son 84 h", C.horasDePct(OF, 0, 50) === 84, C.horasDePct(OF, 0, 50));
 check("el 100 % de febrero (160 h) son 160 h", C.horasDePct(OF, 4, 100) === 160, C.horasDePct(OF, 4, 100));
 check("una jornada de 4 h/día deja el mes en la mitad",
-  C.horasLaborablesMes(M.normalizarOferta({ jornada: { horasDia: 4 } }), 0) === 88);
+  C.horasLaborablesMes(M.normalizarOferta({ jornada: { horasDia: 4 } }), 0) === 84);
 check("trabajar los sábados añade días laborables",
   P.diasLaborables(OF.periodos, 0, [1, 2, 3, 4, 5, 6]) > P.diasLaborables(OF.periodos, 0, [1, 2, 3, 4, 5]),
   P.diasLaborables(OF.periodos, 0, [1, 2, 3, 4, 5]) + " → " + P.diasLaborables(OF.periodos, 0, [1, 2, 3, 4, 5, 6]));
@@ -341,17 +347,17 @@ check("las horas por perfil y mes suman el esfuerzo total",
 const ofExc = EJ.ofertaEjemplo(PF);
 ofExc.tareas.forEach(t2 => t2.subtareas.forEach(sb => sb.lineas.forEach(l => { Object.keys(l.horas).forEach(k => { l.horas[k] = 0; }); })));
 ofExc.tareas[0].subtareas[0].lineas[0].perfilId = PF[0].id;
-ofExc.tareas[0].subtareas[0].lineas[0].horas.p0 = 264;   /* 150 % de 176 h */
+ofExc.tareas[0].subtareas[0].lineas[0].horas.p0 = 252;   /* 150 % de 168 h */
 const exc = C.excesosPerfil(ofExc);
 check("detecta a un perfil por encima del 100 % en un mes", exc.length === 1, JSON.stringify(exc));
 check("el exceso trae perfil, mes, horas, límite y porcentaje",
-  exc[0] && exc[0].perfilId === PF[0].id && exc[0].periodo === 0 && exc[0].horas === 264 && exc[0].limite === 176 && exc[0].pct === 150,
+  exc[0] && exc[0].perfilId === PF[0].id && exc[0].periodo === 0 && exc[0].horas === 252 && exc[0].limite === 168 && exc[0].pct === 150,
   JSON.stringify(exc[0]));
 check("el 100 % justo no se considera exceso", (() => {
   const of2 = EJ.ofertaEjemplo(PF);
   of2.tareas.forEach(t2 => t2.subtareas.forEach(sb => sb.lineas.forEach(l => { Object.keys(l.horas).forEach(k => { l.horas[k] = 0; }); })));
   of2.tareas[0].subtareas[0].lineas[0].perfilId = PF[0].id;
-  of2.tareas[0].subtareas[0].lineas[0].horas.p0 = 176;
+  of2.tareas[0].subtareas[0].lineas[0].horas.p0 = 168;
   return C.excesosPerfil(of2).length === 0;
 })());
 
@@ -405,6 +411,42 @@ check("la vuelta a meses también conserva el total",
   C.ofertaHoras(ofSem) + " h · " + C.importeOferta(ofSem, PF) + " €");
 check("el rango de vuelta cubre septiembre a marzo (7 meses)", rVuelta.nMesesDestino === 7, rVuelta.nMesesDestino);
 check("no se convierte a la unidad que ya está puesta", U.convertirOferta(ofSem, "mes") === null);
+
+/* ---------- 13. Festivos (España y Madrid) y jornada por día ---------- */
+grupo("13. Festivos (España y Madrid) y jornada por día");
+
+check("el Viernes Santo se calcula sin listas: Pascua 2026 = 5 de abril",
+  N.diaISO(F.pascua(2026)) === "2026-04-05", N.diaISO(F.pascua(2026)));
+check("y Pascua 2027 = 28 de marzo", N.diaISO(F.pascua(2027)) === "2027-03-28", N.diaISO(F.pascua(2027)));
+check("Viernes Santo 2026 = 3 de abril", N.diaISO(F.viernesSanto(2026)) === "2026-04-03", N.diaISO(F.viernesSanto(2026)));
+check("Viernes Santo 2027 = 26 de marzo", N.diaISO(F.viernesSanto(2027)) === "2027-03-26", N.diaISO(F.viernesSanto(2027)));
+check("traen España, Madrid y locales",
+  F.deEspanaMadrid(2026).some(x => x.ambito === "España") &&
+  F.deEspanaMadrid(2026).some(x => x.ambito === "Madrid") &&
+  F.deEspanaMadrid(2026).some(x => x.ambito === "Local"),
+  JSON.stringify(F.deEspanaMadrid(2026).map(x => x.fecha)));
+check("la oferta de ejemplo trae los festivos del calendario", OF.jornada.festivos.length > 0, OF.jornada.festivos.length);
+check("el 12 de octubre de 2026 está entre ellos", OF.jornada.festivos.some(f => f.fecha === "2026-10-12"));
+check("octubre tiene 168 h laborables (176 menos el 12 de octubre)", C.horasLaborablesMes(OF, 0) === 168, C.horasLaborablesMes(OF, 0));
+check("diciembre también 168 (8 y 25 fuera)", C.horasLaborablesMes(OF, 2) === 168, C.horasLaborablesMes(OF, 2));
+
+/* Viernes corto: de lunes a jueves 8 h y el viernes 6 */
+const OFV = M.normalizarOferta(JSON.parse(JSON.stringify(OF)));   /* clon: normalizar es in-place */
+OFV.jornada = M.normalizarJornada(Object.assign({}, OFV.jornada, { horasPorDia: { 1: 8, 2: 8, 3: 8, 4: 8, 5: 6 } }));
+check("con el viernes de 6 h, octubre baja de 168 a 158 (16 días de 8 h + 5 viernes de 6)",
+  C.horasLaborablesMes(OFV, 0) === 158, C.horasLaborablesMes(OFV, 0));
+check("y queda guardado día a día", C.jornada(OFV).horasPorDia[5] === 6, JSON.stringify(C.jornada(OFV).horasPorDia));
+check("un día laborable nunca se queda con 0 horas",
+  M.normalizarJornada({ diasSemana: [1, 2, 3, 4, 5, 6], horasPorDia: { 6: 0 } }).horasPorDia[6] === 8,
+  M.normalizarJornada({ diasSemana: [1, 2, 3, 4, 5, 6], horasPorDia: { 6: 0 } }).horasPorDia[6]);
+check("quitar un festivo sube las horas del mes", (() => {
+  const OF2 = M.normalizarOferta(JSON.parse(JSON.stringify(OF)));
+  OF2.jornada.festivos = OF2.jornada.festivos.filter(f => f.fecha !== "2026-10-12");
+  return C.horasLaborablesMes(OF2, 0) === 176;
+})(), C.horasLaborablesMes(M.normalizarOferta(JSON.parse(JSON.stringify(OF))), 0));
+check("el contrato sigue intacto con los festivos puestos",
+  Math.abs(C.ofertaHoras(OF) - 346) < 0.02 && Math.abs(C.importeOferta(OF, PF) - 16352) < 0.05,
+  C.ofertaHoras(OF) + " h · " + C.importeOferta(OF, PF) + " €");
 
 t.resumen();
 process.exit(t.ko ? 1 : 0);

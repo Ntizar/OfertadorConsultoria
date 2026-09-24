@@ -280,6 +280,14 @@ body.pa-sin-importes .pa-importe { display: none; }
   background: var(--pa-tono, var(--nz-border)); flex: 0 0 auto;
 }
 
+/* El entregable se marca con un rombo del mismo color naranja, nunca con un punto. */
+.pa-tono-rombo {
+  display: inline-block; width: 0.6rem; height: 0.6rem; flex: 0 0 auto;
+  background: var(--pa-tono, var(--nz-accent)); transform: rotate(45deg); border-radius: 1px;
+}
+.pa-hito .pa-tono-rombo { margin-right: var(--nz-space-1); }
+
+/* Las tareas: barras con su color; los entregables: el rombo en naranja. */
 .pa-gantt__fila--tarea .pa-barra { background: var(--pa-tono, var(--nz-brand)); }
 .pa-gantt__fila--subtarea .pa-barra { background: var(--pa-tono-fluido, var(--nz-brand)); }
 .pa-gantt__fila--entregable .pa-barra--hito { color: var(--pa-tono, var(--nz-accent)); }
@@ -358,4 +366,36 @@ body.pa-sin-importes .pa-importe { display: none; }
 span.pa-carga {
   display: inline-block; width: 0.85rem; height: 0.85rem; min-width: 0;
   border: 1px solid var(--nz-border); border-radius: 3px; vertical-align: -2px;
+}
+
+
+/* ---------- FULL RESPONSIVE ----------
+   La app se usa en móvil: nada se aplasta, nada se sale. Las tablas anchas hacen su
+   propio scroll (con la columna del concepto pegada) en vez de romper la página. */
+.pa-tabla-horas { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.pa-tabla-horas > table { min-width: 100%; }
+.pa-jornada { display: grid; grid-template-columns: minmax(15rem, 1fr) minmax(18rem, 1.4fr); gap: var(--nz-space-4); align-items: start; }
+.pa-select-pct { min-width: 5.4rem; }
+
+#pa-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+
+@media (max-width: 900px) {
+  .pa-jornada { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  /* Nada de columnas apretadas: scroll propio y tipografía legible */
+  .pa-tabla-horas > table { min-width: 44rem; }
+  .pa-carga { min-width: 2.5rem; font-size: 0.66rem; padding: 0.12rem 0.18rem; }
+  .pa-jornada { display: block; }
+  .pa-jornada > div + div { margin-top: var(--nz-space-4); }
+  .pa-fila { flex-wrap: wrap; }
+  .pa-fila > .nz-input, .pa-fila > .nz-btn, .pa-fila > label { min-height: 44px; }
+  .pa-hito { flex-wrap: wrap; row-gap: var(--nz-space-1); }
+  .pa-hito .nz-input, .pa-hito .nz-btn { min-height: 44px; }
+  .pa-hito__nombre { flex: 1 1 100%; }
+  .pa-select-pct, .pa-input-horas, .pa-input-num { min-height: 44px; font-size: var(--nz-text-md); }
+  .pa-select-pct { width: 100%; }
+  .pa-calendario .pa-ancho-medio { width: 100%; }
+  .nz-table--compact td, .nz-table--compact th { padding: 0.2rem 0.3rem; }
 }

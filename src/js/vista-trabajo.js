@@ -76,9 +76,8 @@
     if (!hitos.length) {
       return '<p class="pa-mini">Sin entregables en esta tarea: añade el primero con «＋ Entregable».</p>';
     }
-    const horas = N().suma(hitos, e => N().num(e.horas));
     return '<p class="pa-mini pa-mini--fuerte">Entregables de la TAREA completa · ' + hitos.length +
-      (horas ? " · " + V2.hor(horas) + " estimadas" : "") + "</p>" +
+      ' · <span class="pa-mini">las horas las marcan las subtareas</span></p>' +
       E().deTarea(o, t).map(e => V2.htmlEntregable(o, pf, e, "tarea", t.id)).join("");
   }
 
@@ -92,12 +91,13 @@
     const hHoras = N().suma(lista, e => N().num(e.horas));
     return '<div class="pa-hitos pa-hitos--sub">' +
       (lista.length
-        ? '<p class="pa-mini pa-mini--fuerte">Se entrega aquí · ' + lista.length + (hHoras ? " · " + V2.hor(hHoras) + " estimadas" : "") + "</p>" +
+        ? '<p class="pa-mini pa-mini--fuerte">Se entrega aquí · ' + lista.length + "" + "</p>" +
           lista.map(e => V2.htmlEntregable(o, pf, e, "subtarea", "", s.id)).join("")
         : "") +
       '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="nuevo-entregable-sub" data-id="' + s.id + '">＋ Entregable de esta subtarea</button>' +
       "</div>";
   }
+
 
   function tablaLineas(o, pf, s) {
     const V2 = V();
@@ -161,11 +161,19 @@
         const marcador = sombra ? '<span class="pa-celda__marca">' + N().fmtNum(pctMax, 0) + "%</span>" : "";
         if (c.periodos.length === 1) {
           return "<td class=\"" + clase + "\"" + eti + ">" + sombra + marcador +
-            '<input class="nz-input nz-input--sm pa-input-horas" type="text" inputmode="decimal" autocomplete="off" ' +
-            'value="' + N().fmtCampo(enPct ? pct : h) + '" placeholder="' +
-              (l.perfilId ? (sinHueco ? "sin hueco" : dicho) : (enPct ? "% de jornada" : "0")) + '" data-campo="horas" ' +
-            'data-modo="' + (enPct ? "pct" : "h") + '" data-id="' + l.id + '" data-mes="' + idx + '" ' +
-            'aria-label="' + N().esc("Horas en " + c.etiqueta) + '">' +
+            (enPct
+              /* De 5 en 5 y con tope 100: las flechas suben/bajan de cinco en cinco y no
+                 se puede pedir más de una jornada. El hueco libre se ve en el propio campo. */
+              ? '<input class="nz-input nz-input--sm pa-input-pct" type="number" inputmode="numeric" ' +
+                'min="0" max="100" step="5" value="' + (h > 0 ? N().fmtCampo(pct, 1) : "") +
+                '" placeholder="' + (l.perfilId ? (sinHueco ? "sin hueco" : "0") : "%") +
+                '" data-campo="horas" data-modo="pct" data-id="' + l.id + '" data-mes="' + idx + '" ' +
+                'aria-label="' + N().esc("Dedicación en " + c.etiqueta) + '" title="' + N().esc(dicho) + '">'
+              : '<input class="nz-input nz-input--sm pa-input-horas" type="text" inputmode="decimal" autocomplete="off" ' +
+                'value="' + (h > 0 ? N().fmtCampo(h) : "") + '" placeholder="' + (l.perfilId ? (sinHueco ? "sin hueco" : "0") : "0") +
+                '" data-campo="horas" data-modo="h" data-id="' + l.id + '" data-mes="' + idx + '" ' +
+                'aria-label="' + N().esc("Horas en " + c.etiqueta) + '" title="' + N().esc(dicho) + '">') +
+            '<span class="pa-celda__eq">' + eq + "</span></td>";
             '<span class="pa-celda__eq">' + eq + "</span></td>";
         }
         return "<td class=\"" + clase + "\"" + eti + ">" + (h > 0 ? "<span>" + N().fmtNum(pct) + " %</span>" : "") + "</td>";
@@ -324,7 +332,6 @@
       V2.articulo("Estructura de la oferta", editor(o, pf),
         '<div class="pa-fila" style="margin-bottom:var(--nz-space-3)">' +
           '<button class="nz-btn nz-btn--primary" data-acc="nueva-tarea">＋ Añadir tarea</button>' +
-          '<button class="nz-btn nz-btn--soft" data-acc="nuevo-entregable-oferta">＋ Entregable de la oferta</button>' +
           '<button class="nz-btn nz-btn--soft" data-acc="plantilla-toggle">📚 Plantillas</button>' +
           '<span class="pa-espacio"></span>' +
           '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="abrir-todo" title="Desplegar tareas, subtareas y horas">⇕ Desplegar todo</button>' +

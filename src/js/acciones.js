@@ -158,6 +158,47 @@
       r.sub._abierta = true;
       R().todo(); APP().guardar();
     },
+    /* --- Festivos: se añaden, se quitan y se recargan los de España y Madrid --- */
+    "nuevo-festivo": () => {
+      const of = o(); if (!of) return;
+      const fEl = document.querySelector('[data-campo="festivo-fecha"]');
+      const nEl = document.querySelector('[data-campo="festivo-nombre"]');
+      const fecha = fEl ? String(fEl.value || "").trim() : "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { APP().toast("Elige primero el día del festivo"); return; }
+      const j = M().normalizarJornada(of.jornada);
+      const lista = j.festivos.filter(x => x.fecha !== fecha);
+      const nombre = (nEl && nEl.value ? String(nEl.value).trim() : "") || "Festivo propio";
+      lista.push({ fecha: fecha, nombre: nombre, ambito: "Propio" });
+      j.festivos = M().normalizarFestivos(lista);
+      of.jornada = j;
+      R().todo(); APP().guardar();
+      APP().toast("Festivo añadido: " + N().fechaCorta(fecha) + " · " + nombre);
+    },
+
+    "quitar-festivo": b => {
+      const of = o(); if (!of) return;
+      const fecha = id(b);
+      const j = M().normalizarJornada(of.jornada);
+      j.festivos = j.festivos.filter(x => x.fecha !== fecha);
+      of.jornada = j;
+      R().todo(); APP().guardar();
+      APP().toast("Festivo quitado del calendario");
+    },
+
+    "festivos-espana": () => {
+      const of = o(); if (!of || !PL.festivos) return;
+      const j = M().normalizarJornada(of.jornada);
+      const carga = PL.festivos.paraRango(of.periodos.inicio, P().meses(of.periodos), of.periodos.unidad);
+      const porFecha = {};
+      j.festivos.forEach(f => { porFecha[f.fecha] = f; });
+      let nuevos = 0;
+      carga.forEach(f => { if (!porFecha[f.fecha]) { porFecha[f.fecha] = f; nuevos++; } });
+      j.festivos = M().normalizarFestivos(Object.keys(porFecha).map(k => porFecha[k]));
+      of.jornada = j;
+      R().todo(); APP().guardar();
+      APP().toast("Festivos de España y Madrid cargados (" + nuevos + " nuevos, " + j.festivos.length + " en total)");
+    },
+
     "elim-linea": b => {
       const r = M().buscarLinea(o(), id(b)); if (!r) return;
       const p = C().perfilPorId(APP().ESTADO.perfiles, r.linea.perfilId);
@@ -209,10 +250,6 @@
       M().colgarEntregable(o(), "Entregable " + (N().lista(t.entregables).length + 1), "tarea", 0, t.id);
       R().todo(); APP().guardar(); APP().toast("Entregable añadido a la tarea");
     },
-    "nuevo-entregable-oferta": () => {
-      M().colgarEntregable(o(), "Hito de la oferta " + (N().lista(o().entregables).length + 1), "oferta", 0, null);
-      R().todo(); APP().guardar(); APP().toast("Entregable de la oferta añadido");
-    },
     "dup-entregable": b => {
       const r = M().buscarEntregable(o(), id(b), tarea(b), b.dataset.subtarea || ""); if (!r) return;
       const copia = N().clonar(r.entregable);
@@ -255,7 +292,7 @@
         const ta = M().nuevaTarea(t.nombre);
         ta.subtareas = N().lista(t.subtareas).map(s => M().nuevaSubtarea(s));
         ta.entregables = N().lista(t.entregables).map(e => Object.assign(M().nuevoEntregable(e.nombre, "tarea", e.periodo), {
-          descripcion: e.descripcion || "", criterio: e.criterio || "", horas: N().num(e.horas)
+          descripcion: e.descripcion || "", criterio: e.criterio || ""
         }));
         return ta;
       });
@@ -274,7 +311,7 @@
           nombre: t.nombre,
           subtareas: N().lista(t.subtareas).map(s => s.nombre),
           entregables: N().lista(t.entregables).map(e => ({
-            nombre: e.nombre, descripcion: e.descripcion, criterio: e.criterio, periodo: e.periodo, horas: e.horas
+            nombre: e.nombre, descripcion: e.descripcion, criterio: e.criterio, periodo: e.periodo
           }))
         }))
       }));

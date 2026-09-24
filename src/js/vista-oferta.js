@@ -117,19 +117,69 @@
   function bloqueJornada(o) {
     const V2 = V();
     const j = C().jornada(o);
-    const DIAS = [[1, "L"], [2, "M"], [3, "X"], [4, "J"], [5, "V"], [6, "S"], [7, "D"]];
-    return V2.articulo("Jornada de trabajo",
-      '<div class="pa-fila">' +
-        '<label class="pa-mini pa-ahora">Horas por día ' +
-          '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0.5" max="24" step="0.5" ' +
-          'data-campo="jornada-horas" value="' + N().fmtNum(j.horasDia) + '"></label>' +
-        '<span class="pa-mini">Días que se trabaja</span>' +
-        DIAS.map(d => '<label class="pa-mini pa-ahora"><input type="checkbox" data-campo="jornada-dia" data-dia="' + d[0] + '"' +
-          (j.diasSemana.indexOf(d[0]) >= 0 ? " checked" : "") + "> " + d[1] + "</label>").join("") +
+    const DIAS = [[1, "lunes"], [2, "martes"], [3, "miércoles"], [4, "jueves"], [5, "viernes"], [6, "sábado"], [7, "domingo"]];
+    const festivos = N().lista(j.festivos);
+
+    /* Un día: casilla de laborable y sus horas. El viernes puede ser más corto. */
+    const filasDias = DIAS.map(d => {
+      const dia = d[0];
+      const laborable = j.diasSemana.indexOf(dia) >= 0;
+      const horas = N().num((j.horasPorDia || {})[dia]);
+      return "<tr>" +
+        '<td><label class="pa-ahora"><input type="checkbox" data-campo="jornada-dia" data-dia="' + dia + '"' +
+          (laborable ? " checked" : "") + "> " + d[1] + "</label></td>" +
+        '<td class="nz-table__right">' + (laborable
+          ? '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0" max="24" step="0.5" ' +
+            'data-campo="jornada-horas-dia" data-dia="' + dia + '" value="' + N().fmtNum(horas) + '" aria-label="Horas del ' + d[1] + '"> h'
+          : '<span class="pa-mini">no se trabaja</span>') + "</td></tr>";
+    }).join("");
+
+    const hFestivo = f => {
+      const partes = f.fecha.split("-");
+      return N().fechaCorta(new Date(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2])));
+    };
+
+    const listaFestivos = festivos.length
+      ? '<table class="nz-table nz-table--compact"><thead><tr><th>Día</th><th>Festivo</th><th></th><th></th></tr></thead><tbody>' +
+        festivos.map(f => "<tr><td>" + N().esc(hFestivo(f)) + "</td><td>" + N().esc(f.nombre) +
+          '</td><td><span class="nz-badge nz-badge--neutral">' + N().esc(f.ambito || "Propio") + "</span></td>" +
+          '<td><button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="quitar-festivo" data-id="' + N().esc(f.fecha) +
+          '" title="Quitar este festivo">✕</button></td></tr>').join("") +
+        "</tbody></table>"
+      : '<p class="pa-mini">No hay festivos: todos los días de diario cuentan como laborables.</p>';
+
+    return V2.articulo("Jornada y festivos",
+      '<p class="pa-mini">Marca los días que se trabaja y <strong>cuántas horas cada uno</strong> (si el viernes es más corto, ' +
+      "se pone aquí). Los festivos no cuentan como laborables, así que bajan las horas del mes y suben el % de dedicación " +
+      "de lo mismo: con esto la dedicación se calcula sobre días reales de trabajo.</p>" +
+      '<div class="pa-jornada">' +
+        '<div>' +
+          '<table class="nz-table nz-table--compact"><thead><tr><th>Día</th><th class="nz-table__right">Horas</th></tr></thead>' +
+          "<tbody>" + filasDias + "</tbody></table>" +
+          '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Horas al día por omisión: ' +
+            '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0.5" max="24" step="0.5" ' +
+            'data-campo="jornada-horas" value="' + N().fmtNum(j.horasDia) + '" aria-label="Horas al día por omisión"> ' +
+            "(al cambiarlo se aplica a todos los días).</p>" +
+        "</div>" +
+        '<div>' +
+          '<div class="pa-fila">' +
+            '<strong class="pa-mini">Festivos del calendario</strong>' +
+            '<input class="nz-input nz-input--sm" type="date" data-campo="festivo-fecha" aria-label="Fecha del festivo">' +
+            '<input class="nz-input nz-input--sm pa-ancho-medio" type="text" data-campo="festivo-nombre" ' +
+              'placeholder="Nombre (opcional)" aria-label="Nombre del festivo">' +
+            '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="nuevo-festivo">＋ Añadir</button>' +
+            '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="festivos-espana" ' +
+              'title="Carga los festivos de España, la Comunidad de Madrid y Madrid capital de los años del calendario">' +
+              "Cargar los de España y Madrid</button>" +
+          "</div>" +
+          '<div class="pa-tabla-horas">' + listaFestivos + "</div>" +
+          '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Van precargados los de España y Madrid, pero ' +
+          "<strong>son editables</strong>: los locales cambian cada año y cada empresa tiene los suyos.</p>" +
+        "</div>" +
       "</div>" +
-      '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Con esto se calculan las horas laborables de cada mes (' +
-        Math.round(C().horasLaborablesTotal(o)).toLocaleString("es-ES") + " h en el calendario actual) y, por tanto, " +
-        "lo que significa una dedicación del 50 % o del 100 %.</p>");
+      '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Con esta jornada el calendario tiene <strong>' +
+        N().fmtNum(C().horasLaborablesTotal(o), 0) + " h laborables</strong>, y eso es lo que significa una dedicación " +
+        "del 50 % o del 100 % de cada periodo.</p>");
   }
 
   PL.vistas.oferta = { render: render, bloqueJornada: bloqueJornada };

@@ -198,11 +198,11 @@
     /* Entregables */
     const ents = E().todos(o);
     if (ents.length) {
-      f.push(["ENTREGABLES", "Entregable", "Origen", "Entrega", "Fecha", "Responsable", "Criterio de aceptación", "Horas estimadas"]);
+      f.push(["ENTREGABLES", "Entregable", "Origen", "Entrega", "Fecha", "Responsable", "Criterio de aceptación"]);
       ents.forEach(e => {
         const r = E().responsable(pf, e);
         f.push(["Entregable", e.nombre, e._contexto === "oferta" ? "Oferta" : e._tareaNombre,
-          P().mesCorto(o.periodos, e.periodo), e.fecha || "", r ? r.nombre : "", e.criterio || "", numES(e.horas)]);
+          P().mesCorto(o.periodos, e.periodo), e.fecha || "", r ? r.nombre : "", e.criterio || ""]);
       });
       f.push([]);
     }

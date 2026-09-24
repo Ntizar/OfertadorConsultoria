@@ -53,7 +53,6 @@
       tareas: N().lista(of.tareas).length,
       subtareas: N().suma(of.tareas, t => N().lista(t.subtareas).length),
       entregables: conteo.total,
-      horasEntregables: E().horasEstimadas(of)
     };
   }
 
@@ -72,7 +71,6 @@
     ];
     const estructura = [
       linea("periodos", "Periodos"), linea("tareas", "Tareas"), linea("subtareas", "Subtareas"),
-      linea("entregables", "Entregables"), linea("horas", "Horas"), linea("horasEntregables", "Horas estimadas en entregables")
     ];
 
     const oA = comoOferta(fA, o), oB = comoOferta(fB, o);

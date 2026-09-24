@@ -35,6 +35,7 @@ MODULOS_JS = [
     "nucleo.js",
     "periodos.js",
     "unidades.js",
+    "festivos.js",
     "modelo.js",
     "ejemplo.js",
     "calculo.js",

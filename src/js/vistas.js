@@ -81,15 +81,33 @@
   const TONOS = 5;
 
   /** 1..5, estable mientras no cambie el orden de las tareas (0 = sin tono). */
+  /* Cada TAREA lleva un color del sistema, ciclando entre cuatro. El naranja se reserva
+     para los entregables, así que una tarea nunca se pinta del color de un entregable. */
+  const TONOS_TAREA = [1, 3, 4, 5];
+
   function tonoDe(o, tareaId) {
-    if (!tareaId) return 0;
     const tareas = N().lista(o && o.tareas);
-    for (let i = 0; i < tareas.length; i++) if (tareas[i].id === tareaId) return (i % TONOS) + 1;
+    for (let i = 0; i < tareas.length; i++) if (tareas[i].id === tareaId) return TONOS_TAREA[i % TONOS_TAREA.length];
     return 0;
   }
 
   function claseTono(o, tareaId) {
     const t = tonoDe(o, tareaId);
+    return t ? " pa-tono-" + t : "";
+  }
+
+  /** Tono de un ENTREGABLE: desplazado dos puestos respecto al de su tarea, así que
+      nunca es del mismo color que la tarea a la que cuelga. El marcador además es un
+      rombo, no un punto, para que se distinga aunque se imprima en blanco y negro. */
+  /** Tono de un ENTREGABLE: siempre el naranja del sistema (el mismo para todos).
+      Los entregables van en un color que ninguna tarea usa, y con rombo en vez de
+      punto: se distinguen de un vistazo y también impresos en blanco y negro. */
+  function tonoEntregable(o, tareaId) {
+    return 2;
+  }
+
+  function claseTonoEntregable(o, tareaId) {
+    const t = tonoEntregable(o, tareaId);
     return t ? " pa-tono-" + t : "";
   }
 
@@ -102,17 +120,18 @@
     const sId = (subtareaId !== undefined) ? subtareaId : (e._subtareaId || "");
     const ctx = contexto || e._contexto || "tarea";
     const at = ' data-id="' + id + '" data-tarea="' + tId + '" data-subtarea="' + sId + '"';
-    const etiqueta = ctx === "oferta"
-      ? '<span class="nz-badge nz-badge--accent">de la oferta</span>'
-      : (ctx === "subtarea" ? "" : '<span class="nz-badge nz-badge--neutral">de la tarea</span>');
-    return '<div class="pa-hito pa-hito--' + ctx + '" data-id="' + id + '" data-subtarea="' + sId + '">' +
-      '<span class="pa-tono-punto" title="Entregable"></span>' +
+    const etiqueta = ctx === "oferta" ? '<span class="nz-badge nz-badge--accent">de la oferta</span>' : "";
+    /* El color del entregable es el de su tarea desplazado: nunca coincide con ella,
+       y el marcador es un rombo (no un punto) para distinguirlo hasta en blanco y negro. */
+    const claseTono = (ctx !== "oferta" && PL.vistas.claseTonoEntregable)
+      ? PL.vistas.claseTonoEntregable(o, tId) : "";
+    return '<div class="pa-hito pa-hito--' + ctx + claseTono + '" data-id="' + id + '" data-subtarea="' + sId + '">' +
+      '<span class="pa-tono-rombo" title="Entregable"></span>' +
       '<span class="pa-hito__nombre"><input class="nz-input" data-campo="hito-nombre"' + at + ' value="' + N().esc(e.nombre) + '" placeholder="Nombre del entregable"></span>' +
       '<span class="pa-ahora pa-mini">◆</span>' +
       selectPeriodo(o, e.periodo, "hito-periodo", id, tId, sId) +
       etiqueta +
       selectPerfil(pf, e.responsablePerfilId, "hito-responsable", id, tId, "", sId) +
-      '<label class="pa-mini pa-ahora">horas <input class="nz-input nz-input--sm pa-input-corto" type="number" min="0" step="1" data-campo="hito-horas"' + at + ' value="' + (N().num(e.horas) || "") + '" title="Estimación orientativa: no suma al total"></label>' +
       '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="dup-entregable"' + at + ' title="Duplicar entregable">⧉</button>' +
       '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-entregable"' + at + ' title="Eliminar entregable">✕</button>' +
       '<span class="pa-hito__detalle">' +
@@ -171,6 +190,6 @@
     moneda: moneda, verImportes: verImportes, imp: imp, impSi: impSi, hor: hor,
     badgeOferta: badgeOferta, selectPeriodo: selectPeriodo, selectPerfil: selectPerfil, htmlEntregable: htmlEntregable,
     articulo: articulo, tabla: tabla, fila: fila, filaDato: filaDato, aviso: aviso, vacio: vacio, delta: delta,
-    tonoDe: tonoDe, claseTono: claseTono, TONOS: TONOS
+    tonoDe: tonoDe, claseTono: claseTono, tonoEntregable: tonoEntregable, claseTonoEntregable: claseTonoEntregable, TONOS: TONOS
   };
 })(typeof window !== "undefined" ? window : globalThis);

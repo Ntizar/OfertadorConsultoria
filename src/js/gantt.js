@@ -81,11 +81,15 @@
     const cols = P().columnas(o.periodos);
     const r = E().responsable(pf, e);
     const nivel = e._contexto === "subtarea" ? " · de la subtarea" : (e._contexto === "tarea" ? " · de la tarea" : " · de la oferta");
-    const titulo = e.nombre + " · entrega " + P().mesCorto(o.periodos, e.periodo) + (r ? " · " + r.nombre : "") + nivel;
-    return '<tr class="pa-gantt__fila pa-gantt__fila--entregable' + PL.vistas.claseTono(o, tareaId) + '">' +
+    const titulo = e.nombre + " · entrega " + P().mesCorto(o.periodos, e.periodo) + (r ? " · responsable: " + r.nombre : "") + nivel +
+      (e._subtareaId ? " · las horas las marca su subtarea" : "");
+    /* Un entregable no lleva horas: se muestran las de su subtarea, como referencia. */
+    const sub = e._subtareaId ? M.buscarSubtarea(o, e._subtareaId) : null;
+    const horas = sub ? C().subtareaHoras(sub.sub) : 0;
+    return '<tr class="pa-gantt__fila pa-gantt__fila--entregable' + PL.vistas.claseTonoEntregable(o, tareaId) + '">' +
       '<th class="pa-gantt__concepto" scope="row" title="' + N().esc(titulo) + '">' + N().esc(e.nombre) + "</th>" +
       celdasHito(cols, e.periodo) +
-      '<td class="pa-gantt__total">' + (N().num(e.horas) ? N().num(e.horas).toLocaleString("es-ES") + " h" : "—") + "</td></tr>";
+      '<td class="pa-gantt__total">' + (horas ? '<span class="pa-mini">(' + N().fmtNum(horas, 0) + " h)</span>" : "—") + "</td></tr>";
   }
 
   /** Con el calendario por semanas, una banda de trimestres: 52 columnas sin
@@ -108,18 +112,13 @@
         '<tr class="pa-gantt__anios"><th class="pa-gantt__concepto" rowspan="3" scope="col">Concepto</th>' + filaAnios +
         '<th class="pa-gantt__total" rowspan="3" scope="col">Horas</th></tr>' +
         tri +
-        '<tr class="pa-gantt__meses">' + cols.map(c => '<th scope="col"><input class="pa-gantt__rotulo' +
-          (P().estaEditada(o.periodos, c.periodos[0]) ? " pa-gantt__rotulo--editado" : "") + '" value="' + N().esc(c.etiqueta) +
-          '" data-campo="periodo-rotulo" data-id="' + c.periodos[0] + '" title="Clic para renombrar este periodo" ' +
-          'aria-label="Nombre del periodo"></th>').join("") +
+        '<tr class="pa-gantt__meses">' + cols.map(c => '<th scope="col">' +
+          N().esc(c.etiqueta) + "</th>").join("") +
         "</tr></thead>";
     }
     const filaMeses = cols.map(c => {
       const idx = c.periodos[0];
-      const editado = P().estaEditada(o.periodos, idx) ? " pa-gantt__rotulo--editado" : "";
-      return '<th scope="col"><input class="pa-gantt__rotulo' + editado + '" value="' + N().esc(c.etiqueta) + '" ' +
-        'data-campo="periodo-rotulo" data-id="' + idx + '" title="Clic para renombrar este periodo (' + N().esc(P().mesCorto(o.periodos, idx)) + ')" ' +
-        'aria-label="Nombre del periodo ' + (idx + 1) + '"></th>';
+      return '<th scope="col">' + N().esc(c.etiqueta) + "</th>";
     }).join("");
     return "<thead>" +
       '<tr class="pa-gantt__anios"><th class="pa-gantt__concepto" rowspan="2" scope="col">Concepto</th>' + filaAnios +
@@ -142,11 +141,6 @@
         N().lista(s.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "subtarea" }), t.id)));
       });
     });
-    const hitosOferta = N().lista(o.entregables);
-    if (hitosOferta.length) {
-      filas.push('<tr class="pa-gantt__fila"><th class="pa-gantt__concepto pa-mini pa-mini--fuerte" colspan="' + (cols.length + 2) + '" scope="row">Hitos de la oferta</th></tr>');
-      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }), null)));
-    }
 
     const totalHitos = E().todos(o).length;
     const nota = '<tr><td class="pa-gantt__nota pa-mini" colspan="' + (cols.length + 2) + '">' +
@@ -194,11 +188,6 @@
         N().lista(s.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "subtarea" }), t.id)));
       });
     });
-    const hitosOferta = N().lista(o.entregables);
-    if (hitosOferta.length) {
-      filas.push('<tr class="pa-gantt__fila"><th class="pa-gantt__concepto pa-mini pa-mini--fuerte" colspan="' + (cols.length + 2) + '" scope="row">Hitos de la oferta</th></tr>');
-      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }), null)));
-    }
     const colgroup = '<colgroup><col class="pa-gantt__col-concepto">' +
       cols.map(() => '<col style="width:2.6rem">').join("") + '<col class="pa-gantt__col-total"></colgroup>';
     return '<div class="pa-gantt-scroll pa-gantt--informe"><table class="pa-gantt">' + colgroup + cabeceraInforme(o) +

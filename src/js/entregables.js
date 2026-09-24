@@ -102,10 +102,6 @@
 
   /* ---------- Cifras de apoyo (estimaciones, NO suman al total) ---------- */
 
-  function horasEstimadas(o) { return N().suma(todos(o), e => N().num(e.horas)); }
-
-  function conHorasEstimadas(o) { return todos(o).filter(e => N().num(e.horas) > 0).length; }
-
   function porContexto(o) {
     const l = todos(o);
     return {
@@ -164,7 +160,7 @@
     todos: todos, deTarea: deTarea, deSubtarea: deSubtarea, deTareaCompleta: deTareaCompleta,
     porPeriodo: porPeriodo, dePeriodo: dePeriodo,
     cuentaPorPeriodo: cuentaPorPeriodo, proximo: proximo, ultimo: ultimo,
-    horasEstimadas: horasEstimadas, conHorasEstimadas: conHorasEstimadas, porContexto: porContexto,
+    porContexto: porContexto,
     responsable: responsable, etiquetaEntrega: etiquetaEntrega, posicion: posicion,
     dentroDeCalendario: dentroDeCalendario, moverAPeriodo: moverAPeriodo,
     marcadoresPorPeriodo: marcadoresPorPeriodo, esfuerzoEnPeriodo: esfuerzoEnPeriodo
