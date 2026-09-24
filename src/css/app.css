@@ -191,3 +191,76 @@ body.pa-sin-importes .pa-importe { display: none; }
   body { background: var(--nz-surface); }
   @page { margin: 14mm; }
 }
+
+/* ---------- Horas por perfil y mes ---------- */
+
+.pa-celda-horas { vertical-align: top; }
+.pa-celda__eq {
+  display: block; font-size: var(--nz-text-xs); color: var(--nz-text-soft); line-height: 1.15;
+  white-space: nowrap;
+}
+/* Quien pasa del 100 % de jornada se marca solo: nadie trabaja dos jornadas. */
+.pa-celda--exceso { background: var(--nz-warning-soft, var(--nz-warning-tint, #fff7ed)); }
+.pa-celda--exceso .pa-celda__eq { color: var(--nz-warning-strong, var(--nz-danger-strong, #b45309)); font-weight: 700; }
+.pa-celda--exceso input { border-color: var(--nz-warning-strong, var(--nz-warning, #f97316)); }
+.pa-fila--exceso .pa-celda-horas-h strong { color: var(--nz-warning-strong, #b45309); }
+
+/* ---------- Móvil: la tabla de horas se convierte en tarjetas por perfil ----------
+   Nada de arrastrar una tabla a lo ancho: cada perfil es una tarjeta y cada mes
+   una fila con su nombre delante y un campo grande (44 px, táctil). */
+@media (max-width: 720px) {
+  .pa-tabla-horas table, .pa-tabla-horas thead, .pa-tabla-horas tbody,
+  .pa-tabla-horas tr, .pa-tabla-horas th, .pa-tabla-horas td { display: block; width: auto; }
+
+  .pa-tabla-horas thead { display: none; }
+  .pa-tabla-horas tr {
+    border: 1px solid var(--nz-border); border-radius: var(--nz-radius-md);
+    padding: var(--nz-space-2); margin-bottom: var(--nz-space-2); background: var(--nz-surface);
+  }
+  .pa-tabla-horas td { border: 0; padding: 0.2rem 0; text-align: left; }
+  .pa-tabla-horas td[data-etiqueta] { display: flex; align-items: center; justify-content: space-between; gap: var(--nz-space-2); }
+  .pa-tabla-horas td[data-etiqueta]::before {
+    content: attr(data-etiqueta); flex: 0 0 5.4rem;
+    font-size: var(--nz-text-xs); color: var(--nz-text-soft); text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .pa-tabla-horas td[data-etiqueta] > * { flex: 1 1 auto; }
+  .pa-tabla-horas td[data-etiqueta="Perfil"]::before { display: none; }
+  .pa-tabla-horas td[data-etiqueta="Perfil"] { display: block; }
+  .pa-tabla-horas input[type="number"], .pa-tabla-horas select { min-height: 44px; font-size: var(--nz-text-md); width: 100%; }
+  .pa-tabla-horas .pa-celda__eq { flex: 0 0 5rem; text-align: right; }
+  .pa-tabla-horas td .nz-btn { min-height: 44px; min-width: 44px; }
+}
+
+/* ---------- Los cuatro pasos del trabajo ---------- */
+
+.pa-pasos {
+  display: grid; gap: var(--nz-space-2); margin-bottom: var(--nz-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+.pa-paso {
+  display: flex; align-items: center; gap: var(--nz-space-2);
+  padding: var(--nz-space-2) var(--nz-space-3);
+  border: 1px solid var(--nz-border); border-radius: var(--nz-radius-md);
+  background: var(--nz-surface-2, var(--nz-surface));
+}
+.pa-paso--hecho { border-color: var(--nz-accent); background: var(--nz-accent-soft); }
+.pa-paso__num {
+  flex: 0 0 auto; width: 1.7rem; height: 1.7rem; border-radius: var(--nz-radius-pill, 999px);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--nz-brand); color: var(--nz-on-brand, #fff); font-weight: 700; font-size: var(--nz-text-sm);
+}
+.pa-paso--hecho .pa-paso__num { background: var(--nz-accent); }
+.pa-paso__cuerpo { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.pa-paso__cuerpo strong { font-size: var(--nz-text-sm); }
+.pa-paso__ok { margin-left: auto; color: var(--nz-accent); font-weight: 700; }
+
+/* ---------- El Gantt dentro del informe ---------- */
+.pa-gantt--informe { border: 0; border-radius: 0; background: transparent; }
+.pa-gantt--informe .pa-gantt__concepto { min-width: 11rem; max-width: 15rem; font-size: 0.72rem; }
+.pa-gantt--informe .pa-gantt__rotulo, .pa-gantt--informe th { font-size: 0.68rem; }
+.pa-gantt--informe .pa-gantt__concepto-clic { cursor: default; }
+@media print {
+  .pa-gantt--informe { break-inside: avoid; }
+  .pa-gantt--informe .pa-gantt__concepto { min-width: 9rem; }
+}
+

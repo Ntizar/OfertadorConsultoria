@@ -70,9 +70,9 @@ async function main() {
 
   console.log("\n3. Calendario: meses legibles y editables");
   irA("trabajo");
-  const bandas = $$(".pa-gantt__anios th").map(t => t.textContent);
+  const bandas = $$("#tr-gantt .pa-gantt__anios th").map(t => t.textContent);
   check("banda de año con los dos años del proyecto", bandas.length === 4 && /20\d\d/.test(bandas[1]) && /20\d\d/.test(bandas[2]), bandas.join("|"));
-  const rotulos = $$(".pa-gantt__rotulo");
+  const rotulos = $$("#tr-gantt .pa-gantt__rotulo");
   check("una columna por mes con rótulo corto", rotulos.length === 6, rotulos.length);
   check("el rótulo NO repite el año", rotulos.every(r => !/\d{2,4}/.test(r.value)), rotulos.map(r => r.value).join(" "));
   check("rótulos en mayúsculas y 3-4 letras", rotulos.every(r => /^[A-ZÁÉÍÓÚ]{3,4}$/.test(r.value)), rotulos.map(r => r.value).join(" "));
@@ -84,19 +84,19 @@ async function main() {
   check("el contador de rótulos editados aparece en el calendario", $("#tr-calendario").innerHTML.indexOf("rótulo") > 0);
   check("el editor de horas usa el rótulo nuevo", $("#tr-editor").innerHTML.indexOf("Fase 1") > 0);
   cambia(rotulos[1], "Fase 1");
-  check("al salir del campo el Gantt se repinta con el rótulo nuevo", $$(".pa-gantt__rotulo")[1].value === "Fase 1");
+  check("al salir del campo el Gantt se repinta con el rótulo nuevo", $$("#tr-gantt .pa-gantt__rotulo")[1].value === "Fase 1");
   $('[data-acc="cal-rotulos-auto"]').click();
-  check("volver a los rótulos automáticos", window.PL.periodos.cuantasEditadas(api().periodos()) === 0 && $$(".pa-gantt__rotulo")[1].value === "NOV");
-  check("los rótulos automáticos vuelven a ser meses", /^[A-ZÁÉÍÓÚ]{3,4}$/.test($$(".pa-gantt__rotulo")[1].value));
+  check("volver a los rótulos automáticos", window.PL.periodos.cuantasEditadas(api().periodos()) === 0 && $$("#tr-gantt .pa-gantt__rotulo")[1].value === "NOV");
+  check("los rótulos automáticos vuelven a ser meses", /^[A-ZÁÉÍÓÚ]{3,4}$/.test($$("#tr-gantt .pa-gantt__rotulo")[1].value));
 
   /* Inicio, duración y desplazamiento */
   const inicio0 = api().periodos().inicio;
   cambia($("#cal-inicio"), "2027-01");
   check("cambiar el mes de inicio", api().periodos().inicio === "2027-01", api().periodos().inicio);
-  check("el Gantt refleja el nuevo inicio", $$(".pa-gantt__anios th").map(t => t.textContent).indexOf("2027") > 0);
+  check("el Gantt refleja el nuevo inicio", $$("#tr-gantt .pa-gantt__anios th").map(t => t.textContent).indexOf("2027") > 0);
   cambia($("#cal-n"), "10");
   check("cambiar la duración", api().periodos().n === 10, api().periodos().n);
-  check("el Gantt tiene ahora 10 columnas", $$(".pa-gantt__rotulo").length === 10, $$(".pa-gantt__rotulo").length);
+  check("el Gantt tiene ahora 10 columnas", $$("#tr-gantt .pa-gantt__rotulo").length === 10, $$("#tr-gantt .pa-gantt__rotulo").length);
   check("las horas de los periodos nuevos están a cero", api().horas() > 0 && api().oferta().tareas.every(t => t.subtareas.every(s => s.lineas.every(l => l.horas.p9 !== undefined))));
   cambia($("#cal-n"), "6");
   cambia($("#cal-inicio"), inicio0);
@@ -105,32 +105,32 @@ async function main() {
   $('[data-acc="cal-antes"]').click();
   check("desplazar atrás lo devuelve", api().periodos().inicio === inicio0, api().periodos().inicio);
   $('[data-acc="cal-zoom"]').click();
-  check("zoom a trimestres", api().periodos().zoom === "trimestre" && $$(".pa-gantt__rotulo").length === 2, $$(".pa-gantt__rotulo").length);
-  check("los rótulos de trimestre son T1..T4", $$(".pa-gantt__rotulo").every(r => /^T\d$/.test(r.value)), $$(".pa-gantt__rotulo").map(r => r.value).join(" "));
+  check("zoom a trimestres", api().periodos().zoom === "trimestre" && $$("#tr-gantt .pa-gantt__rotulo").length === 2, $$("#tr-gantt .pa-gantt__rotulo").length);
+  check("los rótulos de trimestre son T1..T4", $$("#tr-gantt .pa-gantt__rotulo").every(r => /^T\d$/.test(r.value)), $$("#tr-gantt .pa-gantt__rotulo").map(r => r.value).join(" "));
   $('[data-acc="cal-zoom"]').click();
-  check("zoom de vuelta a meses", api().periodos().zoom === "mes" && $$(".pa-gantt__rotulo").length === 6);
+  check("zoom de vuelta a meses", api().periodos().zoom === "mes" && $$("#tr-gantt .pa-gantt__rotulo").length === 6);
 
   console.log("\n4. Gantt: barras y entregables");
-  check("hay una fila por tarea", $$(".pa-gantt__fila--tarea").length === 2, $$(".pa-gantt__fila--tarea").length);
-  check("hay filas de subtarea", $$(".pa-gantt__fila--subtarea").length === 4, $$(".pa-gantt__fila--subtarea").length);
-  check("hay una fila por entregable", $$(".pa-gantt__fila--entregable").length === 5, $$(".pa-gantt__fila--entregable").length);
+  check("hay una fila por tarea", $$("#tr-gantt .pa-gantt__fila--tarea").length === 2, $$("#tr-gantt .pa-gantt__fila--tarea").length);
+  check("hay filas de subtarea", $$("#tr-gantt .pa-gantt__fila--subtarea").length === 4, $$("#tr-gantt .pa-gantt__fila--subtarea").length);
+  check("hay una fila por entregable", $$("#tr-gantt .pa-gantt__fila--entregable").length === 5, $$("#tr-gantt .pa-gantt__fila--entregable").length);
   check("hay barras de esfuerzo", $$(".pa-barra:not(.pa-barra--hito)").length > 5);
-  const rombos = $$(".pa-barra--hito");
+  const rombos = $$("#tr-gantt .pa-barra--hito");
   check("hay un rombo por entregable", rombos.length === 5, rombos.length);
-  const filaTarea = $(".pa-gantt__fila--tarea");
+  const filaTarea = $("#tr-gantt .pa-gantt__fila--tarea");
   check("las horas por fila van a la derecha", /h$/.test(filaTarea.querySelector(".pa-gantt__total").textContent.trim()), filaTarea.querySelector(".pa-gantt__total").textContent);
-  check("el Gantt tiene su nota explicativa", $(".pa-gantt__nota").textContent.indexOf("◆") >= 0);
+  check("el Gantt tiene su nota explicativa", $("#tr-gantt .pa-gantt__nota").textContent.indexOf("◆") >= 0);
 
   console.log("\n5. Estructura: tareas, subtareas, horas y entregables");
   const nT = $$(".pa-tarea").length;
   $('[data-acc="nueva-tarea"]').click();
-  check("＋ Añadir tarea", $$(".pa-tarea").length === nT + 1 && $$(".pa-gantt__fila--tarea").length === 3);
+  check("＋ Añadir tarea", $$(".pa-tarea").length === nT + 1 && $$("#tr-gantt .pa-gantt__fila--tarea").length === 3);
   const ultima = $$(".pa-tarea").pop();
   ultima.querySelector('[data-acc="nueva-sub"]').click();
   check("＋ Subtarea", $$(".pa-tarea").pop().querySelectorAll(".pa-sub").length === 1);
   $$(".pa-tarea").pop().querySelector('[data-acc="nuevo-entregable-tarea"]').click();
   check("＋ Entregable de tarea", $$(".pa-tarea").pop().querySelectorAll(".pa-hito").length === 1);
-  check("el entregable nuevo aparece también en el Gantt", $$(".pa-gantt__fila--entregable").length === 6, $$(".pa-gantt__fila--entregable").length);
+  check("el entregable nuevo aparece también en el Gantt", $$("#tr-gantt .pa-gantt__fila--entregable").length === 6, $$("#tr-gantt .pa-gantt__fila--entregable").length);
 
   const linea = $('[data-campo="linea-perfil"]');
   check("＋ Perfil añade una línea de horas", !!linea);
@@ -151,10 +151,73 @@ async function main() {
   const periodoAntes = api().oferta().tareas.slice(-1)[0].entregables[0].periodo;
   cambia(selPeriodo, String(api().periodos().n - 1));
   check("mover un entregable de mes", api().oferta().tareas.slice(-1)[0].entregables[0].periodo === api().periodos().n - 1, periodoAntes + " → " + api().oferta().tareas.slice(-1)[0].entregables[0].periodo);
-  check("el rombo se mueve en el Gantt", $$(".pa-gantt__fila--entregable").pop().querySelectorAll(".pa-barra--hito").length === 1);
+  check("el rombo se mueve en el Gantt", $$("#tr-gantt .pa-gantt__fila--entregable").pop().querySelectorAll(".pa-barra--hito").length === 1);
 
   $$(".pa-tarea").pop().querySelector('[data-acc="elim-tarea"]').click();
-  check("✕ Eliminar tarea (con sus filas del Gantt)", $$(".pa-tarea").length === nT && $$(".pa-gantt__fila--tarea").length === 2);
+  check("✕ Eliminar tarea (con sus filas del Gantt)", $$(".pa-tarea").length === nT && $$("#tr-gantt .pa-gantt__fila--tarea").length === 2);
+
+  console.log("\n5 bis. Dedicación en % y control del 100 %");
+
+  /* Vuelta al modo % (por defecto) y comprobación de la conversión a horas */
+  irA("trabajo");
+  check("las horas se teclean en % de jornada por defecto",
+    !!$('[data-acc="modo-horas"][data-modo="pct"]') && !!$('[data-acc="modo-horas"][data-modo="h"]'));
+  $('[data-acc="abrir-todo"]').click();
+  const celdaPct = $('.pa-celda-horas input[data-campo="horas"][data-modo="pct"]');
+  check("las celdas de mes piden dedicación", !!celdaPct);
+  check("la cabecera de cada mes dice la unidad", $("#tr-editor").innerHTML.indexOf(">%<") > 0);
+  const filaPct = celdaPct.closest("tr");
+  const lineaId = celdaPct.dataset.id;
+  const mesPct = celdaPct.dataset.mes;
+  const rl = window.PL.modelo.buscarLinea(api().oferta(), lineaId);
+  rl.linea.perfilId = api().perfiles()[0].id;           /* un perfil concreto para poder medir */
+  escribe(celdaPct, "50");
+  const horas50 = rl.linea.horas["p" + mesPct];
+  const labMes = window.PL.calculo.horasLaborablesMes(api().oferta(), Number(mesPct));
+  check("escribir 50 % guarda media jornada de ese mes en horas",
+    Math.abs(horas50 - labMes / 2) < 0.02, "50 % de " + labMes + " h = " + horas50);
+  check("el equivalente en horas se ve al lado de lo tecleado",
+    /\d/.test(filaPct.querySelector(".pa-celda__eq").textContent), filaPct.querySelector(".pa-celda__eq").textContent);
+  check("el equivalente aparece también al pie de la tabla",
+    $("#tr-editor").innerHTML.indexOf("dedicación") > 0);
+
+  /* Pasarse del 100 % tiene que avisar */
+  escribe(celdaPct, "150");
+  await espera(420);
+  check("pasarse del 100 % marca la celda", !!filaPct.querySelector(".pa-celda--exceso"));
+  check("y sale el aviso arriba del editor", $(".pa-aviso-excesos") !== null, "aviso de exceso");
+  check("el aviso nombra el perfil y el mes", /%/.test($(".pa-aviso-excesos").textContent));
+  escribe(celdaPct, "50");
+  await espera(420);
+  check("al volver por debajo del 100 % el aviso desaparece", $(".pa-aviso-excesos") === null);
+
+  /* Modo horas: se teclea directo */
+  $('[data-acc="modo-horas"][data-modo="h"]').click();
+  const celdaH = $('.pa-celda-horas input[data-campo="horas"][data-modo="h"]');
+  check("el botón cambia a modo horas", !!celdaH);
+  escribe(celdaH, "100");
+  const rl2 = window.PL.modelo.buscarLinea(api().oferta(), celdaH.dataset.id);
+  check("en modo horas se guarda lo tecleado tal cual", rl2.linea.horas["p" + celdaH.dataset.mes] === 100);
+  $('[data-acc="modo-horas"][data-modo="pct"]').click();
+
+  console.log("\n5 ter. Los cuatro pasos del trabajo");
+  check("hay cuatro pasos, en orden", $$(".pa-paso").length === 4, $$(".pa-paso").length);
+  const titulosPasos = $$(".pa-paso strong").map(e => e.textContent);
+  check("el orden es tareas → entregables → perfiles → horas",
+    titulosPasos.join(" | ") === "Tareas y subtareas | Entregables | Perfiles del equipo | Horas por perfil y mes",
+    titulosPasos.join(" | "));
+  check("los pasos hechos se marcan", $$(".pa-paso--hecho").length >= 3, $$(".pa-paso--hecho").length);
+
+  console.log("\n5 quater. El calendario dentro del informe");
+  irA("informe");
+  check("el informe incluye la sección de calendario", $("#informe-cuerpo").innerHTML.indexOf("Calendario y entregas") > 0);
+  check("con su diagrama de Gantt", $("#informe-cuerpo").querySelector(".pa-gantt--informe") !== null);
+  check("el Gantt del informe trae barras y rombos de entrega",
+    $("#informe-cuerpo").querySelectorAll(".pa-barra").length > 5 && $("#informe-cuerpo").querySelectorAll(".pa-barra--hito").length > 0);
+  check("y la banda de años", $("#informe-cuerpo").querySelectorAll(".pa-gantt__anios th").length >= 2);
+  check("el informe NO tiene campos editables en el calendario",
+    $("#informe-cuerpo").querySelectorAll(".pa-gantt--informe input").length === 0);
+  irA("trabajo");
 
   console.log("\n6. TODO CONECTADO: un cambio se ve en todas las vistas");
   irA("trabajo");
@@ -247,6 +310,24 @@ async function main() {
   await espera(300);
   check("el descuento fijo se aplica", Math.abs(window.PL.calculo.descuentoImporte(api().oferta(), api().perfiles()) - 500) < 0.005);
 
+  console.log("\n9 bis. Jornada configurable");
+  irA("oferta");
+  check("la pestaña Oferta trae la jornada", $("#ofe-datos").innerHTML.indexOf("Jornada de trabajo") > 0);
+  const lab0 = window.PL.calculo.horasLaborablesTotal(api().oferta());
+  escribe($('[data-campo="jornada-horas"]'), "4");
+  const lab4 = window.PL.calculo.horasLaborablesTotal(api().oferta());
+  check("bajar a 4 h/día deja la jornada a la mitad", Math.abs(lab4 - lab0 / 2) < 0.02, lab0 + " → " + lab4);
+  check("y se ve en el propio texto del bloque", $("#ofe-datos").innerHTML.indexOf("4") > 0);
+  escribe($('[data-campo="jornada-horas"]'), "8");
+  let chkSab = $$('[data-campo="jornada-dia"]')[5];
+  chkSab.checked = true; chkSab.dispatchEvent(new window.Event("change", { bubbles: true }));
+  check("trabajar los sábados sube las horas laborables", window.PL.calculo.horasLaborablesTotal(api().oferta()) > lab0);
+  /* El repintado reemplaza los nodos: hay que volver a coger el checkbox. */
+  chkSab = $$('[data-campo="jornada-dia"]')[5];
+  check("el repintado deja los días como estaban", chkSab.checked);
+  chkSab.checked = false; chkSab.dispatchEvent(new window.Event("change", { bubbles: true }));
+  check("y quitarlo las devuelve a su sitio", Math.abs(window.PL.calculo.horasLaborablesTotal(api().oferta()) - lab0) < 0.02);
+
   console.log("\n10. Importes ocultos, ofertas y ajustes");
   const conImp = $("#kpi-total").textContent;
   $('[data-acc="toggle-importes"]').click();
@@ -266,7 +347,7 @@ async function main() {
   const selOf = $("#pa-sel-oferta");
   selOf.value = selOf.options[0].value;
   selOf.dispatchEvent(new window.Event("change", { bubbles: true }));
-  check("cambiar de oferta activa repinta todo", $("#kpi-total").textContent.indexOf("€") > 0 && $$(".pa-gantt__fila--tarea").length > 0);
+  check("cambiar de oferta activa repinta todo", $("#kpi-total").textContent.indexOf("€") > 0 && $$("#tr-gantt .pa-gantt__fila--tarea").length > 0);
 
   irA("ajustes");
   check("bloque de marca", $("#ajustes-cuerpo").innerHTML.indexOf("Nombre de la marca") > 0);
@@ -318,7 +399,7 @@ async function main() {
   const subtotal = t.window.PL.calculo.subtotalOferta(t.window.Planifica.oferta(), t.window.Planifica.perfiles());
   check("el encargo real cuadra al céntimo (587.009,36)", Math.abs(subtotal - 587009.36) < 0.005, subtotal);
   check("el Gantt del encargo tiene 4 tareas y 14 columnas",
-    dt.querySelectorAll(".pa-gantt__fila--tarea").length === 4 && dt.querySelectorAll(".pa-gantt__rotulo").length === 14);
+    dt.querySelectorAll("#tr-gantt .pa-gantt__fila--tarea").length === 4 && dt.querySelectorAll("#tr-gantt .pa-gantt__rotulo").length === 14);
 
   /* En Ajustes queda la nota, en lenguaje llano */
   dt.querySelector('#pa-tabs .nz-tabs__tab[data-tab="ajustes"]').click();

@@ -65,8 +65,13 @@
       case "horas": {
         const r = M().buscarLinea(of, el.dataset.id);
         if (!r) return;
+        const i = N().num(el.dataset.mes);
+        const v = N().acota(el.value, 0, 1e6);
+        /* En modo % lo tecleado es dedicación: se convierte a horas con la jornada
+           del mes (horas/día × días laborables). Las horas siguen siendo el dato. */
+        const horas = el.dataset.modo === "pct" ? C().horasDePct(of, i, v) : v;
         r.linea.horas = r.linea.horas || {};
-        r.linea.horas["p" + el.dataset.mes] = N().acota(el.value, 0, 1e6);
+        r.linea.horas["p" + i] = N().acota(horas, 0, 1e6);
         V().trabajo.actualizarFilaHoras(of, pf(), r.linea, el.closest("tr"));
         R().datos();
         APP().guardar();
@@ -146,6 +151,14 @@
       }
 
       /* Números de la oferta */
+      case "jornada-horas": {
+        const j = PL.modelo.normalizarJornada(of.jornada);
+        j.horasDia = N().acota(el.value, 0.5, 24);
+        of.jornada = j;
+        R().todo(); APP().guardar();
+        return;
+      }
+
       case "oferta-validez": of.validezDias = N().acota(el.value, 0, 3650); R().datos(); APP().guardar(); return;
       case "oferta-fecha": of.fecha = el.value; R().datos(); APP().guardar(); return;
       case "oferta-impuesto-tasa": of.impuestos.tasa = N().acota(el.value, 0, 100); R().datos(); APP().guardar(); return;
@@ -186,6 +199,18 @@
     if (!of) return;
 
     switch (campo) {
+      case "jornada-dia": {
+        const j = PL.modelo.normalizarJornada(of.jornada);
+        const dia = N().num(el.dataset.dia);
+        j.diasSemana = el.checked
+          ? j.diasSemana.concat([dia]).sort((a, b) => a - b)
+          : j.diasSemana.filter(d => d !== dia);
+        if (!j.diasSemana.length) { APP().toast("Tiene que quedar al menos un día de trabajo"); el.checked = true; return; }
+        of.jornada = j;
+        R().todo(); APP().guardar();
+        return;
+      }
+
       case "cal-inicio": {
         of.periodos = P().conInicio(of.periodos, el.value);
         R().todo(); APP().guardar();

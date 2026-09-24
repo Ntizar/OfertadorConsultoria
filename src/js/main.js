@@ -41,6 +41,13 @@
     },
     pf: function () { return (app.ESTADO && app.ESTADO.perfiles) || []; },
     moneda: function () { return (app.ESTADO && app.ESTADO.marca && app.ESTADO.marca.moneda) || "€"; },
+    /** Cómo se teclean las horas: en dedicación (%) o en horas. Las horas siempre
+        son el dato guardado; el % es la puerta de entrada cómoda. */
+    modoHoras: function () { return (app.ESTADO && app.ESTADO.ui && app.ESTADO.ui.modoHoras) === "h" ? "h" : "pct"; },
+    conModoHoras: function (m) {
+      app.ESTADO.ui = app.ESTADO.ui || {};
+      app.ESTADO.ui.modoHoras = (m === "h") ? "h" : "pct";
+    },
     verImportes: function () { return !!(app.ESTADO && app.ESTADO.mostrarImportes); },
     pestana: function (n) { if (n) mostrarPestana(n); return pestanaActual; },
 

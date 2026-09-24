@@ -137,8 +137,41 @@
       "<tbody>" + filas.join("") + nota + "</tbody></table></div>";
   }
 
+  /** Cabecera estática para el informe: años + periodos como texto. */
+  function cabeceraInforme(o) {
+    const cols = P().columnas(o.periodos);
+    const bandas = P().bandas(o.periodos);
+    const filaAnios = bandas.map(b => '<th colspan="' + b.n + '" scope="colgroup">' + b.anio + "</th>").join("");
+    const filaMeses = cols.map(c => "<th scope=\"col\">" + N().esc(c.etiqueta) + "</th>").join("");
+    return "<thead>" +
+      '<tr class="pa-gantt__anios"><th class="pa-gantt__concepto" rowspan="2" scope="col">Concepto</th>' + filaAnios +
+      '<th class="pa-gantt__total" rowspan="2" scope="col">Horas</th></tr>' +
+      '<tr class="pa-gantt__meses">' + filaMeses + "</tr></thead>";
+  }
+
+  /** El Gantt tal como va en el informe: mismo diagrama, sin campos editables. */
+  function htmlInforme(o, pf) {
+    if (!o) return "";
+    const cols = P().columnas(o.periodos);
+    const filas = [];
+    N().lista(o.tareas).forEach(t => {
+      filas.push(filaTarea(o, pf, t));
+      N().lista(t.entregables).forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "tarea" }))));
+      N().lista(t.subtareas).forEach(s => filas.push(filaSubtarea(o, pf, s)));
+    });
+    const hitosOferta = N().lista(o.entregables);
+    if (hitosOferta.length) {
+      filas.push('<tr class="pa-gantt__fila"><th class="pa-gantt__concepto pa-mini pa-mini--fuerte" colspan="' + (cols.length + 2) + '" scope="row">Hitos de la oferta</th></tr>');
+      hitosOferta.forEach(e => filas.push(filaEntregable(o, pf, Object.assign({}, e, { _contexto: "oferta" }))));
+    }
+    const colgroup = '<colgroup><col class="pa-gantt__col-concepto">' +
+      cols.map(() => '<col style="width:2.6rem">').join("") + '<col class="pa-gantt__col-total"></colgroup>';
+    return '<div class="pa-gantt-scroll pa-gantt--informe"><table class="pa-gantt">' + colgroup + cabeceraInforme(o) +
+      "<tbody>" + filas.join("") + "</tbody></table></div>";
+  }
+
   PL.gantt = {
-    html: html, columnasActivas: columnasActivas,
+    html: html, htmlInforme: htmlInforme, columnasActivas: columnasActivas,
     valoresDeTarea: valoresDeTarea, valoresDeSubtarea: valoresDeSubtarea,
     celdasBarra: celdasBarra, celdasHito: celdasHito
   };

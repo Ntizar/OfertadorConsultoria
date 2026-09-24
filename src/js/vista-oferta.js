@@ -107,10 +107,30 @@
   function render() {
     const V2 = V(), o = APP().pr(), pf = APP().pf();
     if (!o) { ["ofe-datos", "ofe-gastos", "ofe-economia"].forEach(id => V2.vaciar(id)); return; }
-    V2.escribir("ofe-datos", datos(o));
+    V2.escribir("ofe-datos", datos(o) + bloqueJornada(o));
     V2.escribir("ofe-gastos", gastos(o));
     V2.escribir("ofe-economia", economia(o, pf));
   }
 
-  PL.vistas.oferta = { render: render };
+  /** Jornada: es lo que convierte dedicación (%) en horas. Va con la oferta para
+      que el cálculo viaje con ella. */
+  function bloqueJornada(o) {
+    const V2 = V();
+    const j = C().jornada(o);
+    const DIAS = [[1, "L"], [2, "M"], [3, "X"], [4, "J"], [5, "V"], [6, "S"], [7, "D"]];
+    return V2.articulo("Jornada de trabajo",
+      '<div class="pa-fila">' +
+        '<label class="pa-mini pa-ahora">Horas por día ' +
+          '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0.5" max="24" step="0.5" ' +
+          'data-campo="jornada-horas" value="' + N().fmtNum(j.horasDia) + '"></label>' +
+        '<span class="pa-mini">Días que se trabaja</span>' +
+        DIAS.map(d => '<label class="pa-mini pa-ahora"><input type="checkbox" data-campo="jornada-dia" data-dia="' + d[0] + '"' +
+          (j.diasSemana.indexOf(d[0]) >= 0 ? " checked" : "") + "> " + d[1] + "</label>").join("") +
+      "</div>" +
+      '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Con esto se calculan las horas laborables de cada mes (' +
+        Math.round(C().horasLaborablesTotal(o)).toLocaleString("es-ES") + " h en el calendario actual) y, por tanto, " +
+        "lo que significa una dedicación del 50 % o del 100 %.</p>");
+  }
+
+  PL.vistas.oferta = { render: render, bloqueJornada: bloqueJornada };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -24,6 +24,7 @@
     const V2 = V();
     const per = o.periodos;
     const editados = P().cuantasEditadas(per);
+    const enPct = APP().modoHoras() === "pct";
     return '<div class="pa-calendario">' +
       '<span class="pa-calendario__dato"><label class="pa-mini" for="cal-inicio">Empieza en</label>' +
         '<input class="nz-input nz-input--sm pa-input-fecha" type="month" id="cal-inicio" data-campo="cal-inicio" value="' + N().esc(per.inicio) + '"></span>' +
@@ -35,6 +36,9 @@
       '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="cal-zoom" title="Ver por meses o por trimestres">' +
         (per.zoom === "mes" ? "🗓 Ver por trimestres" : "🗓 Ver por meses") + "</button>" +
       (editados ? '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="cal-rotulos-auto" title="Devolver los rótulos automáticos">↺ ' + editados + ' rótulo(s)</button>' : "") +
+      '<span class="pa-calendario__dato"><span class="pa-mini">Las horas se teclean en</span>' +
+        '<button class="nz-btn nz-btn--sm ' + (enPct ? "nz-btn--primary" : "nz-btn--soft") + '" data-acc="modo-horas" data-modo="pct" title="Teclear dedicación: 50 = media jornada ese mes">% jornada</button>' +
+        '<button class="nz-btn nz-btn--sm ' + (enPct ? "nz-btn--soft" : "nz-btn--primary") + '" data-acc="modo-horas" data-modo="h" title="Teclear horas directamente">horas</button></span>' +
       '<span class="pa-espacio"></span>' +
       '<span class="pa-calendario__duracion pa-ahora">' + N().esc(P().duracionLegible(per)) + "</span>" +
       '<span class="pa-mini pa-ahora">' + C().ofertaHoras(o).toLocaleString("es-ES") + " h" +
@@ -71,37 +75,67 @@
       E().deTarea(o, t).map(e => V2.htmlEntregable(o, pf, e, "tarea", t.id)).join("");
   }
 
+  /** Horas de cada perfil y mes. Se teclean en % de jornada o en horas (según el
+      modo), el equivalente va siempre debajo y se marca en rojo quien pasa del
+      100 % —nadie puede estar más de una jornada completa a la vez. */
   function tablaLineas(o, pf, s) {
     const V2 = V();
     const cols = P().columnas(o.periodos);
     const conImp = V2.verImportes();
-    const cabecera = "<tr><th>Perfil</th>" + cols.map(c => '<th class="nz-table__right">' + N().esc(c.etiqueta) + "</th>").join("") +
-      '<th class="nz-table__right">Horas</th>' + (conImp ? '<th class="nz-table__right pa-col-importe">Importe</th>' : "") + "<th></th></tr>";
+    const enPct = APP().modoHoras() === "pct";
+    const unidad = enPct ? "%" : "h";
 
-    const filas = N().lista(s.lineas).map(l =>
-      '<tr data-id="' + l.id + '">' +
-        '<td><select class="nz-input nz-input--sm" data-campo="linea-perfil" data-id="' + l.id + '" aria-label="Perfil" style="min-width:150px">' +
+    const cabecera = "<tr><th>Perfil</th>" +
+      cols.map(c => {
+        const lab = c.periodos.reduce((s2, k) => s2 + C().horasLaborablesMes(o, k), 0);
+        return '<th class="nz-table__right" title="' + Math.round(lab) + ' h laborables">' + N().esc(c.etiqueta) +
+          '<br><span class="pa-mini">' + unidad + "</span></th>";
+      }).join("") +
+      '<th class="nz-table__right">Horas</th>' +
+      (conImp ? '<th class="nz-table__right pa-col-importe">Importe</th>' : "") + "<th></th></tr>";
+
+    const filas = N().lista(s.lineas).map(l => {
+      let exceso = false;
+      const celdas = cols.map(c => {
+        const idx = c.periodos[0];
+        const h = c.periodos.reduce((s2, i) => s2 + N().num(((l.horas) || {})["p" + i]), 0);
+        const lab = c.periodos.reduce((s2, i) => s2 + C().horasLaborablesMes(o, i), 0);
+        const pct = lab > 0 ? N().r2(h / lab * 100) : 0;
+        const pctMax = c.periodos.reduce((mx, i) => Math.max(mx, C().pctPerfilEnMes(o, l.perfilId, i)), 0);
+        const pasado = !!(l.perfilId && pctMax > 100.005);
+        if (pasado) exceso = true;
+        const ayuda = V2.hor(h) + " · " + N().fmtNum(pct) + " % de " + Math.round(lab) + " h laborables" +
+          (pasado ? " — MÁS DEL 100 %" : "");
+        const eq = h > 0 ? (enPct ? V2.hor(h) : N().fmtNum(pct) + " %") : "";
+        const clase = "nz-table__num nz-table__right pa-celda-horas" + (pasado ? " pa-celda--exceso" : "");
+        const eti = ' data-etiqueta="' + N().esc(c.etiqueta) + '" title="' + N().esc(ayuda) + '"';
+        if (c.periodos.length === 1) {
+          return "<td class=\"" + clase + "\"" + eti + ">" +
+            '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0" step="' + (enPct ? "5" : "0.5") + '" ' +
+            'value="' + (h > 0 ? N().fmtNum(enPct ? pct : h) : "") + '" placeholder="0" data-campo="horas" ' +
+            'data-modo="' + (enPct ? "pct" : "h") + '" data-id="' + l.id + '" data-mes="' + idx + '" ' +
+            'aria-label="' + N().esc("Horas en " + c.etiqueta) + '">' +
+            '<span class="pa-celda__eq">' + eq + "</span></td>";
+        }
+        return "<td class=\"" + clase + "\"" + eti + ">" + (h > 0 ? "<span>" + N().fmtNum(pct) + " %</span>" : "") + "</td>";
+      }).join("");
+
+      return '<tr data-id="' + l.id + '"' + (exceso ? ' class="pa-fila--exceso"' : "") + ">" +
+        '<td data-etiqueta="Perfil"><select class="nz-input nz-input--sm" data-campo="linea-perfil" data-id="' + l.id + '" aria-label="Perfil" style="min-width:150px">' +
           '<option value=""' + (!l.perfilId ? " selected" : "") + ' disabled>— Elige perfil —</option>' +
           N().lista(pf).map(p => '<option value="' + p.id + '"' + (p.id === l.perfilId ? " selected" : "") + ">" + N().esc(p.nombre) + "</option>").join("") +
-        "</select></td>" +
-        cols.map(c => {
-          const idx = c.periodos[0];
-          const valor = c.periodos.reduce((s2, i) => s2 + N().num(((l.horas) || {})["p" + i]), 0);
-          if (c.periodos.length === 1) {
-            return '<td class="nz-table__num nz-table__right"><input class="nz-input nz-input--sm pa-input-num" type="number" min="0" step="0.5" ' +
-              'value="' + (valor || "") + '" placeholder="0" data-campo="horas" data-id="' + l.id + '" data-mes="' + idx + '" ' +
-              'aria-label="Horas en ' + N().esc(c.etiqueta) + '"></td>';
-          }
-          return '<td class="nz-table__num nz-table__right" title="Suma del trimestre"><span class="pa-mini">' + (valor || "·") + "</span></td>";
-        }).join("") +
-        '<td class="nz-table__num nz-table__right pa-celda-horas-h"><strong>' + V2.hor(C().lineaHoras(l)) + "</strong></td>" +
-        (conImp ? '<td class="nz-table__num nz-table__right pa-importe pa-celda-importe">' + V2.imp(C().lineaImporte(l, pf)) + "</td>" : "") +
-        '<td><button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-linea" data-id="' + l.id + '" title="Quitar perfil">✕</button></td>' +
-      "</tr>").join("");
+        "</select></td>" + celdas +
+        '<td class="nz-table__num nz-table__right pa-celda-horas-h" data-etiqueta="Total"><strong>' + V2.hor(C().lineaHoras(l)) + "</strong></td>" +
+        (conImp ? '<td class="nz-table__num nz-table__right pa-importe pa-celda-importe" data-etiqueta="Importe">' + V2.imp(C().lineaImporte(l, pf)) + "</td>" : "") +
+        '<td data-etiqueta=""><button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-linea" data-id="' + l.id + '" title="Quitar perfil">✕</button></td>' +
+      "</tr>";
+    }).join("");
 
     return '<div class="pa-tabla-horas"><table class="nz-table nz-table--compact"><thead>' + cabecera + "</thead><tbody>" +
       (filas || '<tr><td colspan="' + (cols.length + 3) + '"><span class="pa-mini">Sin perfiles: añade el primero con «＋ Perfil».</span></td></tr>') +
-      "</tbody></table></div>";
+      "</tbody></table>" +
+      (enPct ? '<p class="pa-mini">Escribes <strong>dedicación</strong>: 50 = media jornada ese mes. Al lado tienes las horas que salen con la jornada de ' +
+        N().fmtNum(C().jornada(o).horasDia) + " h/día.</p>" : "") + "</div>";
   }
 
   function subtareas(o, pf, t) {
@@ -188,11 +222,48 @@
     V2.escribir("tr-gantt", PL.gantt.html(o, APP().pf()));
   }
 
+  /** Aviso de oferta: perfiles por encima del 100 % de jornada en algún mes. */
+  function avisoExcesos(o, pf) {
+    const exc = C().excesosPerfil(o);
+    if (!exc.length) return "";
+    const detalle = exc.slice(0, 5).map(e => {
+      const p = C().perfilPorId(pf, e.perfilId);
+      return N().esc(p ? p.nombre : "?") + " en " + N().esc(P().mesCorto(o.periodos, e.periodo)) +
+        ": " + V().hor(e.horas) + " (" + N().fmtNum(e.pct) + " %)";
+    }).join(" · ");
+    return V().aviso("warning", "<strong>Alguien pasa del 100 % de jornada.</strong> " + detalle +
+      (exc.length > 5 ? " …" : "") +
+      ' <span class="pa-mini">Nadie puede estar más de una jornada completa el mismo mes: reparte esas horas con otro perfil o muévelas de mes.</span>');
+  }
+
+  /** Los cuatro pasos del trabajo, en el orden en que se hace una oferta:
+      tareas → entregables → perfiles → horas. Con el avance de cada uno a la vista. */
+  function pasos(o, pf) {
+    const t = N().lista(o.tareas);
+    const nSub = t.reduce((s, x) => s + N().lista(x.subtareas).length, 0);
+    const nEnt = E().todos(o).length;
+    const nPerf = Object.keys(C().horasPorPerfil(o)).length;
+    const h = C().ofertaHoras(o);
+    const paso = (n, titulo, detalle, hecho) =>
+      '<div class="pa-paso' + (hecho ? " pa-paso--hecho" : "") + '">' +
+        '<span class="pa-paso__num">' + n + "</span>" +
+        '<span class="pa-paso__cuerpo"><strong>' + titulo + "</strong>" +
+        '<span class="pa-mini">' + detalle + "</span></span>" +
+        (hecho ? '<span class="pa-paso__ok" aria-hidden="true">✓</span>' : "") +
+      "</div>";
+    return '<div class="pa-pasos">' +
+      paso(1, "Tareas y subtareas", t.length + " tareas · " + nSub + " subtareas", t.length > 0) +
+      paso(2, "Entregables", nEnt + " entregables", nEnt > 0) +
+      paso(3, "Perfiles del equipo", nPerf + " en uso · " + N().lista(pf).length + " en el catálogo", nPerf > 0) +
+      paso(4, "Horas por perfil y mes", V().hor(h) + " · " + P().duracionLegible(o.periodos), h > 0) +
+      "</div>";
+  }
+
   function renderEditor() {
     const V2 = V(), o = APP().pr();
     if (!o) { V2.vaciar("tr-editor"); return; }
     const pf = APP().pf();
-    V2.escribir("tr-editor", plantillas(o) +
+    V2.escribir("tr-editor", avisoExcesos(o, pf) + pasos(o, pf) + plantillas(o) +
       V2.articulo("Estructura de la oferta", editor(o, pf),
         '<div class="pa-fila" style="margin-bottom:var(--nz-space-3)">' +
           '<button class="nz-btn nz-btn--primary" data-acc="nueva-tarea">＋ Añadir tarea</button>' +
@@ -204,14 +275,46 @@
         "</div>"));
   }
 
+  let T_EXCESOS = null;
+
   /** Tras teclear horas: se actualiza la fila en el sitio y se repinta el resto. */
   function actualizarFilaHoras(o, pf, linea, tr) {
     if (!tr) return;
     const V2 = V();
+    const enPct = APP().modoHoras() === "pct";
     const celdaH = tr.querySelector(".pa-celda-horas-h");
     if (celdaH) celdaH.innerHTML = "<strong>" + V2.hor(C().lineaHoras(linea)) + "</strong>";
     const celdaI = tr.querySelector(".pa-celda-importe");
     if (celdaI) celdaI.textContent = V2.imp(C().lineaImporte(linea, pf));
+
+    /* El equivalente de la celda que se acaba de teclear (horas ⇄ %) y su marca
+       de exceso, sin repintar la tabla (no se pierde el foco). */
+    const celda = tr.querySelector(".pa-celda-horas input[data-campo=\"horas\"]");
+    if (celda) {
+      const td = celda.closest("td");
+      const i = N().num(celda.dataset.mes);
+      const h = N().num((linea.horas || {})["p" + i]);
+      const pct = C().pctDeHoras(o, i, h);
+      const lab = C().horasLaborablesMes(o, i);
+      const eq = td.querySelector(".pa-celda__eq");
+      if (eq) eq.textContent = h > 0 ? (enPct ? V2.hor(h) : N().fmtNum(pct) + " %") : "";
+      const pasado = !!(linea.perfilId && C().pctPerfilEnMes(o, linea.perfilId, i) > 100.005);
+      td.classList.toggle("pa-celda--exceso", pasado);
+      td.title = V2.hor(h) + " · " + N().fmtNum(pct) + " % de " + Math.round(lab) + " h laborables" + (pasado ? " — MÁS DEL 100 %" : "");
+    }
+
+    /* El aviso de excesos (arriba del editor) se refresca con retardo: mirar toda
+       la oferta en cada pulsación triplicaba el tiempo de tecleo. */
+    clearTimeout(T_EXCESOS);
+    T_EXCESOS = setTimeout(function () {
+      const cont = V2.nodo("tr-editor");
+      if (!cont) return;
+      const viejo = cont.querySelector(".pa-aviso-excesos");
+      if (C().excesosPerfil(o).length) {
+        const html = avisoExcesos(o, pf).replace('<div class="nz-callout', '<div class="pa-aviso-excesos nz-callout');
+        if (viejo) viejo.outerHTML = html; else cont.insertAdjacentHTML("afterbegin", html);
+      } else if (viejo) { viejo.remove(); }
+    }, 260);
 
     const det = tr.closest(".pa-sub");
     if (det) {

@@ -135,11 +135,16 @@
     return N().r2(N().acota(pct, 0, 1000) / 100 * horasLaborablesMes(o, i));
   }
 
-  /** Horas de UN perfil en UN mes (sumando todas sus líneas de la oferta). */
+  /** Horas de UN perfil en UN mes (sumando todas sus líneas de la oferta).
+      Recorre sólo el mes pedido: se llama al teclear cada celda, así que no puede
+      construir la matriz completa (eso multiplicaba por 3 el tiempo de tecleo). */
   function horasPerfilEnMes(o, perfilId, i) {
-    const m = horasPerfilPeriodo(o);
-    const fila = m[perfilId] || [];
-    return N().r2(fila[i] || 0);
+    if (!perfilId) return 0;
+    let t = 0;
+    lista(o && o.tareas).forEach(ta => lista(ta.subtareas).forEach(sb => lista(sb.lineas).forEach(l => {
+      if (l.perfilId === perfilId) t += N().num((l.horas || {})["p" + i]);
+    })));
+    return N().r2(t);
   }
 
   function pctPerfilEnMes(o, perfilId, i) { return pctDeHoras(o, i, horasPerfilEnMes(o, perfilId, i)); }

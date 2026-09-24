@@ -40,6 +40,19 @@
       "</tbody></table>";
   }
 
+  /** El calendario dentro del informe: el diagrama completo, con sus barras y sus
+      rombos de entrega. Es la vista que el cliente necesita ver de un vistazo. */
+  function seccionGantt(o, pf) {
+    const P2 = PL.periodos, C2 = PL.calculo;
+    return "<h2>Calendario y entregas</h2>" +
+      '<p class="pa-mini">' + N().esc(P2.duracionLegible(o.periodos)) + " · jornada de " +
+      N().fmtNum(C2.jornada(o).horasDia) + " h/día · " +
+      Math.round(C2.horasLaborablesTotal(o)).toLocaleString("es-ES") + " h laborables en el periodo · " +
+      N().esc(String(C2.ofertaHoras(o)).replace(".", ",")) + " h de esfuerzo comprometido.</p>" +
+      PL.gantt.htmlInforme(o, pf) +
+      '<p class="pa-mini">Las barras señalan los meses con esfuerzo y el rombo ◆ el mes de entrega de cada entregable.</p>';
+  }
+
   function tablaEntregables(o, pf) {
     const V2 = V();
     const ents = E().todos(o);
@@ -172,6 +185,7 @@
       cabecera(o, marca) + logo +
       "<h1>" + N().esc(o.nombre) + "</h1>" +
       datosOferta(o) +
+      seccionGantt(o, pf) +
       tablaEntregables(o, pf) +
       tablaDetalle(o, pf) +
       tablaGastos(o) +

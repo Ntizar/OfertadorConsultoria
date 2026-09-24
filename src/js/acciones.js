@@ -68,6 +68,14 @@
     },
 
     /* ---------- Calendario ---------- */
+    /* Cómo se teclean las horas: dedicación (% de jornada) u horas. */
+    "modo-horas": b => {
+      const m = (b && b.dataset && b.dataset.modo) === "h" ? "h" : "pct";
+      APP().conModoHoras(m);
+      R().trabajo(); R().datos(); APP().guardar();
+      APP().toast(m === "pct" ? "Se teclean dedicaciones (% de jornada)" : "Se teclean horas");
+    },
+
     "cal-antes": () => cambiarCalendario(P().desplazar(o().periodos, -1), "Calendario retrasado un mes"),
     "cal-despues": () => cambiarCalendario(P().desplazar(o().periodos, 1), "Calendario adelantado un mes"),
     "cal-zoom": () => cambiarCalendario(P().conZoom(o().periodos, P().siguienteZoom(o().periodos.zoom)), ""),
