@@ -106,9 +106,18 @@
     const enPct = APP().modoHoras() === "pct";
     const unidad = enPct ? "%" : "h";
 
+    /* Se precalcula UNA vez lo que necesitan todas las celdas: la matriz de horas
+       por perfil y mes y las horas laborables de cada mes. Consultarlo celda a celda
+       multiplicaba el tiempo de repintado con ofertas grandes. */
+    const mPerfil = C().horasPerfilPeriodo(o);
+    const nMeses = P().meses(o.periodos);
+    const labDe = [];
+    for (let i = 0; i < nMeses; i++) labDe[i] = C().horasLaborablesMes(o, i);
+    const ocupadoDe = (perfilId, idx) => (perfilId && mPerfil[perfilId] ? N().num(mPerfil[perfilId][idx]) : 0);
+
     const cabecera = "<tr><th>Perfil</th>" +
       cols.map(c => {
-        const lab = c.periodos.reduce((s2, k) => s2 + C().horasLaborablesMes(o, k), 0);
+        const lab = c.periodos.reduce((s2, k) => s2 + labDe[k], 0);
         return '<th class="nz-table__right" title="' + Math.round(lab) + ' h laborables">' + N().esc(c.etiqueta) +
           '<br><span class="pa-mini">' + unidad + "</span></th>";
       }).join("") +
@@ -120,22 +129,41 @@
       const celdas = cols.map(c => {
         const idx = c.periodos[0];
         const h = c.periodos.reduce((s2, i) => s2 + N().num(((l.horas) || {})["p" + i]), 0);
-        const lab = c.periodos.reduce((s2, i) => s2 + C().horasLaborablesMes(o, i), 0);
+        const lab = c.periodos.reduce((s2, i) => s2 + labDe[i], 0);
         const pct = lab > 0 ? N().r2(h / lab * 100) : 0;
-        const pctMax = c.periodos.reduce((mx, i) => Math.max(mx, C().pctPerfilEnMes(o, l.perfilId, i)), 0);
+        const pctMax = c.periodos.reduce((mx, i) => {
+          const ocupado = ocupadoDe(l.perfilId, i);
+          return Math.max(mx, labDe[i] > 0 ? N().r2(ocupado / labDe[i] * 100) : 0);
+        }, 0);
         const pasado = !!(l.perfilId && pctMax > 100.005);
         if (pasado) exceso = true;
-        const libre = l.perfilId ? C().horasDisponiblesPerfilMes(o, l.perfilId, idx, l.id) : lab;
+        /* Libre = lo laborable del mes menos lo que ya tienen OTRAS líneas de ese
+           perfil (la línea que se edita no se descuenta a sí misma). */
+        /* Hueco real del perfil en ese periodo (contando esta línea) y techo de la línea. */
+        const ocupadoCelda = ocupadoDe(l.perfilId, idx);
+        const libre = l.perfilId ? Math.max(0, N().r2(labDe[idx] - ocupadoCelda)) : labDe[idx];
+        const librePct = labDe[idx] > 0 ? N().r2(libre / labDe[idx] * 100) : 0;
+        /* Lo que le queda libre al perfil ese mes, dicho ANTES de escribir: va en el
+           hueco del campo y de fondo se ve la parte ya ocupada. */
+        const sinHueco = l.perfilId && libre <= 0.5;
+        const dicho = enPct ? N().fmtCampo(librePct) + " % libres" : N().fmtCampo(libre) + " h libres";
         const ayuda = V2.hor(h) + " · " + N().fmtNum(pct) + " % de " + Math.round(lab) + " h laborables" +
-          (l.perfilId ? " · " + N().fmtCampo(libre) + " h libres" : "") +
-          (pasado ? " — MÁS DEL 100 %" : "");
+          (l.perfilId ? " · " + dicho : "") + (pasado ? " — MÁS DEL 100 %" : "");
         const eq = h > 0 ? (enPct ? V2.hor(h) : N().fmtNum(pct) + " %") : "";
-        const clase = "nz-table__num nz-table__right pa-celda-horas" + (pasado ? " pa-celda--exceso" : "");
+        const clase = "nz-table__num nz-table__right pa-celda-horas" +
+          (pasado ? " pa-celda--exceso" : "") + (sinHueco ? " pa-celda--lleno" : "");
         const eti = ' data-etiqueta="' + N().esc(c.etiqueta) + '" title="' + N().esc(ayuda) + '"';
+        /* La sombra: la parte de la jornada de ese perfil que YA está comprometida. */
+        const sombra = (l.perfilId && pctMax > 0)
+          ? '<span class="pa-celda__sombra" aria-hidden="true" style="width:' +
+            N().fmtCampo(Math.min(100, pctMax), 1).replace(",", ".") + '%"></span>'
+          : "";
+        const marcador = sombra ? '<span class="pa-celda__marca">' + N().fmtNum(pctMax, 0) + "%</span>" : "";
         if (c.periodos.length === 1) {
-          return "<td class=\"" + clase + "\"" + eti + ">" +
+          return "<td class=\"" + clase + "\"" + eti + ">" + sombra + marcador +
             '<input class="nz-input nz-input--sm pa-input-horas" type="text" inputmode="decimal" autocomplete="off" ' +
-            'value="' + N().fmtCampo(enPct ? pct : h) + '" placeholder="' + (enPct ? "%" : "0") + '" data-campo="horas" ' +
+            'value="' + N().fmtCampo(enPct ? pct : h) + '" placeholder="' +
+              (l.perfilId ? (sinHueco ? "sin hueco" : dicho) : (enPct ? "% de jornada" : "0")) + '" data-campo="horas" ' +
             'data-modo="' + (enPct ? "pct" : "h") + '" data-id="' + l.id + '" data-mes="' + idx + '" ' +
             'aria-label="' + N().esc("Horas en " + c.etiqueta) + '">' +
             '<span class="pa-celda__eq">' + eq + "</span></td>";
@@ -308,65 +336,168 @@
 
   let T_EXCESOS = null;
 
-  /** Tras teclear horas: se actualiza la fila en el sitio y se repinta el resto. */
-  function actualizarFilaHoras(o, pf, linea, tr) {
-    if (!tr) return;
-    const V2 = V();
-    const enPct = APP().modoHoras() === "pct";
-    const celdaH = tr.querySelector(".pa-celda-horas-h");
-    if (celdaH) celdaH.innerHTML = "<strong>" + V2.hor(C().lineaHoras(linea)) + "</strong>";
-    const celdaI = tr.querySelector(".pa-celda-importe");
-    if (celdaI) celdaI.textContent = V2.imp(C().lineaImporte(linea, pf));
+  /* ---------- Refresco de las horas, sin perder el foco ----------
+     Todo lo que se ve en una celda de horas (el número, su equivalente, la sombra
+     de ocupación del perfil, lo que le queda libre y el aviso de lleno) depende de
+     TODAS las líneas de ese perfil. Por eso, al teclear, no basta con repintar la
+     celda: hay que refrescar la tabla entera. Se hace nodo a nodo (no se regenera el
+     HTML), así el campo que se está escribiendo no se toca y el foco no se pierde. */
 
-    /* El equivalente de la celda que se acaba de teclear (horas ⇄ %) y su marca
-       de exceso, sin repintar la tabla (no se pierde el foco). */
-    const celda = tr.querySelector(".pa-celda-horas input[data-campo=\"horas\"]");
-    if (celda) {
-      const td = celda.closest("td");
-      const i = N().num(celda.dataset.mes);
-      const h = N().num((linea.horas || {})["p" + i]);
-      const pct = C().pctDeHoras(o, i, h);
-      const lab = C().horasLaborablesMes(o, i);
-      const eq = td.querySelector(".pa-celda__eq");
-      if (eq) eq.textContent = h > 0 ? (enPct ? V2.hor(h) : N().fmtNum(pct) + " %") : "";
-      const pasado = !!(linea.perfilId && C().pctPerfilEnMes(o, linea.perfilId, i) > 100.005);
-      td.classList.toggle("pa-celda--exceso", pasado);
-      td.title = V2.hor(h) + " · " + N().fmtNum(pct) + " % de " + Math.round(lab) + " h laborables" + (pasado ? " — MÁS DEL 100 %" : "");
+  /** Índice rápido: horas por perfil y periodo + horas laborables + líneas por id. */
+  function indiceHoras(o) {
+    const mPerfil = C().horasPerfilPeriodo(o);
+    const nMeses = P().meses(o.periodos);
+    const labDe = [];
+    for (let i = 0; i < nMeses; i++) labDe[i] = C().horasLaborablesMes(o, i);
+    const lineas = {};
+    N().lista(o.tareas).forEach(t => N().lista(t.subtareas).forEach(s => N().lista(s.lineas).forEach(l => {
+      lineas[l.id] = { linea: l, sub: s, tarea: t };
+    })));
+    return {
+      mPerfil: mPerfil, labDe: labDe, lineas: lineas, nMeses: nMeses,
+      ocupado: (perfilId, i) => (perfilId && mPerfil[perfilId] ? N().num(mPerfil[perfilId][i]) : 0)
+    };
+  }
+
+  /** Pinta una celda de horas con todo lo que le corresponde. */
+  function pintarCeldaHoras(td, entrada, idx, ind, enPct) {
+    const V2 = V();
+    const linea = ind.lineas[entrada.dataset.id];
+    const l = linea ? linea.linea : null;
+    const h = l ? N().num((l.horas || {})["p" + idx]) : 0;
+    const perfilId = l ? l.perfilId : "";
+    const lab = ind.labDe[idx] || 0;
+    const pctLinea = lab > 0 ? N().r2(h / lab * 100) : 0;
+    const ocupado = ind.ocupado(perfilId, idx);
+    const pctPerfil = lab > 0 ? N().r2(ocupado / lab * 100) : 0;
+    /* HUECO = lo laborable del mes menos TODO lo que ese perfil tiene ya asignado,
+       incluida esta misma línea. Antes se descontaba a sí misma y decía «100 %
+       libres» con el perfil ya lleno: eso era lo que no cuadraba. */
+    const hueco = perfilId ? Math.max(0, N().r2(lab - ocupado)) : lab;
+    const huecoPct = lab > 0 ? N().r2(hueco / lab * 100) : 0;
+    /* TECHO de esta línea: lo que puede llegar a valer contando lo que ya ocupa. */
+    const techo = perfilId ? Math.max(0, N().r2(lab - ocupado + h)) : lab;
+    const sinHueco = !!perfilId && hueco <= 0.5;
+    const pasado = pctPerfil > 100.005;
+
+    /* Equivalente (la otra unidad) y valor del campo si no se está editando. */
+    const eq = td.querySelector(".pa-celda__eq");
+    if (eq) eq.textContent = h > 0 ? (enPct ? V2.hor(h) : N().fmtNum(pctLinea, 0) + " %") : "";
+    if (document.activeElement !== entrada) {
+      entrada.value = N().fmtCampo(enPct ? pctLinea : h);
+    }
+    entrada.placeholder = perfilId
+      ? (sinHueco ? "sin hueco" : (enPct ? N().fmtCampo(huecoPct) + " % libres" : N().fmtCampo(hueco) + " h libres"))
+      : (enPct ? "% de jornada" : "0");
+
+    /* Sombra: la parte de la jornada de ese perfil ya comprometida en ese periodo. */
+    let sombra = td.querySelector(".pa-celda__sombra");
+    if (perfilId && pctPerfil > 0) {
+      if (!sombra) {
+        sombra = document.createElement("span");
+        sombra.className = "pa-celda__sombra";
+        sombra.setAttribute("aria-hidden", "true");
+        td.insertBefore(sombra, td.firstChild);
+      }
+      sombra.style.width = N().fmtCampo(Math.min(100, pctPerfil), 1).replace(",", ".") + "%";
+    } else if (sombra) {
+      sombra.remove();
+    }
+    let marca = td.querySelector(".pa-celda__marca");
+    if (perfilId && pctPerfil > 0) {
+      if (!marca) {
+        marca = document.createElement("span");
+        marca.className = "pa-celda__marca";
+        td.appendChild(marca);
+      }
+      marca.textContent = N().fmtNum(pctPerfil, 0) + "%";
+    } else if (marca) {
+      marca.remove();
     }
 
-    /* El aviso de excesos (arriba del editor) se refresca con retardo: mirar toda
-       la oferta en cada pulsación triplicaba el tiempo de tecleo. */
+    td.classList.toggle("pa-celda--lleno", sinHueco);
+    td.classList.toggle("pa-celda--exceso", pasado);
+    td.title = "Esta línea: " + V2.hor(h) + " (" + N().fmtNum(pctLinea, 0) + " % del mes). " +
+      "El perfil en ese periodo: " + N().fmtNum(pctPerfil, 0) + " % de " + Math.round(lab) + " h laborables. " +
+      (perfilId
+        ? (sinHueco
+            ? "Sin hueco: el perfil ya está al 100 % ese periodo."
+            : "Hueco libre para ese perfil: " + V2.hor(hueco) + " (" + N().fmtNum(huecoPct, 0) + " %). Esta línea puede llegar a " + V2.hor(techo) + ".")
+        : "Sin perfil asignado: el tope son las " + Math.round(lab) + " h del periodo.") +
+      (pasado ? " — MÁS DEL 100 %" : "");
+  }
+
+  /** Refresca TODAS las celdas de horas del editor y los totales de subtarea y tarea.
+      Es lo que hace que los % y lo que queda libre estén siempre al día mientras se
+      escribe: antes sólo se actualizaba la primera celda de la fila editada, así que
+      los números no cuadraban con lo que había en pantalla. */
+  function refrescarHoras(o, pf) {
+    const V2 = V();
+    const cont = V2.nodo("tr-editor");
+    if (!cont) return;
+    const enPct = APP().modoHoras() === "pct";
+    const ind = indiceHoras(o);
+
+    Array.prototype.forEach.call(cont.querySelectorAll(".pa-celda-horas input[data-campo=\"horas\"]"), function (entrada) {
+      const td = entrada.closest("td");
+      if (td) pintarCeldaHoras(td, entrada, N().num(entrada.dataset.mes), ind, enPct);
+    });
+
+    /* Totales por fila, subtarea y tarea. */
+    Array.prototype.forEach.call(cont.querySelectorAll(".pa-tabla-horas tbody tr[data-id]"), function (tr) {
+      const ref = ind.lineas[tr.dataset.id];
+      if (!ref) return;
+      const celdaH = tr.querySelector(".pa-celda-horas-h");
+      if (celdaH) celdaH.innerHTML = "<strong>" + V2.hor(C().lineaHoras(ref.linea)) + "</strong>";
+      const celdaI = tr.querySelector(".pa-celda-importe");
+      if (celdaI) celdaI.textContent = V2.imp(C().lineaImporte(ref.linea, pf));
+    });
+    Array.prototype.forEach.call(cont.querySelectorAll(".pa-sub"), function (det) {
+      const r = M().buscarSubtarea(o, det.dataset.id);
+      if (!r) return;
+      const chips = det.querySelectorAll("summary .nz-badge");
+      if (chips[0]) chips[0].textContent = V2.hor(C().subtareaHoras(r.sub));
+      if (chips[1]) chips[1].textContent = V2.imp(C().subtareaImporte(r.sub, pf));
+    });
+    Array.prototype.forEach.call(cont.querySelectorAll(".pa-tarea"), function (art) {
+      const inp = art.querySelector('[data-campo="tarea-nombre"]');
+      const t = inp ? M().buscarTarea(o, inp.dataset.id) : null;
+      if (!t) return;
+      const chips = art.querySelectorAll(".pa-tarea__cab .nz-badge");
+      if (chips[0]) chips[0].textContent = V2.hor(C().tareaHoras(t));
+      if (chips[1]) chips[1].textContent = V2.imp(C().tareaImporte(t, pf));
+    });
+
+    /* El aviso de excesos, con retardo corto (mira toda la oferta). */
     clearTimeout(T_EXCESOS);
     T_EXCESOS = setTimeout(function () {
-      const cont = V2.nodo("tr-editor");
-      if (!cont) return;
       const viejo = cont.querySelector(".pa-aviso-excesos");
       if (C().excesosPerfil(o).length) {
         const html = avisoExcesos(o, pf).replace('<div class="nz-callout', '<div class="pa-aviso-excesos nz-callout');
         if (viejo) viejo.outerHTML = html; else cont.insertAdjacentHTML("afterbegin", html);
       } else if (viejo) { viejo.remove(); }
-    }, 260);
+    }, 200);
+  }
 
-    const det = tr.closest(".pa-sub");
-    if (det) {
-      const r = M().buscarSubtarea(o, det.dataset.id);
-      if (r) {
-        const chips = det.querySelectorAll("summary .nz-badge");
-        if (chips[0]) chips[0].textContent = V2.hor(C().subtareaHoras(r.sub));
-        if (chips[1]) chips[1].textContent = V2.imp(C().subtareaImporte(r.sub, pf));
-      }
+  let T_HORAS = null;
+
+  /** Al teclear: la celda que se edita, al instante; el resto de la tabla, tras una
+      pausa corta. El resto hace falta refrescarlo porque lo que le queda libre a un
+      perfil depende de TODAS sus líneas, no sólo de la que se está escribiendo. */
+  function refrescarHorasPronto(o, pf) {
+    const activo = document.activeElement;
+    if (activo && activo.dataset && activo.dataset.campo === "horas") {
+      const td = activo.closest("td");
+      if (td) pintarCeldaHoras(td, activo, N().num(activo.dataset.mes), indiceHoras(o), APP().modoHoras() === "pct");
     }
-    /* Chips de la tarea contenedora: el nombre de la tarea lleva su id. */
-    const tareaEl = tr.closest(".nz-article");
-    if (tareaEl) {
-      const inp = tareaEl.querySelector('[data-campo="tarea-nombre"]');
-      const t = inp ? M().buscarTarea(o, inp.dataset.id) : null;
-      if (t) {
-        const chips = tareaEl.querySelectorAll(".pa-tarea__cab .nz-badge");
-        if (chips[0]) chips[0].textContent = V2.hor(C().tareaHoras(t));
-        if (chips[1]) chips[1].textContent = V2.imp(C().tareaImporte(t, pf));
-      }
-    }
+    clearTimeout(T_HORAS);
+    T_HORAS = setTimeout(function () { refrescarHoras(o, pf); }, 260);
+  }
+
+  /** Compatibilidad: refresca la tabla entera (lo usa el arnés y los repintados). */
+  function actualizarFilaHoras(o, pf, linea, tr) {
+    void linea; void tr;
+    refrescarHoras(o, pf);
   }
 
   /** Repintado completo de la pestaña de trabajo. */
@@ -379,6 +510,7 @@
   PL.vistas.trabajo = {
     render: render, renderGuia: renderGuia, renderCalendario: renderCalendario,
     renderGantt: renderGantt, renderEditor: renderEditor,
-    actualizarFilaHoras: actualizarFilaHoras, calendario: calendario
+    actualizarFilaHoras: actualizarFilaHoras, refrescarHoras: refrescarHoras,
+    refrescarHorasPronto: refrescarHorasPronto, calendario: calendario
   };
 })(typeof window !== "undefined" ? window : globalThis);

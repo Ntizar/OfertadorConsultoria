@@ -19,6 +19,7 @@ Es una herramienta de **ofertas**, no de seguimiento: no hay estados de ejecuci�
 | **Trabajo** | Calendario + **Gantt** + editor en **cuatro pasos**: tareas y subtareas → entregables → perfiles → horas por perfil y mes |
 | **Oferta** | Datos comerciales (cliente, referencia, estado, validez), **jornada**, gastos generales y economía |
 | **Perfiles** | El catálogo de puestos con su **precio por hora**: ficha por perfil, y **guardar/cargar** en un fichero |
+| **Carga** | La planificación de un vistazo: **ocupación de cada perfil periodo a periodo**, qué le queda libre a cada uno y el reparto por subtarea |
 | **Resumen** | Totales, esfuerzo por perfil, por tarea y por periodo; **escenarios y versiones** comparadas |
 | **Informe** | El documento final (con el calendario dentro), con marca blanca, para imprimir o exportar a PDF |
 | **Ajustes** | Marca, plantillas de tareas y datos (copias, importar/exportar) |
@@ -32,6 +33,23 @@ El calendario se planifica en la unidad que te encaje: **meses** o **semanas** (
 ### Plegar y desplegar
 
 Cada tarea tiene su botón para plegarla. Arriba del editor hay cuatro atajos: **Desplegar todo · Sólo tareas · Plegar subtareas · Plegar tareas**. Así se ve la oferta entera de un vistazo o se baja al detalle sin perder el sitio.
+
+### El hueco, a la vista antes de escribir
+
+En la tabla de horas **cada celda te dice su hueco antes de que escribas**:
+
+- **El fondo de la celda** lleva una sombra con la parte de la jornada de ese perfil ya comprometida en ese periodo, y un número con su % de ocupación.
+- **El hueco del campo** dice en texto lo que queda: `35 % libres`. Cuando ya no cabe nada, la celda se pone en ámbar y el campo dice **`sin hueco`**.
+- Si aún así pides de más, **se queda en el máximo** y te explica a quién y por qué: *«Jefe/a de proyecto sólo puede llegar a 30 h en oct 2026 (17 %)»*, o *«ya está al 100 % en oct 2026: no cabe nada más»*.
+- Todo se **recalcula solo** mientras escribes: si tocas una línea, las demás líneas de ese mismo perfil actualizan su hueco al momento.
+
+### Vista de Carga
+
+Para ver la planificación entera de un vistazo, sin tocar nada:
+
+- **Mapa de ocupación** perfiles × periodos, con color por tramo (hueco → media carga → al límite → 100 % → pasado) y el % en cada celda.
+- **Disponibilidad por perfil**: horas asignadas, laborables del calendario, dedicación media y lo que le queda libre.
+- **Reparto por subtarea y perfil**: quién hace qué, con horas e importe por subtarea.
 
 ### Horas por % de dedicación
 
@@ -145,12 +163,12 @@ py -3.12 tools/compilar.py       # solo compilar
 node tools/smoke.js              # arranque en seco
 ```
 
-**350 comprobaciones** en total, todas en verde:
+**374 comprobaciones** en total, todas en verde:
 
 | Arnés | Qué cubre |
 |---|---|
 | `verificar-motor.js` (160) | cadena de totales, redondeo, periodos y rótulos, entregables en los tres niveles, **dedicación (% ↔ horas, jornada y tope del 100 %)**, **conversión meses ⇄ semanas** (días laborables reales, total conservado), escenarios y versiones, migración y normalización defensiva |
-| `verificar-dom.js` (190) | arranque sin errores, las **6 pestañas**, edición de rótulos desde el Gantt, **calendario por meses o semanas con banda de trimestres**, **plegado por niveles**, **borrado con confirmación**, **autolímite del 100 %**, color por tarea, campo de esfuerzo con `%` y `h`, **que un cambio se vea en todas las vistas**, responsive, catálogo de perfiles, exportaciones y rendimiento |
+| `verificar-dom.js` (214) | arranque sin errores, las **7 pestañas**, el **hueco que anuncia cada celda** (y que se calcula donde toca, no en otra celda), la **vista de Carga**, edición de rótulos desde el Gantt, **calendario por meses o semanas con banda de trimestres**, **plegado por niveles**, **borrado con confirmación**, **autolímite del 100 %**, color por tarea, campo de esfuerzo con `%` y `h`, **que un cambio se vea en todas las vistas**, responsive, catálogo de perfiles, exportaciones y rendimiento |
 | `auditar-wiring.py` | todo botón tiene acción, todo nodo existe, toda clase `nz-*` es de Aurora, ningún export sin declarar |
 
 ### Contrato de exactitud

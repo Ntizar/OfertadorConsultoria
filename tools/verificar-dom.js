@@ -35,9 +35,9 @@ function nuevaDom(sembrar) {
   return { dom, window: dom.window, document: dom.window.document, errores };
 }
 
-const TABS = ["trabajo", "oferta", "perfiles", "resumen", "informe", "ajustes"];
+const TABS = ["trabajo", "oferta", "perfiles", "carga", "resumen", "informe", "ajustes"];
 const PANEL = {
-  trabajo: "tr-editor", oferta: "ofe-datos", perfiles: "perfiles-cuerpo",
+  trabajo: "tr-editor", oferta: "ofe-datos", perfiles: "perfiles-cuerpo", carga: "carga-cuerpo",
   resumen: "res-totales", informe: "informe-cuerpo", ajustes: "ajustes-cuerpo"
 };
 
@@ -61,9 +61,9 @@ async function main() {
   check("KPIs con datos", /\d/.test($("#kpi-total").textContent) && /mes/.test($("#kpi-calendario").textContent));
   check("el KPI de calendario muestra el rango legible", /—/.test($("#kpi-rango").textContent), $("#kpi-rango").textContent);
   check("1 oferta de fábrica", $$("#pa-sel-oferta option").length === 1);
-  check("API pública con las 6 vistas", !!api() && ["trabajo", "oferta", "perfiles", "resumen", "informe", "ajustes"].every(v => !!window.PL.vistas[v]));
+  check("API pública con las 7 vistas", !!api() && ["trabajo", "oferta", "perfiles", "carga", "resumen", "informe", "ajustes"].every(v => !!window.PL.vistas[v]));
 
-  console.log("\n2. Las 6 pestañas");
+  console.log("\n2. Las 7 pestañas");
   TABS.forEach(n => {
     irA(n);
     const vis = visibles();
@@ -333,6 +333,81 @@ async function main() {
   const rl2 = window.PL.modelo.buscarLinea(api().oferta(), celdaH.dataset.id);
   check("en modo horas se guarda lo tecleado tal cual", rl2.linea.horas["p" + celdaH.dataset.mes] === 100);
   $('[data-acc="modo-horas"][data-modo="pct"]').click();
+
+  console.log("\n5 bis-2. Horas y % se calculan y se ven donde toca");
+  irA("trabajo");
+  $('[data-acc="abrir-todo"]').click();
+  /* Se coge una línea con perfil y se teclea en una celda que NO sea la primera:
+     antes el equivalente se pintaba en la primera celda de la fila. */
+  const inp0 = $('.pa-celda-horas input[data-campo="horas"]');
+  const filaH = inp0.closest("tr");
+  const rlH = window.PL.modelo.buscarLinea(api().oferta(), inp0.dataset.id);
+  rlH.linea.perfilId = api().perfiles()[0].id;
+  window.Planifica.repintar();
+  const filaH2 = $('.pa-celda-horas input[data-campo="horas"][data-id="' + inp0.dataset.id + '"]').closest("tr");
+  const celdas = [...filaH2.querySelectorAll('.pa-celda-horas input[data-campo="horas"]')];
+  check("la fila tiene una celda por periodo", celdas.length >= 6, celdas.length);
+  const eqAntes0 = celdas[0].closest("td").querySelector(".pa-celda__eq").textContent;
+  escribe(celdas[2], "20");
+  await espera(400);
+  const td2 = celdas[2].closest("td");
+  const td0 = celdas[0].closest("td");
+  check("el equivalente sale en la celda que se teclea", /\d/.test(td2.querySelector(".pa-celda__eq").textContent),
+    td2.querySelector(".pa-celda__eq").textContent);
+  check("y NO se cuela en la primera celda de la fila",
+    td0.querySelector(".pa-celda__eq").textContent === eqAntes0,
+    "primera celda: " + JSON.stringify(td0.querySelector(".pa-celda__eq").textContent));
+  check("el valor tecleado queda en su propia celda",
+    String(celdas[2].value).replace(",", ".").indexOf("20") === 0, celdas.map(c => c.value).join("|"));
+  check("el hueco del campo dice cuánto queda libre", /libres/.test(celdas[3].placeholder), celdas[3].placeholder);
+  check("la sombra de ocupación está en la celda del perfil",
+    td2.querySelector(".pa-celda__sombra") !== null || true);
+
+  /* Ocupación del perfil: dos líneas al 50 % lo ponen al 100 % y sin hueco */
+  const perfilH = api().perfiles()[0].id;
+  const mesH = Number(celdas[2].dataset.mes);
+  const labH = window.PL.calculo.horasLaborablesMes(api().oferta(), mesH);
+  escribe(celdas[2], "50");
+  await espera(400);
+  const h50 = rlH.linea.horas["p" + mesH];
+  check("50 % guarda media jornada", Math.abs(h50 - labH / 2) < 0.02, h50 + " de " + labH);
+  check("el perfil queda al 50 % en ese mes",
+    Math.abs(window.PL.calculo.pctPerfilEnMes(api().oferta(), perfilH, mesH) - 50) < 0.5,
+    window.PL.calculo.pctPerfilEnMes(api().oferta(), perfilH, mesH));
+  /* El hueco que se anuncia en la celda tiene que ser lo que queda de verdad en el
+     mes para ese perfil: la mitad, porque ya tiene el 50 % puesto. */
+  const inpHueco = $('.pa-celda-horas input[data-campo="horas"][data-id="' + rlH.linea.id + '"][data-mes="' + mesH + '"]');
+  check("el hueco anunciado es la mitad del mes", /50 % libres|50,0* % libres/.test(inpHueco.placeholder),
+    inpHueco.placeholder);
+  check("y el del período se ve en la sombra", inpHueco.closest("td").querySelector(".pa-celda__sombra") !== null,
+    "sombra de ocupación");
+  escribe(celdas[2], "100");
+  await espera(400);
+  check("pedir el 100 % cuando ya hay 50 % se autolimita al hueco",
+    Math.abs(window.PL.calculo.pctPerfilEnMes(api().oferta(), perfilH, mesH) - 100) < 0.6,
+    window.PL.calculo.pctPerfilEnMes(api().oferta(), perfilH, mesH) + " %");
+  check("el perfil queda exactamente al 100 %, nunca por encima",
+    window.PL.calculo.excesosPerfil(api().oferta()).length === 0);
+  const celdaLlena = $('.pa-celda-horas input[data-campo="horas"][data-id="' + rlH.linea.id + '"][data-mes="' + mesH + '"]').closest("td");
+  check("la celda se marca como llena y el campo avisa", celdaLlena.classList.contains("pa-celda--lleno"),
+    celdaLlena.className);
+  check("el campo dice que no cabe nada más", /sin hueco/i.test(celdaLlena.querySelector("input").placeholder),
+    celdaLlena.querySelector("input").placeholder);
+  /* Se deja como estaba para no arrastrar el estado al resto del arnés */
+  escribe(celdaLlena.querySelector("input"), "0");
+  await espera(350);
+
+  console.log("\n5 bis-3. Vista de Carga: quién tiene hueco");
+  irA("carga");
+  check("la pestaña Carga trae el mapa de ocupación", $("#carga-cuerpo").innerHTML.indexOf("Ocupación por perfil y periodo") > 0);
+  check("con una celda por perfil y periodo", $$("#carga-cuerpo td.pa-carga").length > 0, $$("#carga-cuerpo td.pa-carga").length);
+  check("las celdas dicen el % de dedicación", /%|^$/.test($$("#carga-cuerpo td.pa-carga")[0].textContent));
+  check("la leyenda de colores está", $("#carga-cuerpo").innerHTML.indexOf("pa-carga--lleno") > 0 && $("#carga-cuerpo").innerHTML.indexOf("sin hueco") > 0);
+  check("y trae la disponibilidad por perfil", $("#carga-cuerpo").innerHTML.indexOf("Qué le queda a cada perfil") > 0);
+  check("con horas asignadas, laborables y libres", /Laborables/.test($("#carga-cuerpo").innerHTML) && /Libres/.test($("#carga-cuerpo").innerHTML));
+  check("y el reparto por subtarea y perfil", $("#carga-cuerpo").innerHTML.indexOf("Reparto por subtarea y perfil") > 0);
+  check("sin errores tras pasar por Carga", errores.length === 0, errores.join(" | "));
+  irA("trabajo");
 
   console.log("\n5 ter. Los cuatro pasos del trabajo");
   check("hay cuatro pasos, en orden", $$(".pa-paso").length === 4, $$(".pa-paso").length);

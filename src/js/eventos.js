@@ -81,15 +81,17 @@
         if (horas > disponible + 0.005) {
           const p = C().perfilPorId(pf(), r.linea.perfilId);
           const pctDisp = C().pctDeHoras(of, i, disponible);
-          APP().toast("⛔ " + (p ? p.nombre : "Ese perfil") + " sólo tiene " + N().fmtCampo(disponible) +
-            " h libres en " + P().mesCorto(of.periodos, i) + " (" + N().fmtCampo(pctDisp) +
-            " %). Se deja en el máximo: no se puede pasar del 100 %.");
+          const mes = P().mesCorto(of.periodos, i);
+          APP().toast(pctDisp <= 0.5
+            ? "⛔ " + (p ? p.nombre : "Ese perfil") + " ya está al 100 % en " + mes + ": no cabe nada más."
+            : "⛔ " + (p ? p.nombre : "Ese perfil") + " sólo puede llegar a " + N().fmtCampo(disponible) +
+              " h en " + mes + " (" + N().fmtCampo(pctDisp) + " %). Se deja en ese máximo: nadie pasa del 100 %.");
           horas = disponible;
           el.value = N().fmtCampo(esPct ? pctDisp : disponible);
         }
         r.linea.horas = r.linea.horas || {};
         r.linea.horas["p" + i] = N().acota(horas, 0, 1e6);
-        V().trabajo.actualizarFilaHoras(of, pf(), r.linea, el.closest("tr"));
+        V().trabajo.refrescarHorasPronto(of, pf());
         R().datos();
         APP().guardar();
         return;

@@ -313,3 +313,49 @@ body.pa-sin-importes .pa-importe { display: none; }
 .pa-sub--plegada > .pa-sub__cuerpo { display: none; }
 .pa-tarea__cab .pa-tono-punto { margin-right: var(--nz-space-1); }
 @media (max-width: 720px) { .pa-chevron { width: 44px; height: 44px; font-size: var(--nz-text-lg); } }
+
+
+/* ---------- Cuánto queda libre, a la vista ----------
+   Dentro de cada celda de horas, una sombra marca la parte de la jornada de ese
+   perfil que YA está comprometida en ese periodo, y el hueco del campo dice en
+   texto cuánto queda. Así se ve antes de escribir, no después de pasarse. */
+.pa-celda-horas { position: relative; }
+.pa-celda__sombra {
+  position: absolute; top: 2px; bottom: 2px; left: 2px; z-index: 0;
+  max-width: calc(100% - 4px);
+  background: var(--nz-brand-soft); border-radius: var(--nz-radius-sm, 4px);
+  pointer-events: none;
+}
+.pa-celda__marca {
+  position: absolute; top: 1px; right: 4px; z-index: 2;
+  font-size: 0.6rem; line-height: 1; color: var(--nz-text-soft);
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.pa-celda-horas > input, .pa-celda-horas > .pa-celda__eq { position: relative; z-index: 1; }
+.pa-celda-horas > input.pa-input-horas { background: transparent; }
+.pa-celda-horas > input.pa-input-horas:focus { background: var(--nz-surface); }
+.pa-celda-horas > .pa-celda__eq { position: relative; z-index: 1; }
+
+/* Sin hueco: la celda avisa en ámbar y el campo lo dice con sus palabras. */
+.pa-celda--lleno { background: var(--nz-warning-soft, #fff7ed); }
+.pa-celda--lleno .pa-celda__sombra { background: var(--nz-warning-tint, #fde68a); }
+.pa-celda--lleno > input.pa-input-horas::placeholder { color: var(--nz-warning-strong, #b45309); font-weight: 600; }
+.pa-celda-horas > input.pa-input-horas::placeholder { color: var(--nz-text-soft); font-size: var(--nz-text-xs); }
+
+
+/* ---------- Vista de Carga: el mapa de ocupación ---------- */
+.pa-carga {
+  text-align: right; font-variant-numeric: tabular-nums;
+  font-size: var(--nz-text-xs); min-width: 3.1rem;
+}
+.pa-carga--vacio { background: transparent; }
+.pa-carga--bajo  { background: var(--nz-brand-soft); }
+.pa-carga--medio { background: var(--nz-info-soft); }
+.pa-carga--alto  { background: var(--nz-warning-soft); }
+.pa-carga--lleno { background: var(--nz-warning-tint); font-weight: 700; }
+.pa-carga--pasado { background: var(--nz-danger-soft); color: var(--nz-danger); font-weight: 700; }
+/* En la leyenda, la misma clase se ve como una cuadradito de color. */
+span.pa-carga {
+  display: inline-block; width: 0.85rem; height: 0.85rem; min-width: 0;
+  border: 1px solid var(--nz-border); border-radius: 3px; vertical-align: -2px;
+}

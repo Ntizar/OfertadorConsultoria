@@ -19,7 +19,7 @@ const MODULOS = [
 
 /* Módulos de vista (solo se cargan si el arnés pasa el DOM). */
 const MODULOS_VISTA = [
-  "vistas.js", "vista-oferta.js", "vista-trabajo.js", "vista-resumen.js",
+  "vistas.js", "vista-oferta.js", "vista-trabajo.js", "vista-perfiles.js", "vista-carga.js", "vista-resumen.js",
   "vista-informe.js", "vista-ajustes.js", "acciones.js", "eventos.js", "main.js"
 ];
 

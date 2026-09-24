@@ -2729,6 +2729,52 @@ body.pa-sin-importes .pa-importe { display: none; }
 .pa-tarea__cab .pa-tono-punto { margin-right: var(--nz-space-1); }
 @media (max-width: 720px) { .pa-chevron { width: 44px; height: 44px; font-size: var(--nz-text-lg); } }
 
+
+/* ---------- Cuánto queda libre, a la vista ----------
+   Dentro de cada celda de horas, una sombra marca la parte de la jornada de ese
+   perfil que YA está comprometida en ese periodo, y el hueco del campo dice en
+   texto cuánto queda. Así se ve antes de escribir, no después de pasarse. */
+.pa-celda-horas { position: relative; }
+.pa-celda__sombra {
+  position: absolute; top: 2px; bottom: 2px; left: 2px; z-index: 0;
+  max-width: calc(100% - 4px);
+  background: var(--nz-brand-soft); border-radius: var(--nz-radius-sm, 4px);
+  pointer-events: none;
+}
+.pa-celda__marca {
+  position: absolute; top: 1px; right: 4px; z-index: 2;
+  font-size: 0.6rem; line-height: 1; color: var(--nz-text-soft);
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.pa-celda-horas > input, .pa-celda-horas > .pa-celda__eq { position: relative; z-index: 1; }
+.pa-celda-horas > input.pa-input-horas { background: transparent; }
+.pa-celda-horas > input.pa-input-horas:focus { background: var(--nz-surface); }
+.pa-celda-horas > .pa-celda__eq { position: relative; z-index: 1; }
+
+/* Sin hueco: la celda avisa en ámbar y el campo lo dice con sus palabras. */
+.pa-celda--lleno { background: var(--nz-warning-soft, #fff7ed); }
+.pa-celda--lleno .pa-celda__sombra { background: var(--nz-warning-tint, #fde68a); }
+.pa-celda--lleno > input.pa-input-horas::placeholder { color: var(--nz-warning-strong, #b45309); font-weight: 600; }
+.pa-celda-horas > input.pa-input-horas::placeholder { color: var(--nz-text-soft); font-size: var(--nz-text-xs); }
+
+
+/* ---------- Vista de Carga: el mapa de ocupación ---------- */
+.pa-carga {
+  text-align: right; font-variant-numeric: tabular-nums;
+  font-size: var(--nz-text-xs); min-width: 3.1rem;
+}
+.pa-carga--vacio { background: transparent; }
+.pa-carga--bajo  { background: var(--nz-brand-soft); }
+.pa-carga--medio { background: var(--nz-info-soft); }
+.pa-carga--alto  { background: var(--nz-warning-soft); }
+.pa-carga--lleno { background: var(--nz-warning-tint); font-weight: 700; }
+.pa-carga--pasado { background: var(--nz-danger-soft); color: var(--nz-danger); font-weight: 700; }
+/* En la leyenda, la misma clase se ve como una cuadradito de color. */
+span.pa-carga {
+  display: inline-block; width: 0.85rem; height: 0.85rem; min-width: 0;
+  border: 1px solid var(--nz-border); border-radius: 3px; vertical-align: -2px;
+}
+
 </style>
 
 </head>
@@ -2767,6 +2813,7 @@ body.pa-sin-importes .pa-importe { display: none; }
     <button class="nz-tabs__tab" data-tab="trabajo" aria-selected="true">Trabajo</button>
     <button class="nz-tabs__tab" data-tab="oferta">Oferta</button>
     <button class="nz-tabs__tab" data-tab="perfiles">Perfiles</button>
+    <button class="nz-tabs__tab" data-tab="carga">Carga</button>
     <button class="nz-tabs__tab" data-tab="resumen">Resumen</button>
     <button class="nz-tabs__tab" data-tab="informe">Informe</button>
     <button class="nz-tabs__tab" data-tab="ajustes">Ajustes</button>
@@ -2791,6 +2838,10 @@ body.pa-sin-importes .pa-importe { display: none; }
     <!-- ===== RESUMEN ===== -->
     <section id="sec-perfiles" hidden>
       <div id="perfiles-cuerpo"></div>
+    </section>
+
+    <section id="sec-carga" hidden>
+      <div id="carga-cuerpo"></div>
     </section>
 
     <section id="sec-resumen" hidden>
@@ -5668,9 +5719,18 @@ body.pa-sin-importes .pa-importe { display: none; }
     const enPct = APP().modoHoras() === "pct";
     const unidad = enPct ? "%" : "h";
 
+    /* Se precalcula UNA vez lo que necesitan todas las celdas: la matriz de horas
+       por perfil y mes y las horas laborables de cada mes. Consultarlo celda a celda
+       multiplicaba el tiempo de repintado con ofertas grandes. */
+    const mPerfil = C().horasPerfilPeriodo(o);
+    const nMeses = P().meses(o.periodos);
+    const labDe = [];
+    for (let i = 0; i < nMeses; i++) labDe[i] = C().horasLaborablesMes(o, i);
+    const ocupadoDe = (perfilId, idx) => (perfilId && mPerfil[perfilId] ? N().num(mPerfil[perfilId][idx]) : 0);
+
     const cabecera = "<tr><th>Perfil</th>" +
       cols.map(c => {
-        const lab = c.periodos.reduce((s2, k) => s2 + C().horasLaborablesMes(o, k), 0);
+        const lab = c.periodos.reduce((s2, k) => s2 + labDe[k], 0);
         return '<th class="nz-table__right" title="' + Math.round(lab) + ' h laborables">' + N().esc(c.etiqueta) +
           '<br><span class="pa-mini">' + unidad + "</span></th>";
       }).join("") +
@@ -5682,22 +5742,41 @@ body.pa-sin-importes .pa-importe { display: none; }
       const celdas = cols.map(c => {
         const idx = c.periodos[0];
         const h = c.periodos.reduce((s2, i) => s2 + N().num(((l.horas) || {})["p" + i]), 0);
-        const lab = c.periodos.reduce((s2, i) => s2 + C().horasLaborablesMes(o, i), 0);
+        const lab = c.periodos.reduce((s2, i) => s2 + labDe[i], 0);
         const pct = lab > 0 ? N().r2(h / lab * 100) : 0;
-        const pctMax = c.periodos.reduce((mx, i) => Math.max(mx, C().pctPerfilEnMes(o, l.perfilId, i)), 0);
+        const pctMax = c.periodos.reduce((mx, i) => {
+          const ocupado = ocupadoDe(l.perfilId, i);
+          return Math.max(mx, labDe[i] > 0 ? N().r2(ocupado / labDe[i] * 100) : 0);
+        }, 0);
         const pasado = !!(l.perfilId && pctMax > 100.005);
         if (pasado) exceso = true;
-        const libre = l.perfilId ? C().horasDisponiblesPerfilMes(o, l.perfilId, idx, l.id) : lab;
+        /* Libre = lo laborable del mes menos lo que ya tienen OTRAS líneas de ese
+           perfil (la línea que se edita no se descuenta a sí misma). */
+        /* Hueco real del perfil en ese periodo (contando esta línea) y techo de la línea. */
+        const ocupadoCelda = ocupadoDe(l.perfilId, idx);
+        const libre = l.perfilId ? Math.max(0, N().r2(labDe[idx] - ocupadoCelda)) : labDe[idx];
+        const librePct = labDe[idx] > 0 ? N().r2(libre / labDe[idx] * 100) : 0;
+        /* Lo que le queda libre al perfil ese mes, dicho ANTES de escribir: va en el
+           hueco del campo y de fondo se ve la parte ya ocupada. */
+        const sinHueco = l.perfilId && libre <= 0.5;
+        const dicho = enPct ? N().fmtCampo(librePct) + " % libres" : N().fmtCampo(libre) + " h libres";
         const ayuda = V2.hor(h) + " · " + N().fmtNum(pct) + " % de " + Math.round(lab) + " h laborables" +
-          (l.perfilId ? " · " + N().fmtCampo(libre) + " h libres" : "") +
-          (pasado ? " — MÁS DEL 100 %" : "");
+          (l.perfilId ? " · " + dicho : "") + (pasado ? " — MÁS DEL 100 %" : "");
         const eq = h > 0 ? (enPct ? V2.hor(h) : N().fmtNum(pct) + " %") : "";
-        const clase = "nz-table__num nz-table__right pa-celda-horas" + (pasado ? " pa-celda--exceso" : "");
+        const clase = "nz-table__num nz-table__right pa-celda-horas" +
+          (pasado ? " pa-celda--exceso" : "") + (sinHueco ? " pa-celda--lleno" : "");
         const eti = ' data-etiqueta="' + N().esc(c.etiqueta) + '" title="' + N().esc(ayuda) + '"';
+        /* La sombra: la parte de la jornada de ese perfil que YA está comprometida. */
+        const sombra = (l.perfilId && pctMax > 0)
+          ? '<span class="pa-celda__sombra" aria-hidden="true" style="width:' +
+            N().fmtCampo(Math.min(100, pctMax), 1).replace(",", ".") + '%"></span>'
+          : "";
+        const marcador = sombra ? '<span class="pa-celda__marca">' + N().fmtNum(pctMax, 0) + "%</span>" : "";
         if (c.periodos.length === 1) {
-          return "<td class=\"" + clase + "\"" + eti + ">" +
+          return "<td class=\"" + clase + "\"" + eti + ">" + sombra + marcador +
             '<input class="nz-input nz-input--sm pa-input-horas" type="text" inputmode="decimal" autocomplete="off" ' +
-            'value="' + N().fmtCampo(enPct ? pct : h) + '" placeholder="' + (enPct ? "%" : "0") + '" data-campo="horas" ' +
+            'value="' + N().fmtCampo(enPct ? pct : h) + '" placeholder="' +
+              (l.perfilId ? (sinHueco ? "sin hueco" : dicho) : (enPct ? "% de jornada" : "0")) + '" data-campo="horas" ' +
             'data-modo="' + (enPct ? "pct" : "h") + '" data-id="' + l.id + '" data-mes="' + idx + '" ' +
             'aria-label="' + N().esc("Horas en " + c.etiqueta) + '">' +
             '<span class="pa-celda__eq">' + eq + "</span></td>";
@@ -5870,65 +5949,168 @@ body.pa-sin-importes .pa-importe { display: none; }
 
   let T_EXCESOS = null;
 
-  /** Tras teclear horas: se actualiza la fila en el sitio y se repinta el resto. */
-  function actualizarFilaHoras(o, pf, linea, tr) {
-    if (!tr) return;
-    const V2 = V();
-    const enPct = APP().modoHoras() === "pct";
-    const celdaH = tr.querySelector(".pa-celda-horas-h");
-    if (celdaH) celdaH.innerHTML = "<strong>" + V2.hor(C().lineaHoras(linea)) + "</strong>";
-    const celdaI = tr.querySelector(".pa-celda-importe");
-    if (celdaI) celdaI.textContent = V2.imp(C().lineaImporte(linea, pf));
+  /* ---------- Refresco de las horas, sin perder el foco ----------
+     Todo lo que se ve en una celda de horas (el número, su equivalente, la sombra
+     de ocupación del perfil, lo que le queda libre y el aviso de lleno) depende de
+     TODAS las líneas de ese perfil. Por eso, al teclear, no basta con repintar la
+     celda: hay que refrescar la tabla entera. Se hace nodo a nodo (no se regenera el
+     HTML), así el campo que se está escribiendo no se toca y el foco no se pierde. */
 
-    /* El equivalente de la celda que se acaba de teclear (horas ⇄ %) y su marca
-       de exceso, sin repintar la tabla (no se pierde el foco). */
-    const celda = tr.querySelector(".pa-celda-horas input[data-campo=\"horas\"]");
-    if (celda) {
-      const td = celda.closest("td");
-      const i = N().num(celda.dataset.mes);
-      const h = N().num((linea.horas || {})["p" + i]);
-      const pct = C().pctDeHoras(o, i, h);
-      const lab = C().horasLaborablesMes(o, i);
-      const eq = td.querySelector(".pa-celda__eq");
-      if (eq) eq.textContent = h > 0 ? (enPct ? V2.hor(h) : N().fmtNum(pct) + " %") : "";
-      const pasado = !!(linea.perfilId && C().pctPerfilEnMes(o, linea.perfilId, i) > 100.005);
-      td.classList.toggle("pa-celda--exceso", pasado);
-      td.title = V2.hor(h) + " · " + N().fmtNum(pct) + " % de " + Math.round(lab) + " h laborables" + (pasado ? " — MÁS DEL 100 %" : "");
+  /** Índice rápido: horas por perfil y periodo + horas laborables + líneas por id. */
+  function indiceHoras(o) {
+    const mPerfil = C().horasPerfilPeriodo(o);
+    const nMeses = P().meses(o.periodos);
+    const labDe = [];
+    for (let i = 0; i < nMeses; i++) labDe[i] = C().horasLaborablesMes(o, i);
+    const lineas = {};
+    N().lista(o.tareas).forEach(t => N().lista(t.subtareas).forEach(s => N().lista(s.lineas).forEach(l => {
+      lineas[l.id] = { linea: l, sub: s, tarea: t };
+    })));
+    return {
+      mPerfil: mPerfil, labDe: labDe, lineas: lineas, nMeses: nMeses,
+      ocupado: (perfilId, i) => (perfilId && mPerfil[perfilId] ? N().num(mPerfil[perfilId][i]) : 0)
+    };
+  }
+
+  /** Pinta una celda de horas con todo lo que le corresponde. */
+  function pintarCeldaHoras(td, entrada, idx, ind, enPct) {
+    const V2 = V();
+    const linea = ind.lineas[entrada.dataset.id];
+    const l = linea ? linea.linea : null;
+    const h = l ? N().num((l.horas || {})["p" + idx]) : 0;
+    const perfilId = l ? l.perfilId : "";
+    const lab = ind.labDe[idx] || 0;
+    const pctLinea = lab > 0 ? N().r2(h / lab * 100) : 0;
+    const ocupado = ind.ocupado(perfilId, idx);
+    const pctPerfil = lab > 0 ? N().r2(ocupado / lab * 100) : 0;
+    /* HUECO = lo laborable del mes menos TODO lo que ese perfil tiene ya asignado,
+       incluida esta misma línea. Antes se descontaba a sí misma y decía «100 %
+       libres» con el perfil ya lleno: eso era lo que no cuadraba. */
+    const hueco = perfilId ? Math.max(0, N().r2(lab - ocupado)) : lab;
+    const huecoPct = lab > 0 ? N().r2(hueco / lab * 100) : 0;
+    /* TECHO de esta línea: lo que puede llegar a valer contando lo que ya ocupa. */
+    const techo = perfilId ? Math.max(0, N().r2(lab - ocupado + h)) : lab;
+    const sinHueco = !!perfilId && hueco <= 0.5;
+    const pasado = pctPerfil > 100.005;
+
+    /* Equivalente (la otra unidad) y valor del campo si no se está editando. */
+    const eq = td.querySelector(".pa-celda__eq");
+    if (eq) eq.textContent = h > 0 ? (enPct ? V2.hor(h) : N().fmtNum(pctLinea, 0) + " %") : "";
+    if (document.activeElement !== entrada) {
+      entrada.value = N().fmtCampo(enPct ? pctLinea : h);
+    }
+    entrada.placeholder = perfilId
+      ? (sinHueco ? "sin hueco" : (enPct ? N().fmtCampo(huecoPct) + " % libres" : N().fmtCampo(hueco) + " h libres"))
+      : (enPct ? "% de jornada" : "0");
+
+    /* Sombra: la parte de la jornada de ese perfil ya comprometida en ese periodo. */
+    let sombra = td.querySelector(".pa-celda__sombra");
+    if (perfilId && pctPerfil > 0) {
+      if (!sombra) {
+        sombra = document.createElement("span");
+        sombra.className = "pa-celda__sombra";
+        sombra.setAttribute("aria-hidden", "true");
+        td.insertBefore(sombra, td.firstChild);
+      }
+      sombra.style.width = N().fmtCampo(Math.min(100, pctPerfil), 1).replace(",", ".") + "%";
+    } else if (sombra) {
+      sombra.remove();
+    }
+    let marca = td.querySelector(".pa-celda__marca");
+    if (perfilId && pctPerfil > 0) {
+      if (!marca) {
+        marca = document.createElement("span");
+        marca.className = "pa-celda__marca";
+        td.appendChild(marca);
+      }
+      marca.textContent = N().fmtNum(pctPerfil, 0) + "%";
+    } else if (marca) {
+      marca.remove();
     }
 
-    /* El aviso de excesos (arriba del editor) se refresca con retardo: mirar toda
-       la oferta en cada pulsación triplicaba el tiempo de tecleo. */
+    td.classList.toggle("pa-celda--lleno", sinHueco);
+    td.classList.toggle("pa-celda--exceso", pasado);
+    td.title = "Esta línea: " + V2.hor(h) + " (" + N().fmtNum(pctLinea, 0) + " % del mes). " +
+      "El perfil en ese periodo: " + N().fmtNum(pctPerfil, 0) + " % de " + Math.round(lab) + " h laborables. " +
+      (perfilId
+        ? (sinHueco
+            ? "Sin hueco: el perfil ya está al 100 % ese periodo."
+            : "Hueco libre para ese perfil: " + V2.hor(hueco) + " (" + N().fmtNum(huecoPct, 0) + " %). Esta línea puede llegar a " + V2.hor(techo) + ".")
+        : "Sin perfil asignado: el tope son las " + Math.round(lab) + " h del periodo.") +
+      (pasado ? " — MÁS DEL 100 %" : "");
+  }
+
+  /** Refresca TODAS las celdas de horas del editor y los totales de subtarea y tarea.
+      Es lo que hace que los % y lo que queda libre estén siempre al día mientras se
+      escribe: antes sólo se actualizaba la primera celda de la fila editada, así que
+      los números no cuadraban con lo que había en pantalla. */
+  function refrescarHoras(o, pf) {
+    const V2 = V();
+    const cont = V2.nodo("tr-editor");
+    if (!cont) return;
+    const enPct = APP().modoHoras() === "pct";
+    const ind = indiceHoras(o);
+
+    Array.prototype.forEach.call(cont.querySelectorAll(".pa-celda-horas input[data-campo=\"horas\"]"), function (entrada) {
+      const td = entrada.closest("td");
+      if (td) pintarCeldaHoras(td, entrada, N().num(entrada.dataset.mes), ind, enPct);
+    });
+
+    /* Totales por fila, subtarea y tarea. */
+    Array.prototype.forEach.call(cont.querySelectorAll(".pa-tabla-horas tbody tr[data-id]"), function (tr) {
+      const ref = ind.lineas[tr.dataset.id];
+      if (!ref) return;
+      const celdaH = tr.querySelector(".pa-celda-horas-h");
+      if (celdaH) celdaH.innerHTML = "<strong>" + V2.hor(C().lineaHoras(ref.linea)) + "</strong>";
+      const celdaI = tr.querySelector(".pa-celda-importe");
+      if (celdaI) celdaI.textContent = V2.imp(C().lineaImporte(ref.linea, pf));
+    });
+    Array.prototype.forEach.call(cont.querySelectorAll(".pa-sub"), function (det) {
+      const r = M().buscarSubtarea(o, det.dataset.id);
+      if (!r) return;
+      const chips = det.querySelectorAll("summary .nz-badge");
+      if (chips[0]) chips[0].textContent = V2.hor(C().subtareaHoras(r.sub));
+      if (chips[1]) chips[1].textContent = V2.imp(C().subtareaImporte(r.sub, pf));
+    });
+    Array.prototype.forEach.call(cont.querySelectorAll(".pa-tarea"), function (art) {
+      const inp = art.querySelector('[data-campo="tarea-nombre"]');
+      const t = inp ? M().buscarTarea(o, inp.dataset.id) : null;
+      if (!t) return;
+      const chips = art.querySelectorAll(".pa-tarea__cab .nz-badge");
+      if (chips[0]) chips[0].textContent = V2.hor(C().tareaHoras(t));
+      if (chips[1]) chips[1].textContent = V2.imp(C().tareaImporte(t, pf));
+    });
+
+    /* El aviso de excesos, con retardo corto (mira toda la oferta). */
     clearTimeout(T_EXCESOS);
     T_EXCESOS = setTimeout(function () {
-      const cont = V2.nodo("tr-editor");
-      if (!cont) return;
       const viejo = cont.querySelector(".pa-aviso-excesos");
       if (C().excesosPerfil(o).length) {
         const html = avisoExcesos(o, pf).replace('<div class="nz-callout', '<div class="pa-aviso-excesos nz-callout');
         if (viejo) viejo.outerHTML = html; else cont.insertAdjacentHTML("afterbegin", html);
       } else if (viejo) { viejo.remove(); }
-    }, 260);
+    }, 200);
+  }
 
-    const det = tr.closest(".pa-sub");
-    if (det) {
-      const r = M().buscarSubtarea(o, det.dataset.id);
-      if (r) {
-        const chips = det.querySelectorAll("summary .nz-badge");
-        if (chips[0]) chips[0].textContent = V2.hor(C().subtareaHoras(r.sub));
-        if (chips[1]) chips[1].textContent = V2.imp(C().subtareaImporte(r.sub, pf));
-      }
+  let T_HORAS = null;
+
+  /** Al teclear: la celda que se edita, al instante; el resto de la tabla, tras una
+      pausa corta. El resto hace falta refrescarlo porque lo que le queda libre a un
+      perfil depende de TODAS sus líneas, no sólo de la que se está escribiendo. */
+  function refrescarHorasPronto(o, pf) {
+    const activo = document.activeElement;
+    if (activo && activo.dataset && activo.dataset.campo === "horas") {
+      const td = activo.closest("td");
+      if (td) pintarCeldaHoras(td, activo, N().num(activo.dataset.mes), indiceHoras(o), APP().modoHoras() === "pct");
     }
-    /* Chips de la tarea contenedora: el nombre de la tarea lleva su id. */
-    const tareaEl = tr.closest(".nz-article");
-    if (tareaEl) {
-      const inp = tareaEl.querySelector('[data-campo="tarea-nombre"]');
-      const t = inp ? M().buscarTarea(o, inp.dataset.id) : null;
-      if (t) {
-        const chips = tareaEl.querySelectorAll(".pa-tarea__cab .nz-badge");
-        if (chips[0]) chips[0].textContent = V2.hor(C().tareaHoras(t));
-        if (chips[1]) chips[1].textContent = V2.imp(C().tareaImporte(t, pf));
-      }
-    }
+    clearTimeout(T_HORAS);
+    T_HORAS = setTimeout(function () { refrescarHoras(o, pf); }, 260);
+  }
+
+  /** Compatibilidad: refresca la tabla entera (lo usa el arnés y los repintados). */
+  function actualizarFilaHoras(o, pf, linea, tr) {
+    void linea; void tr;
+    refrescarHoras(o, pf);
   }
 
   /** Repintado completo de la pestaña de trabajo. */
@@ -5941,7 +6123,8 @@ body.pa-sin-importes .pa-importe { display: none; }
   PL.vistas.trabajo = {
     render: render, renderGuia: renderGuia, renderCalendario: renderCalendario,
     renderGantt: renderGantt, renderEditor: renderEditor,
-    actualizarFilaHoras: actualizarFilaHoras, calendario: calendario
+    actualizarFilaHoras: actualizarFilaHoras, refrescarHoras: refrescarHoras,
+    refrescarHorasPronto: refrescarHorasPronto, calendario: calendario
   };
 })(typeof window !== "undefined" ? window : globalThis);
 
@@ -6159,6 +6342,231 @@ body.pa-sin-importes .pa-importe { display: none; }
   }
 
   PL.vistas.perfiles = { render: render };
+})(typeof window !== "undefined" ? window : globalThis);
+
+/* ====== MÓDULO vista-carga.js ====== */
+"use strict";
+/* =====================================================================
+   Planifica v4 — VISTA: CARGA
+   La planificación vista de un vistazo, sin tocar nada: quién está pillado,
+   quién tiene hueco y cómo se reparte el trabajo por subtarea.
+
+   Tres bloques:
+     1. Ocupación por perfil y periodo (mapa de color: del hueco al 100 %)
+     2. Disponibilidad de cada perfil (asignado, laborable, libre)
+     3. Reparto por subtarea y perfil
+
+   Es sólo lectura: aquí se mira, se edita en Trabajo.
+   ===================================================================== */
+(function (raiz) {
+  const PL = (raiz.PL = raiz.PL || {});
+  const N = () => PL.nucleo;
+  const P = () => PL.periodos;
+  const C = () => PL.calculo;
+  const V = () => PL.vistas;
+  const APP = () => PL.app;
+
+  /** Tramo de ocupación: clase de color y texto para la leyenda. */
+  function tramo(pct) {
+    if (pct > 100.5) return "pa-carga--pasado";
+    if (pct >= 99.5) return "pa-carga--lleno";
+    if (pct >= 85) return "pa-carga--alto";
+    if (pct >= 50) return "pa-carga--medio";
+    if (pct > 0) return "pa-carga--bajo";
+    return "pa-carga--vacio";
+  }
+
+  /** Horas laborables de todo el calendario. */
+  function laborables(o) {
+    let t = 0;
+    for (let i = 0; i < P().meses(o.periodos); i++) t += C().horasLaborablesMes(o, i);
+    return N().r2(t);
+  }
+
+  /* ---------- 1. Ocupación por perfil y periodo ---------- */
+
+  function ocupacion(o, pf, mPerfil) {
+    const V2 = V();
+    const cols = P().columnas(o.periodos);
+    const usados = Object.keys(C().horasPorPerfil(o));
+    if (!usados.length) {
+      return V2.articulo("Ocupación por perfil y periodo",
+        '<p class="pa-mini">Todavía no hay horas repartidas. Cuando pongas dedicación en la pestaña Trabajo, ' +
+        "aquí verás la carga de cada perfil periodo a periodo.</p>");
+    }
+
+    const cabecera = "<tr><th>Perfil</th>" +
+      cols.map(c => {
+        const lab = c.periodos.reduce((s2, k) => s2 + C().horasLaborablesMes(o, k), 0);
+        return '<th class="nz-table__right" title="' + Math.round(lab) + ' h laborables">' + N().esc(c.etiqueta) +
+          '<br><span class="pa-mini">' + Math.round(lab) + " h</span></th>";
+      }).join("") +
+      '<th class="nz-table__right">Medio</th><th class="nz-table__right">Libre</th></tr>';
+
+    const filas = usados.map(perfilId => {
+      const perfil = C().perfilPorId(pf, perfilId);
+      let libreTotal = 0;
+      let labTotal = 0;
+      const celdas = cols.map(c => {
+        const idx = c.periodos[0];
+        const ult = c.periodos[c.periodos.length - 1];
+        let horas = 0;
+        let lab = 0;
+        for (let k = c.periodos[0]; k <= ult; k++) {
+          horas += N().num((mPerfil[perfilId] || [])[k]);
+          lab += C().horasLaborablesMes(o, k);
+        }
+        const pct = lab > 0 ? N().r2(horas / lab * 100) : 0;
+        libreTotal = N().r2(libreTotal + Math.max(0, lab - horas));
+        labTotal = N().r2(labTotal + lab);
+        const texto = (perfil ? perfil.nombre : "Perfil") + " en " + c.etiqueta + ": " + N().fmtNum(pct, 0) +
+          " % · " + V2.hor(horas) + " de " + Math.round(lab) + " h laborables";
+        return '<td class="pa-carga ' + tramo(pct) + '" title="' + N().esc(texto) + '">' +
+          (horas > 0 ? N().fmtNum(pct, 0) + "%" : "") + "</td>";
+      }).join("");
+      const medio = labTotal > 0 ? N().r2((labTotal - libreTotal) / labTotal * 100) : 0;
+      return "<tr>" +
+        "<th scope=\"row\"><span class=\"pa-tono-punto\"></span> " + N().esc(perfil ? perfil.nombre : "Perfil") + "</th>" +
+        celdas +
+        '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(medio, 0) + "%</strong></td>" +
+        '<td class="nz-table__num nz-table__right">' + N().fmtNum(libreTotal, 0) + " h</td></tr>";
+    }).join("");
+
+    const leyenda = '<p class="pa-mini">' +
+      '<span class="pa-carga pa-carga--vacio"></span> libre · ' +
+      '<span class="pa-carga pa-carga--bajo"></span> hasta 50 % · ' +
+      '<span class="pa-carga pa-carga--medio"></span> 50-85 % · ' +
+      '<span class="pa-carga pa-carga--alto"></span> 85-100 % · ' +
+      '<span class="pa-carga pa-carga--lleno"></span> 100 %, sin hueco · ' +
+      '<span class="pa-carga pa-carga--pasado"></span> por encima del 100 % · ' +
+      "el número es la dedicación de ese perfil en ese periodo.</p>";
+
+    return V2.articulo("Ocupación por perfil y periodo",
+      '<p class="pa-mini">Cada celda dice la dedicación de ese perfil en ese periodo, sumando todo lo que tiene asignado: ' +
+      "en verde hay hueco, en ámbar está al límite y en rojo no cabe más.</p>" + leyenda +
+      '<div class="pa-tabla-horas"><table class="nz-table nz-table--compact">' +
+      "<thead>" + cabecera + "</thead><tbody>" + filas + "</tbody></table></div>");
+  }
+
+  /* ---------- 2. Disponibilidad por perfil ---------- */
+
+  function disponibilidad(o, pf, mPerfil) {
+    const usados = Object.keys(C().horasPorPerfil(o));
+    const lab = laborables(o);
+    const excesos = C().excesosPerfil(o);
+
+    const filas = usados.map(perfilId => {
+      const perfil = C().perfilPorId(pf, perfilId);
+      const asignadas = N().r2(N().suma(mPerfil[perfilId] || [], v => N().num(v)));
+      const pct = lab > 0 ? N().r2(asignadas / lab * 100) : 0;
+      const malos = excesos.filter(x => x.perfilId === perfilId).length;
+      const clase = pct > 100.5 ? "nz-badge--danger" : (pct >= 85 ? "nz-badge--warning" : "nz-badge--neutral");
+      return "<tr>" +
+        '<td><span class="pa-tono-punto"></span> ' + N().esc(perfil ? perfil.nombre : "Perfil") + "</td>" +
+        '<td class="nz-table__num nz-table__right">' + N().fmtNum(asignadas, 0) + " h</td>" +
+        '<td class="nz-table__num nz-table__right">' + N().fmtNum(lab, 0) + " h</td>" +
+        '<td class="nz-table__num nz-table__right"><span class="nz-badge ' + clase + '">' + N().fmtNum(pct, 0) + " %</span></td>" +
+        '<td class="nz-table__num nz-table__right">' + N().fmtNum(Math.max(0, N().r2(lab - asignadas)), 0) + " h</td>" +
+        "<td>" + (malos ? '<span class="nz-badge nz-badge--danger">' + malos + " periodo(s) pasado(s)</span>" : "") + "</td></tr>";
+    }).join("");
+
+    const totalAsignado = usados.reduce((a, id) => N().r2(a + N().suma(mPerfil[id] || [], v => N().num(v))), 0);
+
+    return V().articulo("Qué le queda a cada perfil",
+      '<p class="pa-mini">El calendario tiene <strong>' + N().fmtNum(lab, 0) +
+      " h laborables por perfil</strong> y hay <strong>" + N().fmtNum(totalAsignado, 0) +
+      " h</strong> repartidas. Lo que sobra de cada uno es lo que aún puedes planificar (o personal que no necesitas).</p>" +
+      '<table class="nz-table nz-table--compact"><thead><tr><th>Perfil</th>' +
+      '<th class="nz-table__right">Asignadas</th><th class="nz-table__right">Laborables</th>' +
+      '<th class="nz-table__right">Dedicación media</th><th class="nz-table__right">Libres</th><th></th></tr></thead>' +
+      "<tbody>" + (filas || '<tr><td colspan="6"><span class="pa-mini">Sin perfiles asignados todavía.</span></td></tr>') +
+      "</tbody></table>" +
+      '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Coste del esfuerzo con las tarifas actuales: <strong>' +
+      N().fmtNum(C().importeOferta(o, pf)) + " €</strong>.</p>");
+  }
+
+  /* ---------- 3. Reparto por subtarea y perfil ---------- */
+
+  function abrevia(nombre) {
+    const t = String(nombre || "").replace(/\(.*?\)/g, "").trim();
+    const partes = t.split(/\s+/);
+    return partes.length > 3 ? partes.slice(0, 3).join(" ") + "…" : t;
+  }
+
+  function reparto(o, pf) {
+    const V2 = V();
+    const porPerfil = {};
+    const filas = [];
+    N().lista(o.tareas).forEach(t => {
+      N().lista(t.subtareas).forEach(s => {
+        const lineas = N().lista(s.lineas);
+        if (!lineas.length) return;
+        const horas = lineas.reduce((a, l) => {
+          const h = C().lineaHoras(l);
+          if (h && l.perfilId) porPerfil[l.perfilId] = N().r2((porPerfil[l.perfilId] || 0) + h);
+          return N().r2(a + h);
+        }, 0);
+        filas.push({ tarea: t.nombre, sub: s.nombre, lineas: lineas, horas: horas });
+      });
+    });
+
+    /* Sólo las columnas de perfiles que se usan: si no, la tabla es un muro. */
+    const cols = pf.filter(p => porPerfil[p.id]);
+    if (!filas.length) {
+      return V2.articulo("Reparto por subtarea y perfil",
+        '<p class="pa-mini">Todavía no hay subtareas con trabajo asignado.</p>');
+    }
+
+    const cabecera = "<tr><th>Subtarea</th>" +
+      cols.map(p => '<th class="nz-table__right" title="' + N().esc(p.nombre) + " · " + N().fmtNum(p.tarifa) + ' €/h">' +
+        N().esc(abrevia(p.nombre)) + '<br><span class="pa-mini">' + N().fmtNum(p.tarifa) + " €/h</span></th>").join("") +
+      '<th class="nz-table__right">Horas</th><th class="nz-table__right">Importe</th></tr>';
+
+    const cuerpo = filas.map(f => {
+      const suyos = {};
+      let importe = 0;
+      f.lineas.forEach(l => {
+        if (l.perfilId) suyos[l.perfilId] = N().r2((suyos[l.perfilId] || 0) + C().lineaHoras(l));
+        importe = N().r2(importe + C().lineaImporte(l, pf));
+      });
+      return '<tr><th scope="row"><span class="pa-mini">' + N().esc(f.tarea) + "</span><br>" + N().esc(f.sub) + "</th>" +
+        cols.map(p => '<td class="nz-table__num nz-table__right">' +
+          (suyos[p.id] ? N().fmtNum(suyos[p.id], 0) : "") + "</td>").join("") +
+        '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(f.horas, 0) + "</strong></td>" +
+        '<td class="nz-table__num nz-table__right">' + N().fmtNum(importe) + " €</td></tr>";
+    }).join("");
+
+    const pie = '<tr><th scope="row">Total</th>' +
+      cols.map(p => '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(porPerfil[p.id] || 0, 0) + "</strong></td>").join("") +
+      '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(C().ofertaHoras(o), 0) + "</strong></td>" +
+      '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(C().importeOferta(o, pf)) + " €</strong></td></tr>";
+
+    return V2.articulo("Reparto por subtarea y perfil",
+      '<p class="pa-mini">Quién hace qué: las horas de cada perfil en cada subtarea.</p>' +
+      '<div class="pa-tabla-horas"><table class="nz-table nz-table--compact">' +
+      "<thead>" + cabecera + "</thead><tbody>" + cuerpo + pie + "</tbody></table></div>");
+  }
+
+  function render() {
+    const V2 = V(), a = APP();
+    const cont = "carga-cuerpo";
+    const o = a.pr();
+    if (!o) { V2.vaciar(cont); return; }
+    const pf = a.pf();
+    const mPerfil = C().horasPerfilPeriodo(o);
+    const excesos = C().excesosPerfil(o);
+
+    V2.escribir(cont,
+      (excesos.length
+        ? V2.aviso("warning", "<strong>Hay " + excesos.length + " caso(s) por encima del 100 %.</strong> " +
+            "Suele venir de datos anteriores a la regla del tope: repártelos con otro perfil o muévelos de periodo.")
+        : "") +
+      ocupacion(o, pf, mPerfil) +
+      disponibilidad(o, pf, mPerfil) +
+      reparto(o, pf));
+  }
+
+  PL.vistas.carga = { render: render, tramo: tramo, laborables: laborables };
 })(typeof window !== "undefined" ? window : globalThis);
 
 /* ====== MÓDULO vista-resumen.js ====== */
@@ -7212,15 +7620,17 @@ body.pa-sin-importes .pa-importe { display: none; }
         if (horas > disponible + 0.005) {
           const p = C().perfilPorId(pf(), r.linea.perfilId);
           const pctDisp = C().pctDeHoras(of, i, disponible);
-          APP().toast("⛔ " + (p ? p.nombre : "Ese perfil") + " sólo tiene " + N().fmtCampo(disponible) +
-            " h libres en " + P().mesCorto(of.periodos, i) + " (" + N().fmtCampo(pctDisp) +
-            " %). Se deja en el máximo: no se puede pasar del 100 %.");
+          const mes = P().mesCorto(of.periodos, i);
+          APP().toast(pctDisp <= 0.5
+            ? "⛔ " + (p ? p.nombre : "Ese perfil") + " ya está al 100 % en " + mes + ": no cabe nada más."
+            : "⛔ " + (p ? p.nombre : "Ese perfil") + " sólo puede llegar a " + N().fmtCampo(disponible) +
+              " h en " + mes + " (" + N().fmtCampo(pctDisp) + " %). Se deja en ese máximo: nadie pasa del 100 %.");
           horas = disponible;
           el.value = N().fmtCampo(esPct ? pctDisp : disponible);
         }
         r.linea.horas = r.linea.horas || {};
         r.linea.horas["p" + i] = N().acota(horas, 0, 1e6);
-        V().trabajo.actualizarFilaHoras(of, pf(), r.linea, el.closest("tr"));
+        V().trabajo.refrescarHorasPronto(of, pf());
         R().datos();
         APP().guardar();
         return;
@@ -7505,10 +7915,10 @@ body.pa-sin-importes .pa-importe { display: none; }
   const A = () => PL.almacen;
   const V = () => PL.vistas;
 
-  const VISTAS = ["trabajo", "oferta", "perfiles", "resumen", "informe", "ajustes"];
+  const VISTAS = ["trabajo", "oferta", "perfiles", "carga", "resumen", "informe", "ajustes"];
   const PANELES = {
     trabajo: "pa-trabajo-panel", oferta: "pa-oferta-panel", perfiles: "pa-perfiles-panel",
-    resumen: "pa-resumen-panel", informe: "pa-informe-panel", ajustes: "pa-ajustes-panel"
+    carga: "pa-carga-panel", resumen: "pa-resumen-panel", informe: "pa-informe-panel", ajustes: "pa-ajustes-panel"
   };
 
   let tGuardar = null, tDatos = null;
@@ -7636,6 +8046,7 @@ body.pa-sin-importes .pa-importe { display: none; }
     trabajo: function () { pintarVista("trabajo"); },
     oferta: function () { pintarVista("oferta"); },
     perfiles: function () { pintarVista("perfiles"); },
+    carga: function () { pintarVista("carga"); },
     resumen: function () { pintarVista("resumen"); },
     informe: function () { pintarVista("informe"); },
     ajustes: function () { pintarVista("ajustes"); },
@@ -7650,7 +8061,7 @@ body.pa-sin-importes .pa-importe { display: none; }
         PL.repintar.cabecera();
         pintarCalendario();
         pintarGantt();
-        ["oferta", "perfiles", "resumen", "informe", "ajustes"].forEach(pintarVista);
+        ["oferta", "perfiles", "carga", "resumen", "informe", "ajustes"].forEach(pintarVista);
       }, 150);
     },
 
@@ -7661,7 +8072,7 @@ body.pa-sin-importes .pa-importe { display: none; }
       tDatos = setTimeout(function () {
         pintarCalendario();
         PL.vistas.trabajo.renderEditor();
-        ["oferta", "perfiles", "resumen", "informe", "ajustes"].forEach(pintarVista);
+        ["oferta", "perfiles", "carga", "resumen", "informe", "ajustes"].forEach(pintarVista);
       }, 120);
     },
 
