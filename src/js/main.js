@@ -199,23 +199,10 @@
 
   /* ---------- Aviso de datos heredados ---------- */
 
-  /** Aviso de que hay datos de versiones anteriores, con las TRES salidas
-      posibles: traerlos, descargar una copia o descartarlos. Nunca se borra
-      nada sin que el usuario lo decida. */
-  function refrescarHeredados() {
-    const hay = A().datosHeredados();
-    if (!hay.length) { V().vaciar("pa-herederos"); return; }
-    V().escribir("pa-herederos", V().aviso("warning",
-      "<strong>Datos de versiones anteriores.</strong> Este navegador guarda datos de " + N().esc(hay.join(", ")) +
-      ". La aplicación ha arrancado con una <strong>oferta de ejemplo</strong> para que veas cómo funciona; " +
-      "tus datos antiguos siguen intactos. ¿Qué hacemos con ellos?" +
-      '<div class="pa-fila" style="margin-top:var(--nz-space-2)">' +
-        '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="traer-heredados">📥 Traer mis ofertas antiguas</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="descargar-heredados">⬇ Descargar una copia</button>' +
-        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="limpiar-heredados">Descartarlos</button>' +
-        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-ejemplo">Empezar de cero con el ejemplo</button>' +
-      "</div>"));
-  }
+  /* Sin banner de migración: los datos anteriores se importan solos y la nota,
+     discreta y sin tecnicismos, vive en Ajustes → Datos. Aquí sólo se vacía el
+     hueco (que sigue existiendo para avisos de error). */
+  function refrescarHeredados() { V().vaciar("pa-herederos"); }
 
   /** Aviso suelto (por ejemplo, si falló la lectura de los datos guardados). */
   function avisoHeredados(aviso) {

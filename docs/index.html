@@ -3099,7 +3099,42 @@ body.pa-sin-importes .pa-importe { display: none; }
     return conInicio(q, N().mesISO(fecha(q, Math.round(N().num(k)))));
   }
 
+  /* ---------- Días y horas laborables ---------- */
+
+  /* Caché: el cálculo de días laborables se pide una vez por celda y no cambia
+     mientras no cambien el mes ni la jornada. */
+  const CACHE_LAB = {};
+
+  /** Días del mes del periodo i. */
+  function diasDelMes(p, i) {
+    const f = fecha(p, i);
+    return new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
+  }
+
+  /** Días laborables del periodo i (los días de la semana que se trabajan). */
+  function diasLaborables(p, i, diasSemana) {
+    const f = fecha(p, i);
+    const dias = (Array.isArray(diasSemana) && diasSemana.length) ? diasSemana : [1, 2, 3, 4, 5];
+    const clave = f.getFullYear() + "-" + (f.getMonth() + 1) + "|" + dias.join(",");
+    if (CACHE_LAB[clave] !== undefined) return CACHE_LAB[clave];
+    const total = new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
+    let n = 0;
+    for (let d = 1; d <= total; d++) {
+      const wd = new Date(f.getFullYear(), f.getMonth(), d).getDay();   /* 0=domingo */
+      if (dias.indexOf(wd === 0 ? 7 : wd) >= 0) n++;
+    }
+    CACHE_LAB[clave] = n;
+    return n;
+  }
+
+  /** Horas laborables del periodo i: días laborables × horas por día. */
+  function horasLaborables(p, i, jornada) {
+    const j = jornada || { horasDia: 8, diasSemana: [1, 2, 3, 4, 5] };
+    return N().r2(diasLaborables(p, i, j.diasSemana) * N().acota(j.horasDia === undefined ? 8 : j.horasDia, 0, 24));
+  }
+
   PL.periodos = {
+    diasDelMes: diasDelMes, diasLaborables: diasLaborables, horasLaborables: horasLaborables,
     ZOOMS: ZOOMS, MIN: MIN_PERIODOS, MAX: MAX_PERIODOS,
     porDefecto: porDefecto, normalizar: normalizar,
     fecha: fecha, meses: meses, indiceDe: indiceDe,
@@ -3164,12 +3199,30 @@ body.pa-sin-importes .pa-importe { display: none; }
     };
   }
 
+  /* Jornada de trabajo: es lo que convierte dedicación (%) en horas. Va dentro de
+     la oferta para que cada oferta sea autocontenida y exportable. */
+  const JORNADA_DEFECTO = { horasDia: 8, diasSemana: [1, 2, 3, 4, 5] };   /* 1=lunes … 7=domingo */
+
+  function normalizarJornada(j) {
+    const u = N();
+    const q = (j && typeof j === "object") ? j : {};
+    let dias = Array.isArray(q.diasSemana)
+      ? q.diasSemana.map(d => Math.round(u.acota(d, 1, 7))).filter(d => d >= 1 && d <= 7)
+      : [];
+    dias = Array.from(new Set(dias)).sort((a, b) => a - b);
+    return {
+      horasDia: u.acota(q.horasDia === undefined ? JORNADA_DEFECTO.horasDia : q.horasDia, 0.5, 24),
+      diasSemana: dias.length ? dias : JORNADA_DEFECTO.diasSemana.slice()
+    };
+  }
+
   function nuevaOferta(nombre) {
     return {
       id: N().uid("of_"), nombre: N().texto(nombre, "Oferta sin título"),
       cliente: { nombre: "", contacto: "", ref: "" },
       estado: "borrador", fecha: N().hoyISO(), validezDias: 30,
       periodos: P().porDefecto(),
+      jornada: normalizarJornada(null),
       descripcion: "", condicionesPago: "",
       impuestos: { tipo: "iva", tasa: 21, incluido: false },
       descuento: { tipo: "", valor: 0 },
@@ -3300,6 +3353,7 @@ body.pa-sin-importes .pa-importe { display: none; }
     }
     q.periodos = P().normalizar(q.periodos);
     delete q.fechaInicio; delete q.meses;
+    q.jornada = normalizarJornada(q.jornada);
 
     if (esMigracion && !q.impuestos) {
       q.impuestos = { tipo: "ninguno", tasa: 0, incluido: false };
@@ -3504,6 +3558,7 @@ body.pa-sin-importes .pa-importe { display: none; }
     normalizarEntregable: normalizarEntregable, normalizarTarea: normalizarTarea,
     normalizarOferta: normalizarOferta, normalizarFoto: normalizarFoto,
     normalizarEstado: normalizarEstado, migrar: migrar, estadoInicial: estadoInicial,
+    JORNADA_DEFECTO: JORNADA_DEFECTO, normalizarJornada: normalizarJornada,
     buscarTarea: buscarTarea, buscarSubtarea: buscarSubtarea, buscarLinea: buscarLinea,
     buscarEntregable: buscarEntregable, buscarFoto: buscarFoto, colgarEntregable: colgarEntregable
   };
@@ -3781,6 +3836,62 @@ body.pa-sin-importes .pa-importe { display: none; }
 
   /* ---------- Gastos, descuento, impuestos, total ---------- */
 
+  /* ---------- Dedicación: porcentaje ↔ horas ----------
+     Las horas son el DATO (y lo que cuadra el encargo al céntimo); el porcentaje
+     es la puerta de entrada cómoda: «media jornada ese mes» = 50 %. */
+
+  function jornada(o) { return PL.modelo.normalizarJornada(o && o.jornada); }
+
+  /** Horas laborables de un mes con la jornada de la oferta. */
+  function horasLaborablesMes(o, i) { return P().horasLaborables(o && o.periodos, i, jornada(o)); }
+
+  /** Horas laborables de toda la oferta. */
+  function horasLaborablesTotal(o) {
+    const n = P().meses(o && o.periodos);
+    let t = 0;
+    for (let i = 0; i < n; i++) t += horasLaborablesMes(o, i);
+    return N().r2(t);
+  }
+
+  /** Qué porcentaje de la jornada del mes representan estas horas. */
+  function pctDeHoras(o, i, horas) {
+    const lim = horasLaborablesMes(o, i);
+    return lim > 0 ? N().r2(N().num(horas) / lim * 100) : 0;
+  }
+
+  /** Cuántas horas son este porcentaje de la jornada del mes. */
+  function horasDePct(o, i, pct) {
+    return N().r2(N().acota(pct, 0, 1000) / 100 * horasLaborablesMes(o, i));
+  }
+
+  /** Horas de UN perfil en UN mes (sumando todas sus líneas de la oferta). */
+  function horasPerfilEnMes(o, perfilId, i) {
+    const m = horasPerfilPeriodo(o);
+    const fila = m[perfilId] || [];
+    return N().r2(fila[i] || 0);
+  }
+
+  function pctPerfilEnMes(o, perfilId, i) { return pctDeHoras(o, i, horasPerfilEnMes(o, perfilId, i)); }
+
+  /** Perfiles que se pasan del 100 % en algún mes: nadie puede estar más de una
+      jornada completa a la vez. Devuelve [{perfilId, periodo, horas, limite, pct}]. */
+  function excesosPerfil(o) {
+    const out = [];
+    const m = horasPerfilPeriodo(o);
+    const n = P().meses(o && o.periodos);
+    Object.keys(m).forEach(perfilId => {
+      for (let i = 0; i < n; i++) {
+        const h = N().r2((m[perfilId] || [])[i] || 0);
+        if (h <= 0) continue;
+        const lim = horasLaborablesMes(o, i);
+        if (lim > 0 && h > lim + 0.005) {
+          out.push({ perfilId: perfilId, periodo: i, horas: h, limite: lim, pct: pctDeHoras(o, i, h) });
+        }
+      }
+    });
+    return out;
+  }
+
   function gastoImporte(g) { return N().r2(N().num(g && g.unidades) * N().num(g && g.precio)); }
   function gastosTotal(o) { return N().r2(N().suma(lista(o && o.gastos), gastoImporte)); }
 
@@ -3880,6 +3991,9 @@ body.pa-sin-importes .pa-importe { display: none; }
     baseImponible: baseImponible, nombreImpuesto: nombreImpuesto,
     impuestoImporte: impuestoImporte, totalOferta: totalOferta, mediaPeriodo: mediaPeriodo,
     anualidades: anualidades, usosPerfil: usosPerfil,
+    jornada: jornada, horasLaborablesMes: horasLaborablesMes, horasLaborablesTotal: horasLaborablesTotal,
+    pctDeHoras: pctDeHoras, horasDePct: horasDePct,
+    horasPerfilEnMes: horasPerfilEnMes, pctPerfilEnMes: pctPerfilEnMes, excesosPerfil: excesosPerfil,
     clonarTarea: clonarTarea, clonarSubtarea: clonarSubtarea
   };
 })(typeof window !== "undefined" ? window : globalThis);
@@ -4274,15 +4388,17 @@ body.pa-sin-importes .pa-importe { display: none; }
         const d = JSON.parse(viejo);
         const ofertas = d && (d.ofertas || d.proyectos);
         if (Array.isArray(ofertas)) {
-          /* Hay datos de una versión anterior y todavía no hay datos v4: NO se
-             imponen. La aplicación arranca con la oferta de ejemplo y los datos
-             antiguos quedan disponibles para traerlos, copiarlos o descartarlos
-             (así se empieza limpio sin perder nada). */
+          /* Datos de una versión anterior y todavía sin datos v4: se importan
+             SOLOS y se usan. Sin banners, sin preguntas y sin claves técnicas en
+             pantalla; en Ajustes → Datos queda una nota discreta por si el usuario
+             quiere descargar una copia o descartarlos. */
           const r = M2.migrar(d);
-          return {
-            estado: null, migrado: M2.normalizarEstado(r.estado), origen: r.origen, heredado: true,
-            aviso: ""   /* el aviso (con sus tres salidas) lo pinta el arranque */
+          const est = M2.normalizarEstado(r.estado);
+          est.importadoAuto = {
+            fecha: PL.nucleo.hoyISO(), origen: r.origen,
+            ofertas: est.ofertas.length, perfiles: est.perfiles.length
           };
+          return { estado: est, origen: r.origen, heredado: true, aviso: "" };
         }
       } catch (e) { /* se prueba con la siguiente clave */ }
     }
@@ -4362,6 +4478,15 @@ body.pa-sin-importes .pa-importe { display: none; }
 
   function exportarTodo(estado) {
     descargar("planifica-datos-" + N().hoyISO() + ".json", JSON.stringify(estado, null, 2), "application/json");
+  }
+
+  /** Catálogo de perfiles: fichero suelto para guardarlo y volver a cargarlo
+      cuando haga falta (puestos, categorías y precios por hora). */
+  function exportarPerfiles(estado) {
+    return JSON.stringify({
+      tipo: "planifica-perfiles", version: M().VERSION_DATOS, exportado: PL.nucleo.hoyISO(),
+      perfiles: estado.perfiles, perfilesInactivos: estado.perfilesInactivos
+    }, null, 2);
   }
 
   function exportarBiblioteca(estado) {
@@ -4445,13 +4570,16 @@ body.pa-sin-importes .pa-importe { display: none; }
     if ((d.tipo === "planifica-oferta" || d.tipo === "planifica-proyecto") && (d.oferta || d.proyecto)) {
       return { ok: true, tipo: "oferta", datos: d.oferta || d.proyecto };
     }
-    if (d.tipo === "planifica-biblioteca") return { ok: true, tipo: "biblioteca", datos: d };
+    if (d.tipo === "planifica-biblioteca" || d.tipo === "planifica-perfiles") {
+      return { ok: true, tipo: "biblioteca", datos: d };
+    }
     const ofertas = d.ofertas || d.proyectos;
     if (Array.isArray(ofertas)) {
       const origen = (d.version === 4) ? 4 : ((d.version === 3 || d.version === 2) ? d.version : 1);
       return { ok: true, tipo: "estado", origen: origen, datos: d };
     }
-    return { ok: false, error: "Formato no reconocido: se espera una oferta, una biblioteca o una copia completa de Planifica." };
+    if (Array.isArray(d.perfiles)) return { ok: true, tipo: "biblioteca", datos: d };
+    return { ok: false, error: "No se reconoce el fichero: se espera una oferta de Planifica, tu catálogo de perfiles o una copia completa." };
   }
 
   function aplicarImportacion(estado, analisis, opciones) {
@@ -4520,6 +4648,7 @@ body.pa-sin-importes .pa-importe { display: none; }
     tieneLS: tieneLS, cargar: cargar, guardar: guardar, datosHeredados: datosHeredados, leerHeredado: leerHeredado,
     olvidarHeredados: olvidarHeredados, descargar: descargar, nombreFichero: nombreFichero,
     exportarOferta: exportarOferta, exportarTodo: exportarTodo, exportarBiblioteca: exportarBiblioteca,
+    exportarPerfiles: exportarPerfiles,
     csvOferta: csvOferta, analizarImportacion: analizarImportacion, aplicarImportacion: aplicarImportacion
   };
 })(typeof window !== "undefined" ? window : globalThis);
@@ -5624,12 +5753,13 @@ body.pa-sin-importes .pa-importe { display: none; }
     }).join("");
 
     return V2.articulo("Perfiles del equipo",
-      '<p class="pa-mini">Biblioteca global: se usa en todas las ofertas. Los perfiles «de fábrica» se restauran con ↺. Llévate la biblioteca a otro navegador exportándola.</p>' +
+      '<p class="pa-mini">Tu catálogo de puestos con su precio por hora. Se usa en todas las ofertas: guárdalo en un fichero para llevártelo a otro equipo o navegador, y cárgalo cuando quieras.</p>' +
       '<div class="pa-fila" style="margin:var(--nz-space-2) 0">' +
-        '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="nuevo-perfil">＋ Perfil</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="restaurar-perfiles-defecto">↺ Perfiles de fábrica</button>' +
+        '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="nuevo-perfil">＋ Añadir perfil</button>' +
+        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-perfiles">⬇ Guardar mis perfiles</button>' +
+        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="imp-perfiles">⬆ Cargar perfiles</button>' +
         '<span class="pa-espacio"></span>' +
-        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="exp-biblio">⬇ Exportar biblioteca</button>' +
+        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-perfiles-defecto">↺ Los de fábrica</button>' +
       "</div>" +
       (filas || '<p class="pa-mini">Sin perfiles: añade los de tu equipo con sus tarifas.</p>') +
       (inactivos.length
@@ -5644,23 +5774,28 @@ body.pa-sin-importes .pa-importe { display: none; }
     const V2 = V();
     const heredados = A().datosHeredados();
     const o = a.pr();
-    return V2.articulo("Datos y copias de seguridad",
+    const imp = a.ESTADO.importadoAuto;
+    return V2.articulo("Datos y copias",
       '<div class="pa-fila">' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-json-todo">⬇ Copia completa (JSON)</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="imp-json">⬆ Importar JSON</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-csv">⬇ CSV de la oferta</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="imprimir">🖨 Informe PDF</button>' +
+        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-json-oferta">⬇ Guardar esta oferta</button>' +
+        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-perfiles">⬇ Guardar mis perfiles</button>' +
+        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-json-todo">⬇ Copia completa</button>' +
       "</div>" +
-      '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Todo se guarda solo en este navegador: nadie más ve tus datos. ' +
-      "Si importas una oferta o una copia, se descarga antes una copia de seguridad de lo que tenías.</p>" +
+      '<div class="pa-fila" style="margin-top:var(--nz-space-2)">' +
+        '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="imp-json">⬆ Cargar un fichero…</button>' +
+        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="exp-csv">⬇ Excel (CSV)</button>' +
+        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="imprimir">🖨 Informe en PDF</button>' +
+      "</div>" +
+      '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Al cargar un fichero, la aplicación reconoce sola si es una oferta, tu catálogo de perfiles o una copia completa. ' +
+      "Todo se guarda en este navegador y no sale de tu equipo.</p>" +
+      (imp
+        ? '<p class="pa-mini" style="margin-top:var(--nz-space-2)">✓ Tus ofertas anteriores se importaron solas el ' + N().fechaCorta(imp.fecha) + " (" + imp.ofertas + " oferta(s)).</p>"
+        : "") +
       (heredados.length
-        ? '<div class="nz-callout nz-callout--warning" style="margin-top:var(--nz-space-2)"><p><strong>Hay datos de versiones anteriores</strong> en este navegador (' +
-          heredados.map(N().esc).join(", ") + "). No se han tocado: puedes traerlos, descargar una copia o descartarlos.</p>" +
-          '<div class="pa-fila">' +
-          '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="traer-heredados">📥 Traer mis ofertas antiguas</button>' +
-          '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="descargar-heredados">⬇ Descargar copia</button>' +
-          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="limpiar-heredados">Descartar</button>' +
-          "</div></div>" 
+        ? '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Queda una copia de tus datos anteriores en este navegador. ' +
+          (imp ? "" : '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="traer-heredados">Importarla</button> ') +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="descargar-heredados">Descargarla</button> ' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="limpiar-heredados">Olvidarla</button></p>'
         : "") +
       '<div class="pa-fila" style="margin-top:var(--nz-space-3)">' +
         '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-ejemplo">Volver al ejemplo de inicio</button>' +
@@ -5997,7 +6132,10 @@ body.pa-sin-importes .pa-importe { display: none; }
     /* ---------- Exportar / importar / imprimir ---------- */
     "exp-json-oferta": () => { A().exportarOferta(o()); APP().toast("Oferta exportada"); },
     "exp-json-todo": () => { A().exportarTodo(APP().ESTADO); APP().toast("Copia de seguridad descargada"); },
-    "exp-biblio": () => { A().exportarBiblioteca(APP().ESTADO); APP().toast("Biblioteca exportada"); },
+    /* Catálogo de perfiles: un fichero que se guarda y se vuelve a cargar cuando
+       haga falta (puestos, categorías y precios por hora), sin base de datos. */
+    "exp-perfiles": () => { A().exportarPerfiles(APP().ESTADO); APP().toast("Perfiles guardados en un fichero"); },
+    "imp-perfiles": () => { const f = V().nodo("pa-fichero"); if (f) f.click(); },
     "exp-csv": () => {
       A().descargar(A().nombreFichero(o().nombre, "csv"), A().csvOferta(o(), pf(), APP().verImportes()), "text/csv;charset=utf-8");
       APP().toast("CSV exportado");
@@ -6014,7 +6152,7 @@ body.pa-sin-importes .pa-importe { display: none; }
     "traer-heredados": () => {
       const migrado = A().leerHeredado();
       if (!migrado) { APP().toast("Ya no quedan datos de versiones anteriores"); return; }
-      if (!confirm("Se van a AÑADIR " + migrado.ofertas.length + " oferta(s) de versiones anteriores a las que tienes ahora y se activará la última.\n\nAntes se descarga una copia de seguridad de tus datos actuales.")) return;
+      if (!confirm("Se van a añadir " + migrado.ofertas.length + " oferta(s) de la copia anterior a las que tienes ahora.\n\nAntes se descarga una copia de seguridad de tus datos actuales.")) return;
       A().descargar("planifica-copia-antes-de-traer-" + N().hoyISO() + ".json", JSON.stringify(APP().ESTADO, null, 2), "application/json");
       const r = A().aplicarImportacion(APP().ESTADO,
         { ok: true, tipo: "estado", datos: migrado, origen: 1 },
@@ -6033,9 +6171,11 @@ body.pa-sin-importes .pa-importe { display: none; }
     },
 
     "limpiar-heredados": () => {
-      if (!confirm("¿Borrar los datos de versiones anteriores guardados en este navegador? La app seguirá con los actuales.")) return;
+      if (!confirm("¿Olvidar la copia de tus datos anteriores?\n\nLos datos que estás usando ahora no se tocan.")) return;
       A().olvidarHeredados();
-      R().todo(); APP().toast("Datos antiguos borrados");
+      const e = APP().ESTADO;
+      if (e && e.importadoAuto) delete e.importadoAuto;
+      R().todo(); APP().guardar(); APP().toast("Copia anterior olvidada");
     },
     "restaurar-ejemplo": () => {
       if (!confirm("¿Volver al ejemplo de inicio? Se reemplazan los datos actuales (antes se descarga una copia).")) return;
@@ -6604,23 +6744,10 @@ body.pa-sin-importes .pa-importe { display: none; }
 
   /* ---------- Aviso de datos heredados ---------- */
 
-  /** Aviso de que hay datos de versiones anteriores, con las TRES salidas
-      posibles: traerlos, descargar una copia o descartarlos. Nunca se borra
-      nada sin que el usuario lo decida. */
-  function refrescarHeredados() {
-    const hay = A().datosHeredados();
-    if (!hay.length) { V().vaciar("pa-herederos"); return; }
-    V().escribir("pa-herederos", V().aviso("warning",
-      "<strong>Datos de versiones anteriores.</strong> Este navegador guarda datos de " + N().esc(hay.join(", ")) +
-      ". La aplicación ha arrancado con una <strong>oferta de ejemplo</strong> para que veas cómo funciona; " +
-      "tus datos antiguos siguen intactos. ¿Qué hacemos con ellos?" +
-      '<div class="pa-fila" style="margin-top:var(--nz-space-2)">' +
-        '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="traer-heredados">📥 Traer mis ofertas antiguas</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="descargar-heredados">⬇ Descargar una copia</button>' +
-        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="limpiar-heredados">Descartarlos</button>' +
-        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-ejemplo">Empezar de cero con el ejemplo</button>' +
-      "</div>"));
-  }
+  /* Sin banner de migración: los datos anteriores se importan solos y la nota,
+     discreta y sin tecnicismos, vive en Ajustes → Datos. Aquí sólo se vacía el
+     hueco (que sigue existiendo para avisos de error). */
+  function refrescarHeredados() { V().vaciar("pa-herederos"); }
 
   /** Aviso suelto (por ejemplo, si falló la lectura de los datos guardados). */
   function avisoHeredados(aviso) {

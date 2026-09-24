@@ -50,12 +50,13 @@
     }).join("");
 
     return V2.articulo("Perfiles del equipo",
-      '<p class="pa-mini">Biblioteca global: se usa en todas las ofertas. Los perfiles «de fábrica» se restauran con ↺. Llévate la biblioteca a otro navegador exportándola.</p>' +
+      '<p class="pa-mini">Tu catálogo de puestos con su precio por hora. Se usa en todas las ofertas: guárdalo en un fichero para llevártelo a otro equipo o navegador, y cárgalo cuando quieras.</p>' +
       '<div class="pa-fila" style="margin:var(--nz-space-2) 0">' +
-        '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="nuevo-perfil">＋ Perfil</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="restaurar-perfiles-defecto">↺ Perfiles de fábrica</button>' +
+        '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="nuevo-perfil">＋ Añadir perfil</button>' +
+        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-perfiles">⬇ Guardar mis perfiles</button>' +
+        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="imp-perfiles">⬆ Cargar perfiles</button>' +
         '<span class="pa-espacio"></span>' +
-        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="exp-biblio">⬇ Exportar biblioteca</button>' +
+        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-perfiles-defecto">↺ Los de fábrica</button>' +
       "</div>" +
       (filas || '<p class="pa-mini">Sin perfiles: añade los de tu equipo con sus tarifas.</p>') +
       (inactivos.length
@@ -70,23 +71,28 @@
     const V2 = V();
     const heredados = A().datosHeredados();
     const o = a.pr();
-    return V2.articulo("Datos y copias de seguridad",
+    const imp = a.ESTADO.importadoAuto;
+    return V2.articulo("Datos y copias",
       '<div class="pa-fila">' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-json-todo">⬇ Copia completa (JSON)</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="imp-json">⬆ Importar JSON</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-csv">⬇ CSV de la oferta</button>' +
-        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="imprimir">🖨 Informe PDF</button>' +
+        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-json-oferta">⬇ Guardar esta oferta</button>' +
+        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-perfiles">⬇ Guardar mis perfiles</button>' +
+        '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="exp-json-todo">⬇ Copia completa</button>' +
       "</div>" +
-      '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Todo se guarda solo en este navegador: nadie más ve tus datos. ' +
-      "Si importas una oferta o una copia, se descarga antes una copia de seguridad de lo que tenías.</p>" +
+      '<div class="pa-fila" style="margin-top:var(--nz-space-2)">' +
+        '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="imp-json">⬆ Cargar un fichero…</button>' +
+        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="exp-csv">⬇ Excel (CSV)</button>' +
+        '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="imprimir">🖨 Informe en PDF</button>' +
+      "</div>" +
+      '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Al cargar un fichero, la aplicación reconoce sola si es una oferta, tu catálogo de perfiles o una copia completa. ' +
+      "Todo se guarda en este navegador y no sale de tu equipo.</p>" +
+      (imp
+        ? '<p class="pa-mini" style="margin-top:var(--nz-space-2)">✓ Tus ofertas anteriores se importaron solas el ' + N().fechaCorta(imp.fecha) + " (" + imp.ofertas + " oferta(s)).</p>"
+        : "") +
       (heredados.length
-        ? '<div class="nz-callout nz-callout--warning" style="margin-top:var(--nz-space-2)"><p><strong>Hay datos de versiones anteriores</strong> en este navegador (' +
-          heredados.map(N().esc).join(", ") + "). No se han tocado: puedes traerlos, descargar una copia o descartarlos.</p>" +
-          '<div class="pa-fila">' +
-          '<button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="traer-heredados">📥 Traer mis ofertas antiguas</button>' +
-          '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="descargar-heredados">⬇ Descargar copia</button>' +
-          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="limpiar-heredados">Descartar</button>' +
-          "</div></div>" 
+        ? '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Queda una copia de tus datos anteriores en este navegador. ' +
+          (imp ? "" : '<button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="traer-heredados">Importarla</button> ') +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="descargar-heredados">Descargarla</button> ' +
+          '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="limpiar-heredados">Olvidarla</button></p>'
         : "") +
       '<div class="pa-fila" style="margin-top:var(--nz-space-3)">' +
         '<button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="restaurar-ejemplo">Volver al ejemplo de inicio</button>' +

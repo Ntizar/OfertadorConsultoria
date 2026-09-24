@@ -315,7 +315,10 @@
     /* ---------- Exportar / importar / imprimir ---------- */
     "exp-json-oferta": () => { A().exportarOferta(o()); APP().toast("Oferta exportada"); },
     "exp-json-todo": () => { A().exportarTodo(APP().ESTADO); APP().toast("Copia de seguridad descargada"); },
-    "exp-biblio": () => { A().exportarBiblioteca(APP().ESTADO); APP().toast("Biblioteca exportada"); },
+    /* Catálogo de perfiles: un fichero que se guarda y se vuelve a cargar cuando
+       haga falta (puestos, categorías y precios por hora), sin base de datos. */
+    "exp-perfiles": () => { A().exportarPerfiles(APP().ESTADO); APP().toast("Perfiles guardados en un fichero"); },
+    "imp-perfiles": () => { const f = V().nodo("pa-fichero"); if (f) f.click(); },
     "exp-csv": () => {
       A().descargar(A().nombreFichero(o().nombre, "csv"), A().csvOferta(o(), pf(), APP().verImportes()), "text/csv;charset=utf-8");
       APP().toast("CSV exportado");
@@ -332,7 +335,7 @@
     "traer-heredados": () => {
       const migrado = A().leerHeredado();
       if (!migrado) { APP().toast("Ya no quedan datos de versiones anteriores"); return; }
-      if (!confirm("Se van a AÑADIR " + migrado.ofertas.length + " oferta(s) de versiones anteriores a las que tienes ahora y se activará la última.\n\nAntes se descarga una copia de seguridad de tus datos actuales.")) return;
+      if (!confirm("Se van a añadir " + migrado.ofertas.length + " oferta(s) de la copia anterior a las que tienes ahora.\n\nAntes se descarga una copia de seguridad de tus datos actuales.")) return;
       A().descargar("planifica-copia-antes-de-traer-" + N().hoyISO() + ".json", JSON.stringify(APP().ESTADO, null, 2), "application/json");
       const r = A().aplicarImportacion(APP().ESTADO,
         { ok: true, tipo: "estado", datos: migrado, origen: 1 },
@@ -351,9 +354,11 @@
     },
 
     "limpiar-heredados": () => {
-      if (!confirm("¿Borrar los datos de versiones anteriores guardados en este navegador? La app seguirá con los actuales.")) return;
+      if (!confirm("¿Olvidar la copia de tus datos anteriores?\n\nLos datos que estás usando ahora no se tocan.")) return;
       A().olvidarHeredados();
-      R().todo(); APP().toast("Datos antiguos borrados");
+      const e = APP().ESTADO;
+      if (e && e.importadoAuto) delete e.importadoAuto;
+      R().todo(); APP().guardar(); APP().toast("Copia anterior olvidada");
     },
     "restaurar-ejemplo": () => {
       if (!confirm("¿Volver al ejemplo de inicio? Se reemplazan los datos actuales (antes se descarga una copia).")) return;

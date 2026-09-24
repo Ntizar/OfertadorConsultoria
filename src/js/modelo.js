@@ -49,12 +49,30 @@
     };
   }
 
+  /* Jornada de trabajo: es lo que convierte dedicación (%) en horas. Va dentro de
+     la oferta para que cada oferta sea autocontenida y exportable. */
+  const JORNADA_DEFECTO = { horasDia: 8, diasSemana: [1, 2, 3, 4, 5] };   /* 1=lunes … 7=domingo */
+
+  function normalizarJornada(j) {
+    const u = N();
+    const q = (j && typeof j === "object") ? j : {};
+    let dias = Array.isArray(q.diasSemana)
+      ? q.diasSemana.map(d => Math.round(u.acota(d, 1, 7))).filter(d => d >= 1 && d <= 7)
+      : [];
+    dias = Array.from(new Set(dias)).sort((a, b) => a - b);
+    return {
+      horasDia: u.acota(q.horasDia === undefined ? JORNADA_DEFECTO.horasDia : q.horasDia, 0.5, 24),
+      diasSemana: dias.length ? dias : JORNADA_DEFECTO.diasSemana.slice()
+    };
+  }
+
   function nuevaOferta(nombre) {
     return {
       id: N().uid("of_"), nombre: N().texto(nombre, "Oferta sin título"),
       cliente: { nombre: "", contacto: "", ref: "" },
       estado: "borrador", fecha: N().hoyISO(), validezDias: 30,
       periodos: P().porDefecto(),
+      jornada: normalizarJornada(null),
       descripcion: "", condicionesPago: "",
       impuestos: { tipo: "iva", tasa: 21, incluido: false },
       descuento: { tipo: "", valor: 0 },
@@ -185,6 +203,7 @@
     }
     q.periodos = P().normalizar(q.periodos);
     delete q.fechaInicio; delete q.meses;
+    q.jornada = normalizarJornada(q.jornada);
 
     if (esMigracion && !q.impuestos) {
       q.impuestos = { tipo: "ninguno", tasa: 0, incluido: false };
@@ -389,6 +408,7 @@
     normalizarEntregable: normalizarEntregable, normalizarTarea: normalizarTarea,
     normalizarOferta: normalizarOferta, normalizarFoto: normalizarFoto,
     normalizarEstado: normalizarEstado, migrar: migrar, estadoInicial: estadoInicial,
+    JORNADA_DEFECTO: JORNADA_DEFECTO, normalizarJornada: normalizarJornada,
     buscarTarea: buscarTarea, buscarSubtarea: buscarSubtarea, buscarLinea: buscarLinea,
     buscarEntregable: buscarEntregable, buscarFoto: buscarFoto, colgarEntregable: colgarEntregable
   };

@@ -49,15 +49,17 @@
         const d = JSON.parse(viejo);
         const ofertas = d && (d.ofertas || d.proyectos);
         if (Array.isArray(ofertas)) {
-          /* Hay datos de una versión anterior y todavía no hay datos v4: NO se
-             imponen. La aplicación arranca con la oferta de ejemplo y los datos
-             antiguos quedan disponibles para traerlos, copiarlos o descartarlos
-             (así se empieza limpio sin perder nada). */
+          /* Datos de una versión anterior y todavía sin datos v4: se importan
+             SOLOS y se usan. Sin banners, sin preguntas y sin claves técnicas en
+             pantalla; en Ajustes → Datos queda una nota discreta por si el usuario
+             quiere descargar una copia o descartarlos. */
           const r = M2.migrar(d);
-          return {
-            estado: null, migrado: M2.normalizarEstado(r.estado), origen: r.origen, heredado: true,
-            aviso: ""   /* el aviso (con sus tres salidas) lo pinta el arranque */
+          const est = M2.normalizarEstado(r.estado);
+          est.importadoAuto = {
+            fecha: PL.nucleo.hoyISO(), origen: r.origen,
+            ofertas: est.ofertas.length, perfiles: est.perfiles.length
           };
+          return { estado: est, origen: r.origen, heredado: true, aviso: "" };
         }
       } catch (e) { /* se prueba con la siguiente clave */ }
     }
@@ -137,6 +139,15 @@
 
   function exportarTodo(estado) {
     descargar("planifica-datos-" + N().hoyISO() + ".json", JSON.stringify(estado, null, 2), "application/json");
+  }
+
+  /** Catálogo de perfiles: fichero suelto para guardarlo y volver a cargarlo
+      cuando haga falta (puestos, categorías y precios por hora). */
+  function exportarPerfiles(estado) {
+    return JSON.stringify({
+      tipo: "planifica-perfiles", version: M().VERSION_DATOS, exportado: PL.nucleo.hoyISO(),
+      perfiles: estado.perfiles, perfilesInactivos: estado.perfilesInactivos
+    }, null, 2);
   }
 
   function exportarBiblioteca(estado) {
@@ -220,13 +231,16 @@
     if ((d.tipo === "planifica-oferta" || d.tipo === "planifica-proyecto") && (d.oferta || d.proyecto)) {
       return { ok: true, tipo: "oferta", datos: d.oferta || d.proyecto };
     }
-    if (d.tipo === "planifica-biblioteca") return { ok: true, tipo: "biblioteca", datos: d };
+    if (d.tipo === "planifica-biblioteca" || d.tipo === "planifica-perfiles") {
+      return { ok: true, tipo: "biblioteca", datos: d };
+    }
     const ofertas = d.ofertas || d.proyectos;
     if (Array.isArray(ofertas)) {
       const origen = (d.version === 4) ? 4 : ((d.version === 3 || d.version === 2) ? d.version : 1);
       return { ok: true, tipo: "estado", origen: origen, datos: d };
     }
-    return { ok: false, error: "Formato no reconocido: se espera una oferta, una biblioteca o una copia completa de Planifica." };
+    if (Array.isArray(d.perfiles)) return { ok: true, tipo: "biblioteca", datos: d };
+    return { ok: false, error: "No se reconoce el fichero: se espera una oferta de Planifica, tu catálogo de perfiles o una copia completa." };
   }
 
   function aplicarImportacion(estado, analisis, opciones) {
@@ -295,6 +309,7 @@
     tieneLS: tieneLS, cargar: cargar, guardar: guardar, datosHeredados: datosHeredados, leerHeredado: leerHeredado,
     olvidarHeredados: olvidarHeredados, descargar: descargar, nombreFichero: nombreFichero,
     exportarOferta: exportarOferta, exportarTodo: exportarTodo, exportarBiblioteca: exportarBiblioteca,
+    exportarPerfiles: exportarPerfiles,
     csvOferta: csvOferta, analizarImportacion: analizarImportacion, aplicarImportacion: aplicarImportacion
   };
 })(typeof window !== "undefined" ? window : globalThis);

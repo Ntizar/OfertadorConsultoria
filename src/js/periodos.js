@@ -223,7 +223,42 @@
     return conInicio(q, N().mesISO(fecha(q, Math.round(N().num(k)))));
   }
 
+  /* ---------- Días y horas laborables ---------- */
+
+  /* Caché: el cálculo de días laborables se pide una vez por celda y no cambia
+     mientras no cambien el mes ni la jornada. */
+  const CACHE_LAB = {};
+
+  /** Días del mes del periodo i. */
+  function diasDelMes(p, i) {
+    const f = fecha(p, i);
+    return new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
+  }
+
+  /** Días laborables del periodo i (los días de la semana que se trabajan). */
+  function diasLaborables(p, i, diasSemana) {
+    const f = fecha(p, i);
+    const dias = (Array.isArray(diasSemana) && diasSemana.length) ? diasSemana : [1, 2, 3, 4, 5];
+    const clave = f.getFullYear() + "-" + (f.getMonth() + 1) + "|" + dias.join(",");
+    if (CACHE_LAB[clave] !== undefined) return CACHE_LAB[clave];
+    const total = new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate();
+    let n = 0;
+    for (let d = 1; d <= total; d++) {
+      const wd = new Date(f.getFullYear(), f.getMonth(), d).getDay();   /* 0=domingo */
+      if (dias.indexOf(wd === 0 ? 7 : wd) >= 0) n++;
+    }
+    CACHE_LAB[clave] = n;
+    return n;
+  }
+
+  /** Horas laborables del periodo i: días laborables × horas por día. */
+  function horasLaborables(p, i, jornada) {
+    const j = jornada || { horasDia: 8, diasSemana: [1, 2, 3, 4, 5] };
+    return N().r2(diasLaborables(p, i, j.diasSemana) * N().acota(j.horasDia === undefined ? 8 : j.horasDia, 0, 24));
+  }
+
   PL.periodos = {
+    diasDelMes: diasDelMes, diasLaborables: diasLaborables, horasLaborables: horasLaborables,
     ZOOMS: ZOOMS, MIN: MIN_PERIODOS, MAX: MAX_PERIODOS,
     porDefecto: porDefecto, normalizar: normalizar,
     fecha: fecha, meses: meses, indiceDe: indiceDe,

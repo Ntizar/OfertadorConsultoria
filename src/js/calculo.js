@@ -107,6 +107,62 @@
 
   /* ---------- Gastos, descuento, impuestos, total ---------- */
 
+  /* ---------- Dedicación: porcentaje ↔ horas ----------
+     Las horas son el DATO (y lo que cuadra el encargo al céntimo); el porcentaje
+     es la puerta de entrada cómoda: «media jornada ese mes» = 50 %. */
+
+  function jornada(o) { return PL.modelo.normalizarJornada(o && o.jornada); }
+
+  /** Horas laborables de un mes con la jornada de la oferta. */
+  function horasLaborablesMes(o, i) { return P().horasLaborables(o && o.periodos, i, jornada(o)); }
+
+  /** Horas laborables de toda la oferta. */
+  function horasLaborablesTotal(o) {
+    const n = P().meses(o && o.periodos);
+    let t = 0;
+    for (let i = 0; i < n; i++) t += horasLaborablesMes(o, i);
+    return N().r2(t);
+  }
+
+  /** Qué porcentaje de la jornada del mes representan estas horas. */
+  function pctDeHoras(o, i, horas) {
+    const lim = horasLaborablesMes(o, i);
+    return lim > 0 ? N().r2(N().num(horas) / lim * 100) : 0;
+  }
+
+  /** Cuántas horas son este porcentaje de la jornada del mes. */
+  function horasDePct(o, i, pct) {
+    return N().r2(N().acota(pct, 0, 1000) / 100 * horasLaborablesMes(o, i));
+  }
+
+  /** Horas de UN perfil en UN mes (sumando todas sus líneas de la oferta). */
+  function horasPerfilEnMes(o, perfilId, i) {
+    const m = horasPerfilPeriodo(o);
+    const fila = m[perfilId] || [];
+    return N().r2(fila[i] || 0);
+  }
+
+  function pctPerfilEnMes(o, perfilId, i) { return pctDeHoras(o, i, horasPerfilEnMes(o, perfilId, i)); }
+
+  /** Perfiles que se pasan del 100 % en algún mes: nadie puede estar más de una
+      jornada completa a la vez. Devuelve [{perfilId, periodo, horas, limite, pct}]. */
+  function excesosPerfil(o) {
+    const out = [];
+    const m = horasPerfilPeriodo(o);
+    const n = P().meses(o && o.periodos);
+    Object.keys(m).forEach(perfilId => {
+      for (let i = 0; i < n; i++) {
+        const h = N().r2((m[perfilId] || [])[i] || 0);
+        if (h <= 0) continue;
+        const lim = horasLaborablesMes(o, i);
+        if (lim > 0 && h > lim + 0.005) {
+          out.push({ perfilId: perfilId, periodo: i, horas: h, limite: lim, pct: pctDeHoras(o, i, h) });
+        }
+      }
+    });
+    return out;
+  }
+
   function gastoImporte(g) { return N().r2(N().num(g && g.unidades) * N().num(g && g.precio)); }
   function gastosTotal(o) { return N().r2(N().suma(lista(o && o.gastos), gastoImporte)); }
 
@@ -206,6 +262,9 @@
     baseImponible: baseImponible, nombreImpuesto: nombreImpuesto,
     impuestoImporte: impuestoImporte, totalOferta: totalOferta, mediaPeriodo: mediaPeriodo,
     anualidades: anualidades, usosPerfil: usosPerfil,
+    jornada: jornada, horasLaborablesMes: horasLaborablesMes, horasLaborablesTotal: horasLaborablesTotal,
+    pctDeHoras: pctDeHoras, horasDePct: horasDePct,
+    horasPerfilEnMes: horasPerfilEnMes, pctPerfilEnMes: pctPerfilEnMes, excesosPerfil: excesosPerfil,
     clonarTarea: clonarTarea, clonarSubtarea: clonarSubtarea
   };
 })(typeof window !== "undefined" ? window : globalThis);

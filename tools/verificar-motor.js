@@ -17,7 +17,7 @@ if (CARGADO.faltan.length) {
 }
 check("los 8 módulos del motor se cargan", CARGADO.cargados.length === 8, CARGADO.cargados.join(", "));
 
-const N = PL.nucleo, P = PL.periodos, M = PL.modelo, C = PL.calculo, E = PL.entregables, X = PL.comparar;
+const N = PL.nucleo, P = PL.periodos, M = PL.modelo, C = PL.calculo, E = PL.entregables, X = PL.comparar, EJ = PL.ejemplo;
 const ESTADO = M.estadoInicial();
 const OF = ESTADO.ofertas[0];
 const PF = ESTADO.perfiles;
@@ -298,6 +298,49 @@ check("el importe de línea redondea a 2 decimales", (() => {
 })());
 check("fechaCorta formatea dd/mm/aaaa", N.fechaCorta("2027-03-15") === "15/03/2027", N.fechaCorta("2027-03-15"));
 check("fechaLarga en español", N.fechaLarga("2027-03-15").indexOf("marzo") > 0, N.fechaLarga("2027-03-15"));
+
+/* ---------- 12. Dedicación: porcentaje ↔ horas y tope del 100 % ---------- */
+t.grupo("12. Dedicación (% ↔ horas) y control del 100 %");
+
+/* Las horas laborables de cada mes se contrastan contra un cálculo independiente
+   (Python: calendar + weekday < 5, jornada de 8 h). */
+const LAB_ESPERADO = [176, 168, 184, 168, 160, 184];
+const LAB_MOTOR = [0, 1, 2, 3, 4, 5].map(i => C.horasLaborablesMes(OF, i));
+check("horas laborables de los 6 meses coinciden con el cálculo independiente",
+  LAB_MOTOR.join(",") === LAB_ESPERADO.join(","), "motor " + LAB_MOTOR.join(",") + " vs esperado " + LAB_ESPERADO.join(","));
+check("total de horas laborables del calendario = 1.040 h", C.horasLaborablesTotal(OF) === 1040, C.horasLaborablesTotal(OF));
+check("jornada de fábrica: 8 h al día de lunes a viernes",
+  OF.jornada.horasDia === 8 && OF.jornada.diasSemana.join(",") === "1,2,3,4,5", JSON.stringify(OF.jornada));
+check("88 h en octubre (176 h laborables) son el 50 %", C.pctDeHoras(OF, 0, 88) === 50, C.pctDeHoras(OF, 0, 88));
+check("el 50 % de octubre son 88 h", C.horasDePct(OF, 0, 50) === 88, C.horasDePct(OF, 0, 50));
+check("el 100 % de febrero (160 h) son 160 h", C.horasDePct(OF, 4, 100) === 160, C.horasDePct(OF, 4, 100));
+check("una jornada de 4 h/día deja el mes en la mitad",
+  C.horasLaborablesMes(M.normalizarOferta({ jornada: { horasDia: 4 } }), 0) === 88);
+check("trabajar los sábados añade días laborables",
+  P.diasLaborables(OF.periodos, 0, [1, 2, 3, 4, 5, 6]) > P.diasLaborables(OF.periodos, 0, [1, 2, 3, 4, 5]),
+  P.diasLaborables(OF.periodos, 0, [1, 2, 3, 4, 5]) + " → " + P.diasLaborables(OF.periodos, 0, [1, 2, 3, 4, 5, 6]));
+check("la oferta de ejemplo NO tiene a nadie por encima del 100 %", C.excesosPerfil(OF).length === 0,
+  JSON.stringify(C.excesosPerfil(OF).slice(0, 2)));
+check("las horas por perfil y mes suman el esfuerzo total",
+  Math.abs(N.suma(Object.keys(C.horasPerfilPeriodo(OF)).map(k => N.suma(C.horasPerfilPeriodo(OF)[k]))) - C.ofertaHoras(OF)) < 0.005);
+
+/* Un perfil al 150 % en octubre: se tiene que ver */
+const ofExc = EJ.ofertaEjemplo(PF);
+ofExc.tareas.forEach(t2 => t2.subtareas.forEach(sb => sb.lineas.forEach(l => { Object.keys(l.horas).forEach(k => { l.horas[k] = 0; }); })));
+ofExc.tareas[0].subtareas[0].lineas[0].perfilId = PF[0].id;
+ofExc.tareas[0].subtareas[0].lineas[0].horas.p0 = 264;   /* 150 % de 176 h */
+const exc = C.excesosPerfil(ofExc);
+check("detecta a un perfil por encima del 100 % en un mes", exc.length === 1, JSON.stringify(exc));
+check("el exceso trae perfil, mes, horas, límite y porcentaje",
+  exc[0] && exc[0].perfilId === PF[0].id && exc[0].periodo === 0 && exc[0].horas === 264 && exc[0].limite === 176 && exc[0].pct === 150,
+  JSON.stringify(exc[0]));
+check("el 100 % justo no se considera exceso", (() => {
+  const of2 = EJ.ofertaEjemplo(PF);
+  of2.tareas.forEach(t2 => t2.subtareas.forEach(sb => sb.lineas.forEach(l => { Object.keys(l.horas).forEach(k => { l.horas[k] = 0; }); })));
+  of2.tareas[0].subtareas[0].lineas[0].perfilId = PF[0].id;
+  of2.tareas[0].subtareas[0].lineas[0].horas.p0 = 176;
+  return C.excesosPerfil(of2).length === 0;
+})());
 
 t.resumen();
 process.exit(t.ko ? 1 : 0);
