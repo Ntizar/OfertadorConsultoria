@@ -14,7 +14,7 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parents[1]
 AURORA = Path(r"C:/Users/d_ant/Projects/Aurora-7")
-TAG = "v7.2.0"
+TAG = "v7.2.1"
 
 PACKS = [
     "tokens.css",

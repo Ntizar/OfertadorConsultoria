@@ -77,6 +77,17 @@
         if (!culpable || el.contains(culpable) === false) culpable = culpable || el;
       }
     });
+    /* Dentro de una tarjeta de horas: quien manda de ancho cuando no cabe. */
+    const internos = [];
+    document.querySelectorAll(".pa-tabla-horas").forEach(c => {
+      if (!c.clientWidth) return;
+      let mayor = null;
+      c.querySelectorAll("td, th, select, input, .pa-celda__eq").forEach(el => {
+        const ancho = Math.round(el.getBoundingClientRect().width);
+        if (!mayor || ancho > mayor.ancho) mayor = { el: describe(el).slice(0, 50), ancho: ancho };
+      });
+      internos.push({ caja: describe(c).slice(0, 40), visible: c.clientWidth, contenido: c.scrollWidth, mayor: mayor });
+    });
     return {
       anchoVentana: vw,
       escala: window.devicePixelRatio,
@@ -89,6 +100,7 @@
       elementosFuera: fuera.slice(0, 20),
       totalFuera: fuera.length,
       contenedoresConScroll: scrolls,
+      internos: internos,
       tablas: tablas
     };
   }

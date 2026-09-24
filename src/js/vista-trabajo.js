@@ -180,7 +180,7 @@
       }).join("");
 
       return '<tr data-id="' + l.id + '"' + (exceso ? ' class="pa-fila--exceso"' : "") + ">" +
-        '<td data-etiqueta="Perfil"><select class="nz-input nz-input--sm" data-campo="linea-perfil" data-id="' + l.id + '" aria-label="Perfil" style="min-width:150px">' +
+        '<td data-etiqueta="Perfil"><select class="nz-input nz-input--sm pa-select-perfil" data-campo="linea-perfil" data-id="' + l.id + '" aria-label="Perfil">' +
           '<option value=""' + (!l.perfilId ? " selected" : "") + ' disabled>— Elige perfil —</option>' +
           N().lista(pf).map(p => '<option value="' + p.id + '"' + (p.id === l.perfilId ? " selected" : "") + ">" + N().esc(p.nombre) + "</option>").join("") +
         "</select></td>" + celdas +

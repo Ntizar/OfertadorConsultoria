@@ -128,7 +128,7 @@
       return "<tr>" +
         '<td><label class="pa-ahora"><input type="checkbox" data-campo="jornada-dia" data-dia="' + dia + '"' +
           (laborable ? " checked" : "") + "> " + d[1] + "</label></td>" +
-        '<td class="nz-table__right">' + (laborable
+        '<td class="nz-table__right" data-etiqueta="Horas">' + (laborable
           ? '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0" max="24" step="0.5" ' +
             'data-campo="jornada-horas-dia" data-dia="' + dia + '" value="' + N().fmtNum(horas) + '" aria-label="Horas del ' + d[1] + '"> h'
           : '<span class="pa-mini">no se trabaja</span>') + "</td></tr>";
@@ -140,9 +140,11 @@
     };
 
     const listaFestivos = festivos.length
-      ? '<table class="nz-table nz-table--compact"><thead><tr><th>Día</th><th>Festivo</th><th></th><th></th></tr></thead><tbody>' +
-        festivos.map(f => "<tr><td>" + N().esc(hFestivo(f)) + "</td><td>" + N().esc(f.nombre) +
-          '</td><td><span class="nz-badge nz-badge--neutral">' + N().esc(f.ambito || "Propio") + "</span></td>" +
+      ? '<table class="nz-table nz-table--apilable"><thead><tr><th>Día</th><th>Festivo</th><th></th><th></th></tr></thead><tbody>' +
+        festivos.map(f => "<tr>" +
+          '<td data-etiqueta="Día">' + N().esc(hFestivo(f)) + "</td>" +
+          '<td data-etiqueta="Festivo">' + N().esc(f.nombre) + "</td>" +
+          '<td data-etiqueta="Ámbito"><span class="nz-badge nz-badge--neutral">' + N().esc(f.ambito || "Propio") + "</span></td>" +
           '<td><button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="quitar-festivo" data-id="' + N().esc(f.fecha) +
           '" title="Quitar este festivo">✕</button></td></tr>').join("") +
         "</tbody></table>"
@@ -154,8 +156,8 @@
       "de lo mismo: con esto la dedicación se calcula sobre días reales de trabajo.</p>" +
       '<div class="pa-jornada">' +
         '<div>' +
-          '<table class="nz-table nz-table--compact"><thead><tr><th>Día</th><th class="nz-table__right">Horas</th></tr></thead>' +
-          "<tbody>" + filasDias + "</tbody></table>" +
+          '<div class="nz-table-wrap nz-table-wrap--apilable"><table class="nz-table nz-table--apilable"><thead><tr><th>Día</th><th class="nz-table__right">Horas</th></tr></thead>' +
+          "<tbody>" + filasDias + "</tbody></table></div>" +
           '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Horas al día por omisión: ' +
             '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0.5" max="24" step="0.5" ' +
             'data-campo="jornada-horas" value="' + N().fmtNum(j.horasDia) + '" aria-label="Horas al día por omisión"> ' +
@@ -172,7 +174,7 @@
               'title="Carga los festivos de España, la Comunidad de Madrid y Madrid capital de los años del calendario">' +
               "Cargar los de España y Madrid</button>" +
           "</div>" +
-          '<div class="pa-tabla-horas">' + listaFestivos + "</div>" +
+          '<div class="nz-table-wrap nz-table-wrap--apilable">' + listaFestivos + "</div>" +
           '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Van precargados los de España y Madrid, pero ' +
           "<strong>son editables</strong>: los locales cambian cada año y cada empresa tiene los suyos.</p>" +
         "</div>" +

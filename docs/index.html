@@ -6,8 +6,8 @@
 <title>Oferta — del encargo a la oferta</title>
 <!-- Aurora 7 v7.2.0 — packs incrustados por tools/compilar.py. App autocontenida: sin CDN, sin servidor. -->
 <style>
-/* ====== Aurora 7 v7.2.0 incrustado (10 packs) ====== */
-/* ====== Aurora 7 v7.2.0: tokens.css ====== */
+/* ====== Aurora 7 v7.2.1 incrustado (10 packs) ====== */
+/* ====== Aurora 7 v7.2.1: tokens.css ====== */
 /* ============================================================
    AURORA 7 — tokens.css
    Design System Ntizar · Fuente única de verdad de tokens
@@ -271,7 +271,7 @@
    lg    ≥ 1200px  layout completo
 ---- */
 
-/* ====== Aurora 7 v7.2.0: packs/p1-layout.css ====== */
+/* ====== Aurora 7 v7.2.1: packs/p1-layout.css ====== */
 /* ============================================================
    AURORA 7 — p1-layout.css · Categoría 1 · Layout y estructura (167 objetos)
    Contenedores, rejillas, spans, pilas, landmarks, sticky, bleed,
@@ -289,6 +289,15 @@
 .nz-container--fixed { max-width: 60rem; }
 .nz-container--wide { max-width: 84rem; }
 .nz-container--narrow { max-width: var(--nz-container-narrow); }
+
+/* ---- Nada se sale de la pantalla ----
+   Un hijo de rejilla o de caja flexible nace con min-width:auto, así que una
+   tabla o una línea larga estira su columna y desborda la página entera: es la
+   causa número uno de que un móvil se vea «cortado». Con min-width:0 el hijo
+   encoge y quien se desplaza es su propio contenedor (.nz-table-wrap). */
+.nz-container > *, .nz-dash-grid > *, .nz-split > *, .nz-thirds > *, .nz-bento > *,
+.nz-grid-12 > *, .nz-holy > *, .nz-splitpane > *,
+.nz-article, .nz-collapsible { min-width: 0; }
 
 /* ---- 03 Grid de 12 columnas ---- */
 .nz-grid-12 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--nz-space-4); }
@@ -623,7 +632,7 @@
 .nz-collapsible.is-open { border-left: var(--nz-border-w-strong) solid var(--nz-brand); }
 .nz-route.is-active { border-left: var(--nz-border-w-strong) solid var(--nz-brand); padding-left: var(--nz-space-4); }
 
-/* ====== Aurora 7 v7.2.0: packs/p2-navigation.css ====== */
+/* ====== Aurora 7 v7.2.1: packs/p2-navigation.css ====== */
 /* ============================================================
    AURORA 7 — p2-navigation.css · Categoría 2 · Navegación (76 objetos)
    Navbar, menú, sidebar, tabs, breadcrumbs, paginación, TOC,
@@ -633,11 +642,11 @@
    ============================================================ */
 
 /* ---- 01 Navbar superior ---- */
-.nz-navbar { display: flex; align-items: center; gap: var(--nz-space-3); min-height: 56px; padding: 0 var(--nz-gutter); background: var(--nz-surface); border-bottom: var(--nz-border-w) solid var(--nz-border-soft); }
+.nz-navbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nz-space-2) var(--nz-space-3); min-height: 56px; padding: var(--nz-space-2) var(--nz-gutter); background: var(--nz-surface); border-bottom: var(--nz-border-w) solid var(--nz-border-soft); }
 .nz-navbar__brand { display: flex; align-items: center; gap: var(--nz-space-2); font-weight: 800; letter-spacing: var(--nz-tracking-tight); color: var(--nz-text); }
 .nz-navbar__brand i { width: 10px; height: 10px; border-radius: var(--nz-radius-full); background: var(--nz-brand); }
 .nz-navbar__brand--lg { font-size: var(--nz-text-lg); }
-.nz-navbar__links { display: flex; align-items: center; gap: var(--nz-space-1); margin-left: auto; overflow-x: auto; scrollbar-width: none; }
+.nz-navbar__links { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nz-space-1); margin-left: auto; min-width: 0; }
 .nz-navbar__links::-webkit-scrollbar { display: none; }
 .nz-navbar__link { min-height: 44px; display: inline-flex; align-items: center; padding: 0 var(--nz-space-3); border-radius: var(--nz-radius-full); color: var(--nz-text-soft); font-size: var(--nz-text-sm); font-weight: 600; text-decoration: none; }
 .nz-navbar__link:hover { background: var(--nz-bg-inset); color: var(--nz-text); }
@@ -685,7 +694,10 @@
 .nz-sidebar--brand .nz-sidebar__link:not([aria-current="page"]) { color: var(--nz-text); }
 
 /* ---- 05 Tabs ---- */
-.nz-tabs { display: flex; gap: var(--nz-space-1); border-bottom: var(--nz-border-w) solid var(--nz-border-soft); overflow-x: auto; scrollbar-width: none; }
+/* Las pestañas se envuelven: todas se ven y se pulsan sin desplazar nada ni
+   adivinar que hay más a la derecha. Si una barra tiene que quedarse en una
+   línea, se pide con --scroll. */
+.nz-tabs { display: flex; flex-wrap: wrap; gap: var(--nz-space-1); border-bottom: var(--nz-border-w) solid var(--nz-border-soft); }
 .nz-tabs::-webkit-scrollbar { display: none; }
 .nz-tabs__tab { position: relative; white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center; padding: 0 var(--nz-space-4); color: var(--nz-text-soft); font-size: var(--nz-text-sm); font-weight: 600; text-decoration: none; border: 0; background: transparent; font-family: inherit; cursor: pointer; }
 .nz-tabs__tab:hover { color: var(--nz-text); }
@@ -694,21 +706,28 @@
 .nz-tabs__tab--count::before { content: attr(data-count); margin-right: var(--nz-space-2); font-size: var(--nz-text-2xs); padding: 0.1rem 0.45rem; border-radius: var(--nz-radius-full); background: var(--nz-bg-inset); color: var(--nz-text-mute); font-variant-numeric: tabular-nums; }
 .nz-tabs__tab--disabled, .nz-tabs__tab[aria-disabled="true"] { color: var(--nz-text-faint); cursor: not-allowed; }
 .nz-tabs__badge { margin-left: var(--nz-space-2); min-width: 1.5rem; height: 1.25rem; display: inline-flex; align-items: center; justify-content: center; padding: 0 var(--nz-space-1); border-radius: var(--nz-radius-full); background: var(--nz-brand); color: var(--nz-text-invert); font-size: var(--nz-text-2xs); font-variant-numeric: tabular-nums; }
-.nz-tabs__panel { padding-block: var(--nz-space-4); color: var(--nz-text-soft); font-size: var(--nz-text-sm); }
+.nz-tabs__panel { min-width: 0; padding-block: var(--nz-space-4); color: var(--nz-text-soft); font-size: var(--nz-text-sm); }
 .nz-tabs--center { justify-content: center; }
 .nz-tabs--full .nz-tabs__tab { flex: 1 1 0; justify-content: center; }
 .nz-tabs--underline .nz-tabs__tab[aria-selected="true"], .nz-tabs--underline .nz-tabs__tab.is-active { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: var(--nz-space-2); }
 .nz-tabs--underline .nz-tabs__tab[aria-selected="true"]::after, .nz-tabs--underline .nz-tabs__tab.is-active::after { display: none; }
-.nz-tabs--vertical { flex-direction: column; align-items: stretch; border-bottom: 0; border-inline-start: var(--nz-border-w) solid var(--nz-border-soft); overflow-x: visible; }
+.nz-tabs--vertical { flex-direction: column; flex-wrap: nowrap; align-items: stretch; border-bottom: 0; border-inline-start: var(--nz-border-w) solid var(--nz-border-soft); overflow-x: visible; }
 .nz-tabs--vertical .nz-tabs__tab { justify-content: flex-start; }
 .nz-tabs--vertical .nz-tabs__tab[aria-selected="true"]::after, .nz-tabs--vertical .nz-tabs__tab.is-active::after { left: -1px; right: auto; top: var(--nz-space-2); bottom: var(--nz-space-2); width: 3px; height: auto; }
 
-/* ---- 06 Pill tabs (móvil, scroll horizontal) ---- */
+/* ---- 06 Pill tabs ---- */
 .nz-tabs--pill { gap: var(--nz-space-2); border: 0; }
 .nz-tabs--pill .nz-tabs__tab { border-radius: var(--nz-radius-full); }
 .nz-tabs--pill .nz-tabs__tab[aria-selected="true"], .nz-tabs--pill .nz-tabs__tab.is-active { background: var(--nz-brand); color: var(--nz-text-invert); }
 .nz-tabs--pill .nz-tabs__tab[aria-selected="true"]::after, .nz-tabs--pill .nz-tabs__tab.is-active::after { display: none; }
 .nz-tabs--pill .nz-tabs__badge { background: var(--nz-text-invert); color: var(--nz-brand); }
+
+/* ---- 06b Barra en una sola línea, con desplazamiento a propósito ----
+   Para cuando las pestañas deben ocupar el ancho exacto de la pantalla y
+   prefieres deslizar antes que envolver. La barra fina deja ver que hay más. */
+.nz-tabs--scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+.nz-tabs--scroll::-webkit-scrollbar { height: 4px; display: block; }
+.nz-tabs--scroll::-webkit-scrollbar-thumb { background: var(--nz-border-strong); border-radius: var(--nz-radius-full); }
 
 /* ---- 07 Breadcrumbs ---- */
 .nz-breadcrumb { display: flex; align-items: center; gap: var(--nz-space-1); flex-wrap: wrap; padding: var(--nz-space-2) 0; font-size: var(--nz-text-sm); }
@@ -792,7 +811,7 @@
 .nz-stepper--compact .nz-stepper__num { min-width: 22px; height: 22px; }
 .nz-stepper--vertical { flex-direction: column; align-items: flex-start; gap: var(--nz-space-3); overflow-x: visible; }
 
-/* ====== Aurora 7 v7.2.0: packs/p3-typography.css ====== */
+/* ====== Aurora 7 v7.2.1: packs/p3-typography.css ====== */
 /* ============================================================
    AURORA 7 — p3-typography.css · Categoría 3 · Tipografía (130 objetos)
    Escala, tonos de titular, cuerpo, prose (dueño único), listas,
@@ -991,7 +1010,7 @@
 .nz--tracking-tight { letter-spacing: var(--nz-tracking-tight); }
 .nz--tracking-caps { letter-spacing: var(--nz-tracking-caps); }
 
-/* ====== Aurora 7 v7.2.0: packs/p4-actions.css ====== */
+/* ====== Aurora 7 v7.2.1: packs/p4-actions.css ====== */
 /* ============================================================
    AURORA 7 — p4-actions.css · Categoría 04 · Acciones y botones
    Botones (variantes, tonos, tamaños y formas), grupos, segmentado,
@@ -1147,7 +1166,7 @@
   .nz-spin { animation-duration: 1.6s; }
 }
 
-/* ====== Aurora 7 v7.2.0: packs/p5-forms.css ====== */
+/* ====== Aurora 7 v7.2.1: packs/p5-forms.css ====== */
 /* ============================================================
    AURORA 7 — p5-forms.css · Categoría 05 · Formularios e inputs (97 objetos)
    Etiquetas, campos, inputs, select, textarea, check/radio/switch, range,
@@ -1420,7 +1439,7 @@
 .nz-filezona.is-error { border-color: var(--nz-danger); background: var(--nz-danger-soft); color: var(--nz-danger); }
 .nz-filezona.is-success { border-color: var(--nz-success); background: var(--nz-success-soft); color: var(--nz-success); }
 
-/* ====== Aurora 7 v7.2.0: packs/p6-feedback.css ====== */
+/* ====== Aurora 7 v7.2.1: packs/p6-feedback.css ====== */
 /* ============================================================
    AURORA 7 — p6-feedback.css · Categoría 06 · Feedback y estados (143 objetos)
    Alertas, callouts, badges, chips, toast, banner, barras de estado,
@@ -1688,7 +1707,7 @@
 .nz-loading-bar__bar--warning { background: var(--nz-warning); }
 .nz-loading-bar__bar--danger { background: var(--nz-danger); }
 
-/* ====== Aurora 7 v7.2.0: packs/p7-overlays.css ====== */
+/* ====== Aurora 7 v7.2.1: packs/p7-overlays.css ====== */
 /* ============================================================
    AURORA 7 — p7-overlays.css · Categoría 07 · Overlays y diálogo (117 objetos)
    Modal (tamaños, centrado, sheet móvil), drawer (ancho, flotante, grupos),
@@ -1892,7 +1911,7 @@
    Lightbox compacto (ampliado con léxico cerrado (tanda D))   */
 .nz-lightbox--compact { width: min(100%, 28rem); aspect-ratio: 4 / 3; }
 
-/* ====== Aurora 7 v7.2.0: packs/p8-data.css ====== */
+/* ====== Aurora 7 v7.2.1: packs/p8-data.css ====== */
 /* ============================================================
    AURORA 7 — p8-data.css · Categoría 08 · Datos, tablas y listas (139 objetos)
    Tablas (densidad, sticky, bordes, hover, toolbar, filtros, pie, celdas),
@@ -1941,6 +1960,58 @@
 .nz-table__filters { display: flex; flex-wrap: wrap; gap: var(--nz-space-2); padding: var(--nz-space-2) var(--nz-space-4); background: var(--nz-bg-soft); border-bottom: var(--nz-border-w) solid var(--nz-border-soft); }
 .nz-table__empty { padding: var(--nz-space-8) var(--nz-space-4); text-align: center; font-size: var(--nz-text-sm); color: var(--nz-text-mute); }
 .nz-table__foot { display: flex; justify-content: space-between; gap: var(--nz-space-3); padding: var(--nz-space-3) var(--nz-space-4); font-size: var(--nz-text-xs); color: var(--nz-text-mute); border-top: var(--nz-border-w) solid var(--nz-border-soft); }
+
+/* ---- Tabla apilable: móvil primero ----
+   En pantalla estrecha cada fila es una tarjeta y cada celda lleva delante el
+   nombre de su columna, que se lee del atributo data-etiqueta. Desde 640 px la
+   tabla vuelve a ser una tabla. Sin JS: la etiqueta viaja en el HTML.
+
+   El ancho mínimo del sistema (30rem) es lo que obliga a desplazar una tabla
+   ancha; apilada no hace falta, así que aquí se suelta y vuelve a 640 px.
+
+   Ojo con las combinaciones: en móvil manda este patrón (celdas a una columna,
+   texto a la izquierda) y desde 640 px recupera la densidad de serie, no la de
+   --compact ni el marco de --bordered. Se usa para tablas de datos que deben
+   caber enteras: entregables, detalle, resúmenes. */
+.nz-table--apilable { display: block; min-width: 0; background: transparent; }
+.nz-table--apilable thead { display: none; }
+.nz-table--apilable tbody, .nz-table--apilable tfoot { display: block; }
+.nz-table--apilable tbody tr, .nz-table--apilable tfoot tr {
+  display: block; padding: var(--nz-space-2) var(--nz-space-3);
+  border: var(--nz-border-w) solid var(--nz-border-soft); border-radius: var(--nz-radius-md);
+  background: var(--nz-surface); box-shadow: var(--nz-shadow-xs);
+}
+.nz-table--apilable tbody tr + tr, .nz-table--apilable tfoot tr + tr { margin-top: var(--nz-space-2); }
+.nz-table--apilable tbody th, .nz-table--apilable tbody td, .nz-table--apilable tfoot td {
+  display: block; padding: var(--nz-space-1) 0; border: 0; text-align: left;
+}
+.nz-table--apilable tbody th[scope="row"] { font-size: var(--nz-text-sm); font-weight: 800; color: var(--nz-text); }
+.nz-table--apilable tbody td[data-etiqueta]::before, .nz-table--apilable tfoot td[data-etiqueta]::before {
+  content: attr(data-etiqueta); display: block;
+  font-size: var(--nz-text-2xs); font-weight: 800; letter-spacing: var(--nz-tracking-caps);
+  text-transform: uppercase; color: var(--nz-text-mute);
+}
+@media (min-width: 640px) {
+  .nz-table--apilable { display: table; min-width: 30rem; }
+  .nz-table--apilable thead { display: table-header-group; }
+  .nz-table--apilable tbody { display: table-row-group; }
+  .nz-table--apilable tfoot { display: table-footer-group; }
+  .nz-table--apilable tbody tr, .nz-table--apilable tfoot tr {
+    display: table-row; padding: 0; margin-top: 0; border: 0; border-radius: 0;
+    background: transparent; box-shadow: none;
+  }
+  .nz-table--apilable tbody th, .nz-table--apilable tbody td, .nz-table--apilable tfoot td {
+    display: table-cell; padding: var(--nz-space-3) var(--nz-space-4);
+    border-top: var(--nz-border-w) solid var(--nz-border-soft); text-align: inherit;
+  }
+  .nz-table--apilable tbody td[data-etiqueta]::before, .nz-table--apilable tfoot td[data-etiqueta]::before { display: none; }
+}
+/* Envoltorio de una tabla apilable: en móvil no dibuja marco, porque el marco
+   ya lo lleva cada tarjeta; desde 640 px enmarca la tabla como siempre. */
+.nz-table-wrap--apilable { border: 0; border-radius: 0; overflow-x: visible; }
+@media (min-width: 640px) {
+  .nz-table-wrap--apilable { border: var(--nz-border-w) solid var(--nz-border-soft); border-radius: var(--nz-radius-md); overflow-x: auto; }
+}
 
 /* ---- Celda de status en tabla ---- */
 .nz-table__status { display: inline-flex; align-items: center; gap: var(--nz-space-1); font-weight: 700; }
@@ -2127,7 +2198,7 @@
 .nz-record--warning { box-shadow: inset 3px 0 0 var(--nz-warning), var(--nz-shadow-sm); }
 .nz-record.is-selected { box-shadow: 0 0 0 2px var(--nz-brand), var(--nz-shadow-sm); }
 
-/* ====== Aurora 7 v7.2.0: packs/p13-charts.css ====== */
+/* ====== Aurora 7 v7.2.1: packs/p13-charts.css ====== */
 /* ============================================================
    AURORA 7 — p13-charts.css · Categoría 13 · Gráficos y visualización
    Visualización de datos sin librerías: barras, línea, área, donut,
@@ -2564,9 +2635,17 @@
 .pa-informe { max-width: 52rem; margin: 0 auto; }
 .pa-informe h1 { font-size: var(--nz-text-xl); margin: var(--nz-space-3) 0 var(--nz-space-1); }
 .pa-informe h2 { font-size: var(--nz-text-md); margin-top: var(--nz-space-4); border-bottom: 2px solid var(--nz-brand); padding-bottom: 2px; }
-.pa-informe table { width: 100%; border-collapse: collapse; font-size: var(--nz-text-xs); margin: var(--nz-space-2) 0; }
-.pa-informe th, .pa-informe td { border: 1px solid var(--nz-border); padding: var(--nz-space-1) var(--nz-space-2); text-align: left; }
-.pa-informe th { background: var(--nz-surface-2, var(--nz-surface)); }
+.pa-informe table:not(.pa-gantt) { width: 100%; border-collapse: collapse; font-size: var(--nz-text-xs); margin: var(--nz-space-2) 0; }
+.pa-informe table:not(.pa-gantt) th, .pa-informe table:not(.pa-gantt) td { padding: var(--nz-space-1) var(--nz-space-2); text-align: left; }
+/* El marco de tabla es de escritorio para arriba: en el móvil las tablas de
+   datos van apiladas en tarjetas (objeto `.nz-table--apilable` de Aurora 7). */
+@media (min-width: 640px) {
+  .pa-informe table:not(.pa-gantt) th, .pa-informe table:not(.pa-gantt) td { border: 1px solid var(--nz-border); }
+  .pa-informe table:not(.pa-gantt) th { background: var(--nz-surface-2, var(--nz-surface)); }
+  .pa-informe__clave { width: 11rem; }
+  .pa-detalle__grupo { background: var(--nz-surface-2, var(--nz-surface)); }
+}
+.pa-detalle__grupo { font-weight: 800; color: var(--nz-text); }
 .pa-informe__cab { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--nz-space-2); align-items: flex-start; border-bottom: 3px solid var(--nz-brand); padding-bottom: var(--nz-space-2); }
 .pa-informe__pie { margin-top: var(--nz-space-5); padding-top: var(--nz-space-2); border-top: 1px solid var(--nz-border); font-size: var(--nz-text-xs); color: var(--nz-text-soft); display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--nz-space-2); }
 .pa-num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -2622,26 +2701,31 @@ body.pa-sin-importes .pa-importe { display: none; }
 
 /* ---------- Móvil: la tabla de horas se convierte en tarjetas por perfil ----------
    Nada de arrastrar una tabla a lo ancho: cada perfil es una tarjeta y cada mes
-   una fila con su nombre delante y un campo grande (44 px, táctil). */
+   una fila con su nombre delante y un campo grande (44 px, táctil). Nada lleva
+   `nowrap` ni un ancho mínimo: la tarjeta mide lo que mide la pantalla. */
 @media (max-width: 720px) {
+  .pa-tabla-horas { overflow-x: visible; }
   .pa-tabla-horas table, .pa-tabla-horas thead, .pa-tabla-horas tbody,
-  .pa-tabla-horas tr, .pa-tabla-horas th, .pa-tabla-horas td { display: block; width: auto; }
+  .pa-tabla-horas tr, .pa-tabla-horas th, .pa-tabla-horas td { display: block; width: auto; min-width: 0; }
 
   .pa-tabla-horas thead { display: none; }
   .pa-tabla-horas tr {
     border: 1px solid var(--nz-border); border-radius: var(--nz-radius-md);
     padding: var(--nz-space-2); margin-bottom: var(--nz-space-2); background: var(--nz-surface);
   }
-  .pa-tabla-horas td { border: 0; padding: 0.2rem 0; text-align: left; }
+  .pa-tabla-horas th, .pa-tabla-horas td { border: 0; padding: 0.2rem 0; text-align: left; white-space: normal; }
+  /* La primera columna ya no es la columna pegada de la tabla ancha: aquí cada
+     fila es una tarjeta y no hay nada que pegar ni que ensanchar. */
+  .pa-tabla-horas td:first-child, .pa-tabla-horas th:first-child { position: static; min-width: 0; }
   .pa-tabla-horas td[data-etiqueta] { display: flex; align-items: center; justify-content: space-between; gap: var(--nz-space-2); }
   .pa-tabla-horas td[data-etiqueta]::before {
     content: attr(data-etiqueta); flex: 0 0 5.4rem;
     font-size: var(--nz-text-xs); color: var(--nz-text-soft); text-transform: uppercase; letter-spacing: 0.03em;
   }
-  .pa-tabla-horas td[data-etiqueta] > * { flex: 1 1 auto; }
+  .pa-tabla-horas td[data-etiqueta] > * { flex: 1 1 auto; min-width: 0; }
   .pa-tabla-horas td[data-etiqueta="Perfil"]::before { display: none; }
   .pa-tabla-horas td[data-etiqueta="Perfil"] { display: block; }
-  .pa-tabla-horas input[type="number"], .pa-tabla-horas select { min-height: 44px; font-size: var(--nz-text-md); width: 100%; }
+  .pa-tabla-horas input[type="number"], .pa-tabla-horas select { min-height: 44px; font-size: var(--nz-text-md); width: 100%; min-width: 0; }
   .pa-tabla-horas .pa-celda__eq { flex: 0 0 5rem; text-align: right; }
   .pa-tabla-horas td .nz-btn { min-height: 44px; min-width: 44px; }
 }
@@ -2785,24 +2869,21 @@ span.pa-carga {
 
 
 /* ---------- FULL RESPONSIVE ----------
-   La app se usa en móvil: nada se aplasta, nada se sale. Las tablas anchas hacen su
-   propio scroll (con la columna del concepto pegada) en vez de romper la página. */
-.pa-tabla-horas { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
-.pa-tabla-horas > table { min-width: 100%; }
+   La app se usa en móvil: nada se aplasta y nada se sale de la pantalla.
+   Las tablas de datos se apilan en tarjetas (objeto `.nz-table--apilable` de
+   Aurora 7) y la tabla de horas, que es un editor de campos, se convierte en una
+   tarjeta por perfil. Ninguna tabla obliga a arrastrar de lado. */
 .pa-jornada { display: grid; grid-template-columns: minmax(15rem, 1fr) minmax(18rem, 1.4fr); gap: var(--nz-space-4); align-items: start; }
 .pa-select-pct { min-width: 5.4rem; }
-
-#pa-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+.pa-select-perfil { min-width: 150px; }
+.pa-jornada > div { min-width: 0; }
 
 @media (max-width: 900px) {
   .pa-jornada { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {
-  /* Nada de columnas apretadas: scroll propio y tipografía legible */
-  .pa-tabla-horas > table { min-width: 44rem; }
   .pa-carga { min-width: 2.5rem; font-size: 0.66rem; padding: 0.12rem 0.18rem; }
-  .pa-jornada { display: block; }
   .pa-jornada > div + div { margin-top: var(--nz-space-4); }
   .pa-fila { flex-wrap: wrap; }
   .pa-fila > .nz-input, .pa-fila > .nz-btn, .pa-fila > label { min-height: 44px; }
@@ -2811,8 +2892,15 @@ span.pa-carga {
   .pa-hito__nombre { flex: 1 1 100%; }
   .pa-select-pct, .pa-input-horas, .pa-input-num { min-height: 44px; font-size: var(--nz-text-md); }
   .pa-select-pct { width: 100%; }
+  .pa-select-perfil { min-width: 0; }
   .pa-calendario .pa-ancho-medio { width: 100%; }
   .nz-table--compact td, .nz-table--compact th { padding: 0.2rem 0.3rem; }
+
+  /* La barra de la app: las acciones bajan a su propia fila, envueltas y a 44 px.
+     Antes se salían de la pantalla y había botones imposibles de pulsar. */
+  .nz-navbar__links { width: 100%; justify-content: flex-start; margin-left: 0; }
+  .nz-navbar .nz-btn, .nz-navbar .nz-input { min-height: 44px; }
+  .nz-navbar #pa-sel-oferta { flex: 1 1 8rem; min-width: 0; }
 }
 
 </style>
@@ -5795,8 +5883,13 @@ span.pa-carga {
     return '<article class="nz-article">' + (titulo ? '<h3 class="nz-h3">' + titulo + "</h3>" : "") + (extra || "") + cuerpo + "</article>";
   }
 
-  function tabla(cabeceras, filas, pie, clase) {
-    return '<div class="nz-table-wrap"><table class="nz-table' + (clase ? " " + clase : "") + '">' +
+  /** Tabla. Con `apilable` en true (objeto `.nz-table--apilable` de Aurora 7),
+      cada fila se convierte en una tarjeta en pantalla estrecha y cada celda
+      lleva delante el nombre de su columna: hay que dar `etiqueta` en `fila`. */
+  function tabla(cabeceras, filas, pie, clase, apilable) {
+    const envoltorio = "nz-table-wrap" + (apilable ? " nz-table-wrap--apilable" : "");
+    const clases = "nz-table" + (apilable ? " nz-table--apilable" : "") + (clase ? " " + clase : "");
+    return '<div class="' + envoltorio + '"><table class="' + clases + '">' +
       (cabeceras && cabeceras.length ? "<thead><tr>" + cabeceras.map(c => '<th class="nz-table__right">' + c + "</th>").join("") + "</tr></thead>" : "") +
       "<tbody>" + (filas || "") + "</tbody>" + (pie || "") + "</table></div>";
   }
@@ -5805,7 +5898,8 @@ span.pa-carga {
     return "<tr>" + celdas.map(c => {
       if (c === null || c === undefined) return "<td></td>";
       if (typeof c === "string") return "<td>" + c + "</td>";
-      return "<td" + (c.clase ? ' class="' + c.clase + '"' : "") + ">" + (c.html === undefined ? "" : c.html) + "</td>";
+      return "<td" + (c.clase ? ' class="' + c.clase + '"' : "") +
+        (c.etiqueta ? ' data-etiqueta="' + c.etiqueta + '"' : "") + ">" + (c.html === undefined ? "" : c.html) + "</td>";
     }).join("") + "</tr>";
   }
 
@@ -6023,7 +6117,7 @@ span.pa-carga {
       }).join("");
 
       return '<tr data-id="' + l.id + '"' + (exceso ? ' class="pa-fila--exceso"' : "") + ">" +
-        '<td data-etiqueta="Perfil"><select class="nz-input nz-input--sm" data-campo="linea-perfil" data-id="' + l.id + '" aria-label="Perfil" style="min-width:150px">' +
+        '<td data-etiqueta="Perfil"><select class="nz-input nz-input--sm pa-select-perfil" data-campo="linea-perfil" data-id="' + l.id + '" aria-label="Perfil">' +
           '<option value=""' + (!l.perfilId ? " selected" : "") + ' disabled>— Elige perfil —</option>' +
           N().lista(pf).map(p => '<option value="' + p.id + '"' + (p.id === l.perfilId ? " selected" : "") + ">" + N().esc(p.nombre) + "</option>").join("") +
         "</select></td>" + celdas +
@@ -6496,7 +6590,7 @@ span.pa-carga {
       return "<tr>" +
         '<td><label class="pa-ahora"><input type="checkbox" data-campo="jornada-dia" data-dia="' + dia + '"' +
           (laborable ? " checked" : "") + "> " + d[1] + "</label></td>" +
-        '<td class="nz-table__right">' + (laborable
+        '<td class="nz-table__right" data-etiqueta="Horas">' + (laborable
           ? '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0" max="24" step="0.5" ' +
             'data-campo="jornada-horas-dia" data-dia="' + dia + '" value="' + N().fmtNum(horas) + '" aria-label="Horas del ' + d[1] + '"> h'
           : '<span class="pa-mini">no se trabaja</span>') + "</td></tr>";
@@ -6508,9 +6602,11 @@ span.pa-carga {
     };
 
     const listaFestivos = festivos.length
-      ? '<table class="nz-table nz-table--compact"><thead><tr><th>Día</th><th>Festivo</th><th></th><th></th></tr></thead><tbody>' +
-        festivos.map(f => "<tr><td>" + N().esc(hFestivo(f)) + "</td><td>" + N().esc(f.nombre) +
-          '</td><td><span class="nz-badge nz-badge--neutral">' + N().esc(f.ambito || "Propio") + "</span></td>" +
+      ? '<table class="nz-table nz-table--apilable"><thead><tr><th>Día</th><th>Festivo</th><th></th><th></th></tr></thead><tbody>' +
+        festivos.map(f => "<tr>" +
+          '<td data-etiqueta="Día">' + N().esc(hFestivo(f)) + "</td>" +
+          '<td data-etiqueta="Festivo">' + N().esc(f.nombre) + "</td>" +
+          '<td data-etiqueta="Ámbito"><span class="nz-badge nz-badge--neutral">' + N().esc(f.ambito || "Propio") + "</span></td>" +
           '<td><button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="quitar-festivo" data-id="' + N().esc(f.fecha) +
           '" title="Quitar este festivo">✕</button></td></tr>').join("") +
         "</tbody></table>"
@@ -6522,8 +6618,8 @@ span.pa-carga {
       "de lo mismo: con esto la dedicación se calcula sobre días reales de trabajo.</p>" +
       '<div class="pa-jornada">' +
         '<div>' +
-          '<table class="nz-table nz-table--compact"><thead><tr><th>Día</th><th class="nz-table__right">Horas</th></tr></thead>' +
-          "<tbody>" + filasDias + "</tbody></table>" +
+          '<div class="nz-table-wrap nz-table-wrap--apilable"><table class="nz-table nz-table--apilable"><thead><tr><th>Día</th><th class="nz-table__right">Horas</th></tr></thead>' +
+          "<tbody>" + filasDias + "</tbody></table></div>" +
           '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Horas al día por omisión: ' +
             '<input class="nz-input nz-input--sm pa-input-num" type="number" min="0.5" max="24" step="0.5" ' +
             'data-campo="jornada-horas" value="' + N().fmtNum(j.horasDia) + '" aria-label="Horas al día por omisión"> ' +
@@ -6540,7 +6636,7 @@ span.pa-carga {
               'title="Carga los festivos de España, la Comunidad de Madrid y Madrid capital de los años del calendario">' +
               "Cargar los de España y Madrid</button>" +
           "</div>" +
-          '<div class="pa-tabla-horas">' + listaFestivos + "</div>" +
+          '<div class="nz-table-wrap nz-table-wrap--apilable">' + listaFestivos + "</div>" +
           '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Van precargados los de España y Madrid, pero ' +
           "<strong>son editables</strong>: los locales cambian cada año y cada empresa tiene los suyos.</p>" +
         "</div>" +
@@ -6708,15 +6804,15 @@ span.pa-carga {
         labTotal = N().r2(labTotal + lab);
         const texto = (perfil ? perfil.nombre : "Perfil") + " en " + c.etiqueta + ": " + N().fmtNum(pct, 0) +
           " % · " + V2.hor(horas) + " de " + Math.round(lab) + " h laborables";
-        return '<td class="pa-carga ' + tramo(pct) + '" title="' + N().esc(texto) + '">' +
+        return '<td class="pa-carga ' + tramo(pct) + '" data-etiqueta="' + N().esc(c.etiqueta) + '" title="' + N().esc(texto) + '">' +
           (horas > 0 ? N().fmtNum(pct, 0) + "%" : "") + "</td>";
       }).join("");
       const medio = labTotal > 0 ? N().r2((labTotal - libreTotal) / labTotal * 100) : 0;
       return "<tr>" +
-        "<th scope=\"row\"><span class=\"pa-tono-punto\"></span> " + N().esc(perfil ? perfil.nombre : "Perfil") + "</th>" +
+        '<th scope="row"><span class="pa-tono-punto"></span> ' + N().esc(perfil ? perfil.nombre : "Perfil") + "</th>" +
         celdas +
-        '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(medio, 0) + "%</strong></td>" +
-        '<td class="nz-table__num nz-table__right">' + N().fmtNum(libreTotal, 0) + " h</td></tr>";
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Medio"><strong>' + N().fmtNum(medio, 0) + "%</strong></td>" +
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Libre">' + N().fmtNum(libreTotal, 0) + " h</td></tr>";
     }).join("");
 
     const leyenda = '<p class="pa-mini">' +
@@ -6731,7 +6827,7 @@ span.pa-carga {
     return V2.articulo("Ocupación por perfil y periodo",
       '<p class="pa-mini">Cada celda dice la dedicación de ese perfil en ese periodo, sumando todo lo que tiene asignado: ' +
       "en verde hay hueco, en ámbar está al límite y en rojo no cabe más.</p>" + leyenda +
-      '<div class="pa-tabla-horas"><table class="nz-table nz-table--compact">' +
+      '<div class="nz-table-wrap nz-table-wrap--apilable"><table class="nz-table nz-table--apilable">' +
       "<thead>" + cabecera + "</thead><tbody>" + filas + "</tbody></table></div>");
   }
 
@@ -6750,11 +6846,11 @@ span.pa-carga {
       const clase = pct > 100.5 ? "nz-badge--danger" : (pct >= 85 ? "nz-badge--warning" : "nz-badge--neutral");
       return "<tr>" +
         '<td><span class="pa-tono-punto"></span> ' + N().esc(perfil ? perfil.nombre : "Perfil") + "</td>" +
-        '<td class="nz-table__num nz-table__right">' + N().fmtNum(asignadas, 0) + " h</td>" +
-        '<td class="nz-table__num nz-table__right">' + N().fmtNum(lab, 0) + " h</td>" +
-        '<td class="nz-table__num nz-table__right"><span class="nz-badge ' + clase + '">' + N().fmtNum(pct, 0) + " %</span></td>" +
-        '<td class="nz-table__num nz-table__right">' + N().fmtNum(Math.max(0, N().r2(lab - asignadas)), 0) + " h</td>" +
-        "<td>" + (malos ? '<span class="nz-badge nz-badge--danger">' + malos + " periodo(s) pasado(s)</span>" : "") + "</td></tr>";
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Asignadas">' + N().fmtNum(asignadas, 0) + " h</td>" +
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Laborables">' + N().fmtNum(lab, 0) + " h</td>" +
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Dedicación media"><span class="nz-badge ' + clase + '">' + N().fmtNum(pct, 0) + " %</span></td>" +
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Libres">' + N().fmtNum(Math.max(0, N().r2(lab - asignadas)), 0) + " h</td>" +
+        '<td data-etiqueta="Avisos">' + (malos ? '<span class="nz-badge nz-badge--danger">' + malos + " periodo(s) pasado(s)</span>" : "") + "</td></tr>";
     }).join("");
 
     const totalAsignado = usados.reduce((a, id) => N().r2(a + N().suma(mPerfil[id] || [], v => N().num(v))), 0);
@@ -6763,11 +6859,11 @@ span.pa-carga {
       '<p class="pa-mini">El calendario tiene <strong>' + N().fmtNum(lab, 0) +
       " h laborables por perfil</strong> y hay <strong>" + N().fmtNum(totalAsignado, 0) +
       " h</strong> repartidas. Lo que sobra de cada uno es lo que aún puedes planificar (o personal que no necesitas).</p>" +
-      '<table class="nz-table nz-table--compact"><thead><tr><th>Perfil</th>' +
+      '<div class="nz-table-wrap nz-table-wrap--apilable"><table class="nz-table nz-table--apilable"><thead><tr><th>Perfil</th>' +
       '<th class="nz-table__right">Asignadas</th><th class="nz-table__right">Laborables</th>' +
       '<th class="nz-table__right">Dedicación media</th><th class="nz-table__right">Libres</th><th></th></tr></thead>' +
       "<tbody>" + (filas || '<tr><td colspan="6"><span class="pa-mini">Sin perfiles asignados todavía.</span></td></tr>') +
-      "</tbody></table>" +
+      "</tbody></table></div>" +
       '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Coste del esfuerzo con las tarifas actuales: <strong>' +
       N().fmtNum(C().importeOferta(o, pf)) + " €</strong>.</p>");
   }
@@ -6817,20 +6913,20 @@ span.pa-carga {
         importe = N().r2(importe + C().lineaImporte(l, pf));
       });
       return '<tr><th scope="row"><span class="pa-mini">' + N().esc(f.tarea) + "</span><br>" + N().esc(f.sub) + "</th>" +
-        cols.map(p => '<td class="nz-table__num nz-table__right">' +
+        cols.map(p => '<td class="nz-table__num nz-table__right" data-etiqueta="' + N().esc(abrevia(p.nombre)) + '">' +
           (suyos[p.id] ? N().fmtNum(suyos[p.id], 0) : "") + "</td>").join("") +
-        '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(f.horas, 0) + "</strong></td>" +
-        '<td class="nz-table__num nz-table__right">' + N().fmtNum(importe) + " €</td></tr>";
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Horas"><strong>' + N().fmtNum(f.horas, 0) + "</strong></td>" +
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Importe">' + N().fmtNum(importe) + " €</td></tr>";
     }).join("");
 
     const pie = '<tr><th scope="row">Total</th>' +
-      cols.map(p => '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(porPerfil[p.id] || 0, 0) + "</strong></td>").join("") +
-      '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(C().ofertaHoras(o), 0) + "</strong></td>" +
-      '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(C().importeOferta(o, pf)) + " €</strong></td></tr>";
+      cols.map(p => '<td class="nz-table__num nz-table__right" data-etiqueta="' + N().esc(abrevia(p.nombre)) + '"><strong>' + N().fmtNum(porPerfil[p.id] || 0, 0) + "</strong></td>").join("") +
+      '<td class="nz-table__num nz-table__right" data-etiqueta="Horas"><strong>' + N().fmtNum(C().ofertaHoras(o), 0) + "</strong></td>" +
+      '<td class="nz-table__num nz-table__right" data-etiqueta="Importe"><strong>' + N().fmtNum(C().importeOferta(o, pf)) + " €</strong></td></tr>";
 
     return V2.articulo("Reparto por subtarea y perfil",
       '<p class="pa-mini">Quién hace qué: las horas de cada perfil en cada subtarea.</p>' +
-      '<div class="pa-tabla-horas"><table class="nz-table nz-table--compact">' +
+      '<div class="nz-table-wrap nz-table-wrap--apilable"><table class="nz-table nz-table--apilable">' +
       "<thead>" + cabecera + "</thead><tbody>" + cuerpo + pie + "</tbody></table></div>");
   }
 
@@ -6893,7 +6989,7 @@ span.pa-carga {
       (conImp ? V2.imp(C().totalOferta(o, pf)) : "") + "</strong></td></tr></tfoot>";
     const info = '<p class="pa-mini">' + C().ofertaHoras(o).toLocaleString("es-ES") + " h en " + P().duracionLegible(o.periodos) +
       " · " + E().porContexto(o).total + " entregable(s) · media mensual " + (conImp ? V2.imp(C().mediaPeriodo(o, pf)) : "—") + "</p>";
-    return V2.articulo("Totales de la oferta", V2.tabla(["", ""], filas, pie), info);
+    return V2.articulo("Totales de la oferta", V2.tabla(["", ""], filas, pie, null, true), info);
   }
 
   function porPerfil(o, pf) {
@@ -6902,12 +6998,12 @@ span.pa-carga {
     const conImp = V2.verImportes();
     const filas = N().lista(pf).filter(p => N().num(horas[p.id]) > 0).map(p => V2.fila([
       { html: N().esc(p.nombre) + '<br><span class="pa-mini">' + N().esc(p.categoria) + "</span>" },
-      { html: V2.hor(horas[p.id]), clase: "nz-table__right" },
-      { html: conImp ? V2.imp(C().importePerfil(o, pf, p.id)) : "", clase: "nz-table__right pa-importe" }
+      { html: V2.hor(horas[p.id]), clase: "nz-table__right", etiqueta: "Horas" },
+      { html: conImp ? V2.imp(C().importePerfil(o, pf, p.id)) : "", clase: "nz-table__right pa-importe", etiqueta: "Importe" }
     ])).join("");
     const pie = '<tfoot><tr><td>Total</td><td class="nz-table__right">' + V2.hor(C().ofertaHoras(o)) + '</td><td class="nz-table__right pa-importe">' +
       (conImp ? V2.imp(C().importeOferta(o, pf)) : "") + "</td></tr></tfoot>";
-    return V2.articulo("Esfuerzo por perfil", V2.tabla(["Perfil", "Horas", "Importe"], filas || '<tr><td colspan="3">Sin horas asignadas.</td></tr>', pie, "nz-table--compact"));
+    return V2.articulo("Esfuerzo por perfil", V2.tabla(["Perfil", "Horas", "Importe"], filas || '<tr><td colspan="3">Sin horas asignadas.</td></tr>', pie, "nz-table--compact", true));
   }
 
   function porTarea(o, pf) {
@@ -6915,15 +7011,15 @@ span.pa-carga {
     const conImp = V2.verImportes();
     const filas = N().lista(o.tareas).map(t => V2.fila([
       { html: N().esc(t.nombre) },
-      { html: N().lista(t.subtareas).length, clase: "nz-table__right" },
-      { html: N().lista(t.entregables).length, clase: "nz-table__right" },
-      { html: V2.hor(C().tareaHoras(t)), clase: "nz-table__right" },
-      { html: conImp ? V2.imp(C().tareaImporte(t, pf)) : "", clase: "nz-table__right pa-importe" }
+      { html: N().lista(t.subtareas).length, clase: "nz-table__right", etiqueta: "Subtareas" },
+      { html: N().lista(t.entregables).length, clase: "nz-table__right", etiqueta: "Entregables" },
+      { html: V2.hor(C().tareaHoras(t)), clase: "nz-table__right", etiqueta: "Horas" },
+      { html: conImp ? V2.imp(C().tareaImporte(t, pf)) : "", clase: "nz-table__right pa-importe", etiqueta: "Importe" }
     ])).join("");
     const pie = '<tfoot><tr><td>Total</td><td class="nz-table__right">' + N().suma(o.tareas, t => N().lista(t.subtareas).length) +
       '</td><td class="nz-table__right">' + E().porContexto(o).total + '</td><td class="nz-table__right">' + V2.hor(C().ofertaHoras(o)) +
       '</td><td class="nz-table__right pa-importe">' + (conImp ? V2.imp(C().importeOferta(o, pf)) : "") + "</td></tr></tfoot>";
-    return V2.articulo("Por tareas", V2.tabla(["Tarea", "Subtareas", "Entregables", "Horas", "Importe"], filas || '<tr><td colspan="5">Sin tareas.</td></tr>', pie, "nz-table--compact"));
+    return V2.articulo("Por tareas", V2.tabla(["Tarea", "Subtareas", "Entregables", "Horas", "Importe"], filas || '<tr><td colspan="5">Sin tareas.</td></tr>', pie, "nz-table--compact", true));
   }
 
   function porPeriodo(o, pf) {
@@ -6936,15 +7032,15 @@ span.pa-carga {
       const hitos = c.periodos.reduce((s, i) => s + E().dePeriodo(o, i).length, 0);
       return V2.fila([
         { html: N().esc(c.etiqueta) + ' <span class="pa-mini">' + c.anio + "</span>" },
-        { html: horas ? horas.toLocaleString("es-ES") : "·", clase: "nz-table__right" },
-        { html: hitos ? '<span class="pa-hito-informe">◆ ' + hitos + "</span>" : "·", clase: "nz-table__right" },
-        { html: conImp ? V2.imp(imp) : "", clase: "nz-table__right pa-importe" }
+        { html: horas ? horas.toLocaleString("es-ES") : "·", clase: "nz-table__right", etiqueta: "Horas" },
+        { html: hitos ? '<span class="pa-hito-informe">◆ ' + hitos + "</span>" : "·", clase: "nz-table__right", etiqueta: "Entregables" },
+        { html: conImp ? V2.imp(imp) : "", clase: "nz-table__right pa-importe", etiqueta: "Importe" }
       ]);
     }).join("");
     const pie = '<tfoot><tr><td>Total</td><td class="nz-table__right">' + C().ofertaHoras(o).toLocaleString("es-ES") +
       '</td><td class="nz-table__right">' + E().porContexto(o).total + '</td><td class="nz-table__right pa-importe">' +
       (conImp ? V2.imp(C().importeOferta(o, pf)) : "") + "</td></tr></tfoot>";
-    return V2.articulo("Esfuerzo y entregas por periodo", V2.tabla(["Periodo", "Horas", "Entregables", "Importe"], filas, pie, "nz-table--compact"));
+    return V2.articulo("Esfuerzo y entregas por periodo", V2.tabla(["Periodo", "Horas", "Entregables", "Importe"], filas, pie, "nz-table--compact", true));
   }
 
   /* ---------- Escenarios y versiones ---------- */
@@ -6996,28 +7092,28 @@ span.pa-carga {
     const conImp = V2.verImportes();
     const filasEco = cmp.economia.map(l => V2.fila([
       { html: l.texto },
-      { html: conImp ? V2.imp(l.a) : "", clase: "nz-table__right" },
-      { html: conImp ? V2.imp(l.b) : "", clase: "nz-table__right" },
-      { html: Math.abs(l.d) > 0.005 ? V2.delta(l.d) : '<span class="pa-mini">igual</span>', clase: "nz-table__right" }
+      { html: conImp ? V2.imp(l.a) : "", clase: "nz-table__right", etiqueta: N().esc(cmp.etiquetaA) },
+      { html: conImp ? V2.imp(l.b) : "", clase: "nz-table__right", etiqueta: N().esc(cmp.etiquetaB) },
+      { html: Math.abs(l.d) > 0.005 ? V2.delta(l.d) : '<span class="pa-mini">igual</span>', clase: "nz-table__right", etiqueta: "Diferencia" }
     ])).join("");
     const filasEst = cmp.estructura.map(l => V2.fila([
       { html: l.texto },
-      { html: l.clave === "horas" ? V2.hor(l.a) : N().fmtNum(l.a), clase: "nz-table__right" },
-      { html: l.clave === "horas" ? V2.hor(l.b) : N().fmtNum(l.b), clase: "nz-table__right" },
-      { html: Math.abs(l.d) > 0.005 ? V2.delta(l.d, (l.clave === "horas") ? "horas" : "numero") : '<span class="pa-mini">igual</span>', clase: "nz-table__right" }
+      { html: l.clave === "horas" ? V2.hor(l.a) : N().fmtNum(l.a), clase: "nz-table__right", etiqueta: N().esc(cmp.etiquetaA) },
+      { html: l.clave === "horas" ? V2.hor(l.b) : N().fmtNum(l.b), clase: "nz-table__right", etiqueta: N().esc(cmp.etiquetaB) },
+      { html: Math.abs(l.d) > 0.005 ? V2.delta(l.d, (l.clave === "horas") ? "horas" : "numero") : '<span class="pa-mini">igual</span>', clase: "nz-table__right", etiqueta: "Diferencia" }
     ])).join("");
     const filasPerf = cmp.porPerfil.map(x => V2.fila([
       { html: N().esc(x.nombre) },
-      { html: V2.hor(x.a), clase: "nz-table__right" },
-      { html: V2.hor(x.b), clase: "nz-table__right" },
-      { html: Math.abs(x.d) > 0.005 ? V2.delta(x.d, "horas") : '<span class="pa-mini">igual</span>', clase: "nz-table__right" },
-      { html: conImp ? V2.delta(x.importeD) : "", clase: "nz-table__right" }
+      { html: V2.hor(x.a), clase: "nz-table__right", etiqueta: "Antes" },
+      { html: V2.hor(x.b), clase: "nz-table__right", etiqueta: "Ahora" },
+      { html: Math.abs(x.d) > 0.005 ? V2.delta(x.d, "horas") : '<span class="pa-mini">igual</span>', clase: "nz-table__right", etiqueta: "Diferencia" },
+      { html: conImp ? V2.delta(x.importeD) : "", clase: "nz-table__right", etiqueta: "Δ importe" }
     ])).join("");
     const filasMes = cmp.porPeriodo.filter(m => m.a || m.b).map(m => V2.fila([
       { html: N().esc(m.etiqueta) },
-      { html: conImp ? V2.imp(m.a) : "", clase: "nz-table__right" },
-      { html: conImp ? V2.imp(m.b) : "", clase: "nz-table__right" },
-      { html: Math.abs(m.d) > 0.005 ? V2.delta(m.d) : '<span class="pa-mini">igual</span>', clase: "nz-table__right" }
+      { html: conImp ? V2.imp(m.a) : "", clase: "nz-table__right", etiqueta: "Antes" },
+      { html: conImp ? V2.imp(m.b) : "", clase: "nz-table__right", etiqueta: "Ahora" },
+      { html: Math.abs(m.d) > 0.005 ? V2.delta(m.d) : '<span class="pa-mini">igual</span>', clase: "nz-table__right", etiqueta: "Diferencia" }
     ])).join("");
     const cambios = cmp.cambios.length
       ? cmp.cambios.map(c => '<p class="pa-mini">' +
@@ -7027,10 +7123,10 @@ span.pa-carga {
 
     return '<div class="pa-bloque" style="margin-top:var(--nz-space-3)">' +
       V2.articulo("Diferencias: " + N().esc(cmp.etiquetaA) + " → " + N().esc(cmp.etiquetaB),
-        V2.tabla(["", cmp.etiquetaA, cmp.etiquetaB, "Diferencia"], filasEco) +
-        V2.tabla(["", cmp.etiquetaA, cmp.etiquetaB, "Diferencia"], filasEst, null, "nz-table--compact") +
-        '<h4 class="nz-h4">Esfuerzo por perfil</h4>' + V2.tabla(["Perfil", "Antes", "Ahora", "Diferencia", "Δ importe"], filasPerf, null, "nz-table--compact") +
-        (filasMes ? '<h4 class="nz-h4">Importe por periodo</h4>' + V2.tabla(["Periodo", "Antes", "Ahora", "Diferencia"], filasMes, null, "nz-table--compact") : "") +
+        V2.tabla(["", cmp.etiquetaA, cmp.etiquetaB, "Diferencia"], filasEco, null, null, true) +
+        V2.tabla(["", cmp.etiquetaA, cmp.etiquetaB, "Diferencia"], filasEst, null, "nz-table--compact", true) +
+        '<h4 class="nz-h4">Esfuerzo por perfil</h4>' + V2.tabla(["Perfil", "Antes", "Ahora", "Diferencia", "Δ importe"], filasPerf, null, "nz-table--compact", true) +
+        (filasMes ? '<h4 class="nz-h4">Importe por periodo</h4>' + V2.tabla(["Periodo", "Antes", "Ahora", "Diferencia"], filasMes, null, "nz-table--compact", true) : "") +
         '<h4 class="nz-h4">Qué ha cambiado</h4>' + cambios,
         '<div class="pa-fila" style="margin-bottom:var(--nz-space-2)"><button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="foto-cerrar-comparacion">✕ Cerrar comparación</button></div>') +
       "</div>";
@@ -7059,6 +7155,10 @@ span.pa-carga {
    de la oferta, entregables con su fecha de entrega y criterio, detalle del
    esfuerzo, gastos, totales, resúmenes y condiciones.
    Sin seguimiento ni facturación.
+
+   Todas las tablas son `--apilable` (objeto de Aurora 7): en el móvil cada fila
+   es una tarjeta con el nombre de su columna delante, así que ninguna tabla se
+   aplasta ni hay que arrastrar el documento de lado.
    ===================================================================== */
 (function (raiz) {
   const PL = (raiz.PL = raiz.PL || {});
@@ -7068,6 +7168,29 @@ span.pa-carga {
   const E = () => PL.entregables;
   const V = () => PL.vistas;
   const APP = () => PL.app;
+
+  /** Tabla del informe. Apilable: en móvil, tarjetas con la etiqueta de cada
+      columna; desde 640 px, la tabla de siempre. `cabeceras` admite cadenas o
+      `{ texto, num }` para alinear a la derecha. */
+  function tabla(cabeceras, filas, pie) {
+    const th = (cabeceras || []).map(c => {
+      const texto = (typeof c === "string") ? c : c.texto;
+      const num = (typeof c === "object") && c.num;
+      return "<th" + (num ? ' class="pa-num"' : "") + ">" + texto + "</th>";
+    }).join("");
+    return '<div class="nz-table-wrap nz-table-wrap--apilable">' +
+      '<table class="nz-table nz-table--apilable">' +
+      (cabeceras && cabeceras.length ? "<thead><tr>" + th + "</tr></thead>" : "") +
+      "<tbody>" + (filas || "") + "</tbody>" + (pie || "") + "</table></div>";
+  }
+
+  /** Fila de dos columnas: la primera es la clave (no lleva etiqueta), la segunda el valor. */
+  function claveValor(k, v, fuerte) {
+    return V().fila([
+      { html: (fuerte ? "<strong>" : "") + k + (fuerte ? "</strong>" : ""), clase: "pa-informe__clave" },
+      { html: v }
+    ]);
+  }
 
   function cabecera(o, marca) {
     const V2 = V();
@@ -7081,21 +7204,22 @@ span.pa-carga {
 
   function datosOferta(o) {
     const V2 = V();
-    const linea = (k, v) => '<tr><td style="width:11rem"><strong>' + k + "</strong></td><td>" + v + "</td></tr>";
-    return "<h2>Datos de la oferta</h2><table><tbody>" +
-      linea("Oferta", N().esc(o.nombre)) +
-      (o.cliente.nombre ? linea("Cliente", N().esc(o.cliente.nombre)) : "") +
-      (o.cliente.contacto ? linea("Contacto", N().esc(o.cliente.contacto)) : "") +
-      (o.cliente.ref ? linea("Referencia", N().esc(o.cliente.ref)) : "") +
-      linea("Estado", V2.badgeOferta(o)) +
-      linea("Calendario", N().esc(P().duracionLegible(o.periodos))) +
-      linea("Esfuerzo total", N().fmtHoras(C().ofertaHoras(o))) +
-      (o.descripcion ? linea("Alcance", N().esc(o.descripcion)) : "") +
-      "</tbody></table>";
+    const filas =
+      claveValor("Oferta", N().esc(o.nombre)) +
+      (o.cliente.nombre ? claveValor("Cliente", N().esc(o.cliente.nombre)) : "") +
+      (o.cliente.contacto ? claveValor("Contacto", N().esc(o.cliente.contacto)) : "") +
+      (o.cliente.ref ? claveValor("Referencia", N().esc(o.cliente.ref)) : "") +
+      claveValor("Estado", V2.badgeOferta(o)) +
+      claveValor("Calendario", N().esc(P().duracionLegible(o.periodos))) +
+      claveValor("Esfuerzo total", N().fmtHoras(C().ofertaHoras(o))) +
+      (o.descripcion ? claveValor("Alcance", N().esc(o.descripcion)) : "");
+    return "<h2>Datos de la oferta</h2>" + tabla(null, filas);
   }
 
   /** El calendario dentro del informe: el diagrama completo, con sus barras y sus
-      rombos de entrega. Es la vista que el cliente necesita ver de un vistazo. */
+      rombos de entrega. Es la vista que el cliente necesita ver de un vistazo.
+      Es ancho por naturaleza: aquí sí se desplaza, con la columna del concepto
+      pegada a la izquierda para no perder el hilo. */
   function seccionGantt(o, pf) {
     const P2 = PL.periodos, C2 = PL.calculo;
     return "<h2>Calendario y entregas</h2>" +
@@ -7116,14 +7240,15 @@ span.pa-carga {
       return V2.fila([
         { html: '<span class="pa-hito-informe">◆</span> ' + N().esc(P().mesCorto(o.periodos, e.periodo)) +
             (e.fecha ? '<br><span class="pa-mini">' + N().esc(N().fechaCorta(e.fecha)) + "</span>" : "") },
-        { html: "<strong>" + N().esc(e.nombre) + "</strong>" + (e.descripcion ? '<br><span class="pa-mini">' + N().esc(e.descripcion) + "</span>" : "") },
-        { html: e._contexto === "oferta" ? "Oferta" : N().esc(e._tareaNombre) },
-        { html: r ? N().esc(r.nombre) : "—", clase: "pa-mini" },
-        { html: N().esc(e.criterio || "—"), clase: "pa-mini" }
+        { html: "<strong>" + N().esc(e.nombre) + "</strong>" + (e.descripcion ? '<br><span class="pa-mini">' + N().esc(e.descripcion) + "</span>" : ""),
+          etiqueta: "Entregable" },
+        { html: e._contexto === "oferta" ? "Oferta" : N().esc(e._tareaNombre), etiqueta: "Origen" },
+        { html: r ? N().esc(r.nombre) : "—", clase: "pa-mini", etiqueta: "Responsable" },
+        { html: N().esc(e.criterio || "—"), clase: "pa-mini", etiqueta: "Criterio de aceptación" }
       ]);
     }).join("");
-    return "<h2>Entregables comprometidos</h2><table><thead><tr><th>Entrega</th><th>Entregable</th><th>Origen</th><th>Responsable</th><th>Criterio de aceptación</th></tr></thead>" +
-      "<tbody>" + filas + "</tbody></table>";
+    return "<h2>Entregables comprometidos</h2>" +
+      tabla(["Entrega", "Entregable", "Origen", "Responsable", "Criterio de aceptación"], filas);
   }
 
   function tablaDetalle(o, pf) {
@@ -7131,23 +7256,31 @@ span.pa-carga {
     const conImp = V2.verImportes();
     const filas = [];
     N().lista(o.tareas).forEach(t => {
-      filas.push('<tr><td colspan="5" style="background:var(--nz-surface-2,var(--nz-surface));font-weight:800">' + N().esc(t.nombre) + "</td></tr>");
+      filas.push('<tr><td colspan="5" class="pa-detalle__grupo">' + N().esc(t.nombre) + "</td></tr>");
       N().lista(t.subtareas).forEach(s => {
-        filas.push('<tr><td style="padding-left:18px">' + N().esc(s.nombre) + '</td><td class="pa-num pa-importe">' +
-          (conImp ? V2.imp(C().subtareaImporte(s, pf)) : "") + '</td><td class="pa-num">' + N().fmtHoras(C().subtareaHoras(s)) +
-          '</td><td class="pa-num"></td><td></td></tr>');
+        filas.push(V2.fila([
+          { html: "<strong>" + N().esc(s.nombre) + "</strong>" },
+          { html: conImp ? V2.imp(C().subtareaImporte(s, pf)) : "", clase: "pa-num pa-importe", etiqueta: "Importe" },
+          { html: N().fmtHoras(C().subtareaHoras(s)), clase: "pa-num", etiqueta: "Horas" },
+          null,
+          { html: P().duracionLegible(o.periodos).split(" · ")[0], etiqueta: "Periodo" }
+        ]));
         N().lista(s.lineas).forEach(l => {
           const p = C().perfilPorId(pf, l.perfilId);
-          filas.push('<tr><td style="padding-left:36px;color:var(--nz-text-soft)">' + N().esc(p ? p.nombre : "(perfil eliminado)") + "</td>" +
-            '<td class="pa-num pa-importe">' + (conImp ? V2.imp(p ? p.tarifa : 0) : "") + "</td>" +
-            '<td class="pa-num pa-importe">' + (conImp ? V2.imp(C().lineaImporte(l, pf)) : "") + "</td>" +
-            '<td class="pa-num">' + N().fmtHoras(C().lineaHoras(l)) + "</td>" +
-            "<td>" + P().duracionLegible(o.periodos).split(" · ")[0] + "</td></tr>");
+          filas.push(V2.fila([
+            { html: N().esc(p ? p.nombre : "(perfil eliminado)"), clase: "pa-mini" },
+            { html: conImp ? V2.imp(p ? p.tarifa : 0) : "", clase: "pa-num pa-importe", etiqueta: "Tarifa" },
+            { html: conImp ? V2.imp(C().lineaImporte(l, pf)) : "", clase: "pa-num pa-importe", etiqueta: "Importe" },
+            { html: N().fmtHoras(C().lineaHoras(l)), clase: "pa-num", etiqueta: "Horas" },
+            { html: P().duracionLegible(o.periodos).split(" · ")[0], etiqueta: "Periodo" }
+          ]));
         });
       });
     });
-    return "<h2>Detalle de tareas y esfuerzo</h2><table><thead><tr><th>Concepto</th><th class=\"pa-num\">Importe</th><th class=\"pa-num\">Horas</th><th class=\"pa-num\"></th><th>Periodo</th></tr></thead><tbody>" +
-      (filas.join("") || '<tr><td colspan="5">Sin contenido.</td></tr>') + "</tbody></table>";
+    const pie = "";
+    return "<h2>Detalle de tareas y esfuerzo</h2>" +
+      tabla(["Concepto", { texto: "Importe", num: true }, { texto: "Horas", num: true }, "", "Periodo"],
+        filas.join("") || '<tr><td colspan="5">Sin contenido.</td></tr>', pie);
   }
 
   function tablaGastos(o) {
@@ -7155,13 +7288,14 @@ span.pa-carga {
     const gastos = N().lista(o.gastos);
     if (!gastos.length) return "";
     const conImp = V2.verImportes();
-    return "<h2>Gastos generales</h2><table><thead><tr><th>Concepto</th><th class=\"pa-num\">Unidades</th><th class=\"pa-num\">Precio</th><th class=\"pa-num\">Importe</th></tr></thead><tbody>" +
-      gastos.map(g => V2.fila([
-        { html: N().esc(g.nombre) },
-        { html: N().fmtNum(g.unidades), clase: "pa-num" },
-        { html: conImp ? V2.imp(g.precio) : "", clase: "pa-num pa-importe" },
-        { html: conImp ? V2.imp(C().gastoImporte(g)) : "", clase: "pa-num pa-importe" }
-      ])).join("") + "</tbody></table>";
+    const filas = gastos.map(g => V2.fila([
+      { html: N().esc(g.nombre) },
+      { html: N().fmtNum(g.unidades), clase: "pa-num", etiqueta: "Unidades" },
+      { html: conImp ? V2.imp(g.precio) : "", clase: "pa-num pa-importe", etiqueta: "Precio" },
+      { html: conImp ? V2.imp(C().gastoImporte(g)) : "", clase: "pa-num pa-importe", etiqueta: "Importe" }
+    ])).join("");
+    return "<h2>Gastos generales</h2>" +
+      tabla(["Concepto", { texto: "Unidades", num: true }, { texto: "Precio", num: true }, { texto: "Importe", num: true }], filas);
   }
 
   function tablaTotales(o, pf) {
@@ -7178,9 +7312,9 @@ span.pa-carga {
       (d.tipo ? linea("Descuento (" + (d.tipo === "%" ? N().fmtNum(d.valor) + " %" : "importe fijo") + ")", -C().descuentoImporte(o, pf)) : "") +
       linea("Base imponible", C().baseImponible(o, pf)) +
       (C().nombreImpuesto(o) ? linea(C().nombreImpuesto(o) + " " + N().fmtNum(t.tasa) + " %" + (t.incluido ? " (incluido en los precios)" : ""), C().impuestoImporte(o, pf)) : "");
-    const pie = '<tfoot><tr><td><strong>TOTAL</strong></td><td class="pa-num pa-importe"><strong>' +
+    const pie = "<tfoot><tr><td><strong>TOTAL</strong></td><td class=\"pa-num pa-importe\"><strong>" +
       (conImp ? V2.imp(C().totalOferta(o, pf)) : "") + "</strong></td></tr></tfoot>";
-    return "<h2>Totales</h2><table><tbody>" + filas + "</tbody>" + pie + "</table>" +
+    return "<h2>Totales</h2>" + tabla(null, filas, pie) +
       (o.condicionesPago ? "<p><strong>Condiciones de pago:</strong> " + N().esc(o.condicionesPago) + "</p>" : "");
   }
 
@@ -7190,11 +7324,12 @@ span.pa-carga {
     const conImp = V2.verImportes();
     const filas = N().lista(pf).filter(p => N().num(horas[p.id]) > 0).map(p => V2.fila([
       { html: N().esc(p.nombre) + ' <span class="pa-mini">(' + N().esc(p.categoria) + ")</span>" },
-      { html: N().fmtHoras(horas[p.id]), clase: "pa-num" },
-      { html: conImp ? V2.imp(C().importePerfil(o, pf, p.id)) : "", clase: "pa-num pa-importe" }
-    ]));
-    return "<h2>Resumen por perfil</h2><table><thead><tr><th>Perfil</th><th class=\"pa-num\">Horas</th><th class=\"pa-num\">Importe</th></tr></thead><tbody>" +
-      (filas.join("") || '<tr><td colspan="3">—</td></tr>') + "</tbody></table>";
+      { html: N().fmtHoras(horas[p.id]), clase: "pa-num", etiqueta: "Horas" },
+      { html: conImp ? V2.imp(C().importePerfil(o, pf, p.id)) : "", clase: "pa-num pa-importe", etiqueta: "Importe" }
+    ])).join("");
+    return "<h2>Resumen por perfil</h2>" +
+      tabla(["Perfil", { texto: "Horas", num: true }, { texto: "Importe", num: true }],
+        filas || '<tr><td colspan="3">—</td></tr>');
   }
 
   function tablaPeriodos(o, pf) {
@@ -7203,15 +7338,15 @@ span.pa-carga {
     const conImp = V2.verImportes();
     const filas = cols.map(c => V2.fila([
       { html: N().esc(c.etiqueta) + " " + c.anio },
-      { html: c.periodos.reduce((s, i) => s + C().horasPeriodo(o, i), 0).toLocaleString("es-ES"), clase: "pa-num" },
-      { html: c.periodos.reduce((s, i) => s + E().dePeriodo(o, i).length, 0) || "·", clase: "pa-num" },
-      { html: conImp ? V2.imp(c.periodos.reduce((s, i) => s + C().importePeriodo(o, pf, i), 0)) : "", clase: "pa-num pa-importe" }
+      { html: c.periodos.reduce((s, i) => s + C().horasPeriodo(o, i), 0).toLocaleString("es-ES"), clase: "pa-num", etiqueta: "Horas" },
+      { html: c.periodos.reduce((s, i) => s + E().dePeriodo(o, i).length, 0) || "·", clase: "pa-num", etiqueta: "Entregables" },
+      { html: conImp ? V2.imp(c.periodos.reduce((s, i) => s + C().importePeriodo(o, pf, i), 0)) : "", clase: "pa-num pa-importe", etiqueta: "Importe" }
     ])).join("");
     const pie = '<tfoot><tr><td><strong>Total</strong></td><td class="pa-num"><strong>' + C().ofertaHoras(o).toLocaleString("es-ES") +
       '</strong></td><td class="pa-num"><strong>' + E().porContexto(o).total + '</strong></td><td class="pa-num pa-importe"><strong>' +
       (conImp ? V2.imp(C().importeOferta(o, pf)) : "") + "</strong></td></tr></tfoot>";
-    return "<h2>Esfuerzo y entregas por periodo</h2><table><thead><tr><th>Periodo</th><th class=\"pa-num\">Horas</th><th class=\"pa-num\">Entregables</th><th class=\"pa-num\">Importe</th></tr></thead><tbody>" +
-      filas + "</tbody>" + pie + "</table>";
+    return "<h2>Esfuerzo y entregas por periodo</h2>" +
+      tabla(["Periodo", { texto: "Horas", num: true }, { texto: "Entregables", num: true }, { texto: "Importe", num: true }], filas, pie);
   }
 
   function tablaAnualidades(o, pf) {
@@ -7220,10 +7355,14 @@ span.pa-carga {
     const claves = Object.keys(an);
     if (claves.length < 2) return "";
     const conImp = V2.verImportes();
-    return "<h2>Anualidades</h2><table><thead><tr><th>Año</th><th class=\"pa-num\">Importe</th></tr></thead><tbody>" +
-      claves.map(y => V2.fila([{ html: y }, { html: conImp ? V2.imp(an[y]) : "", clase: "pa-num pa-importe" }])).join("") +
-      '</tbody><tfoot><tr><td><strong>TOTAL</strong></td><td class="pa-num pa-importe"><strong>' +
-      (conImp ? V2.imp(N().r2(N().suma(claves, y => an[y]))) : "") + "</strong></td></tr></tfoot></table>";
+    const filas = claves.map(y => V2.fila([
+      { html: y },
+      { html: conImp ? V2.imp(an[y]) : "", clase: "pa-num pa-importe", etiqueta: "Importe" }
+    ])).join("");
+    const pie = '<tfoot><tr><td><strong>TOTAL</strong></td><td class="pa-num pa-importe"><strong>' +
+      (conImp ? V2.imp(N().r2(N().suma(claves, y => an[y]))) : "") + "</strong></td></tr></tfoot>";
+    return "<h2>Anualidades</h2>" +
+      tabla(["Año", { texto: "Importe", num: true }], filas, pie);
   }
 
   function render() {

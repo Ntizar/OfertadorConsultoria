@@ -34,7 +34,7 @@
       (conImp ? V2.imp(C().totalOferta(o, pf)) : "") + "</strong></td></tr></tfoot>";
     const info = '<p class="pa-mini">' + C().ofertaHoras(o).toLocaleString("es-ES") + " h en " + P().duracionLegible(o.periodos) +
       " · " + E().porContexto(o).total + " entregable(s) · media mensual " + (conImp ? V2.imp(C().mediaPeriodo(o, pf)) : "—") + "</p>";
-    return V2.articulo("Totales de la oferta", V2.tabla(["", ""], filas, pie), info);
+    return V2.articulo("Totales de la oferta", V2.tabla(["", ""], filas, pie, null, true), info);
   }
 
   function porPerfil(o, pf) {
@@ -43,12 +43,12 @@
     const conImp = V2.verImportes();
     const filas = N().lista(pf).filter(p => N().num(horas[p.id]) > 0).map(p => V2.fila([
       { html: N().esc(p.nombre) + '<br><span class="pa-mini">' + N().esc(p.categoria) + "</span>" },
-      { html: V2.hor(horas[p.id]), clase: "nz-table__right" },
-      { html: conImp ? V2.imp(C().importePerfil(o, pf, p.id)) : "", clase: "nz-table__right pa-importe" }
+      { html: V2.hor(horas[p.id]), clase: "nz-table__right", etiqueta: "Horas" },
+      { html: conImp ? V2.imp(C().importePerfil(o, pf, p.id)) : "", clase: "nz-table__right pa-importe", etiqueta: "Importe" }
     ])).join("");
     const pie = '<tfoot><tr><td>Total</td><td class="nz-table__right">' + V2.hor(C().ofertaHoras(o)) + '</td><td class="nz-table__right pa-importe">' +
       (conImp ? V2.imp(C().importeOferta(o, pf)) : "") + "</td></tr></tfoot>";
-    return V2.articulo("Esfuerzo por perfil", V2.tabla(["Perfil", "Horas", "Importe"], filas || '<tr><td colspan="3">Sin horas asignadas.</td></tr>', pie, "nz-table--compact"));
+    return V2.articulo("Esfuerzo por perfil", V2.tabla(["Perfil", "Horas", "Importe"], filas || '<tr><td colspan="3">Sin horas asignadas.</td></tr>', pie, "nz-table--compact", true));
   }
 
   function porTarea(o, pf) {
@@ -56,15 +56,15 @@
     const conImp = V2.verImportes();
     const filas = N().lista(o.tareas).map(t => V2.fila([
       { html: N().esc(t.nombre) },
-      { html: N().lista(t.subtareas).length, clase: "nz-table__right" },
-      { html: N().lista(t.entregables).length, clase: "nz-table__right" },
-      { html: V2.hor(C().tareaHoras(t)), clase: "nz-table__right" },
-      { html: conImp ? V2.imp(C().tareaImporte(t, pf)) : "", clase: "nz-table__right pa-importe" }
+      { html: N().lista(t.subtareas).length, clase: "nz-table__right", etiqueta: "Subtareas" },
+      { html: N().lista(t.entregables).length, clase: "nz-table__right", etiqueta: "Entregables" },
+      { html: V2.hor(C().tareaHoras(t)), clase: "nz-table__right", etiqueta: "Horas" },
+      { html: conImp ? V2.imp(C().tareaImporte(t, pf)) : "", clase: "nz-table__right pa-importe", etiqueta: "Importe" }
     ])).join("");
     const pie = '<tfoot><tr><td>Total</td><td class="nz-table__right">' + N().suma(o.tareas, t => N().lista(t.subtareas).length) +
       '</td><td class="nz-table__right">' + E().porContexto(o).total + '</td><td class="nz-table__right">' + V2.hor(C().ofertaHoras(o)) +
       '</td><td class="nz-table__right pa-importe">' + (conImp ? V2.imp(C().importeOferta(o, pf)) : "") + "</td></tr></tfoot>";
-    return V2.articulo("Por tareas", V2.tabla(["Tarea", "Subtareas", "Entregables", "Horas", "Importe"], filas || '<tr><td colspan="5">Sin tareas.</td></tr>', pie, "nz-table--compact"));
+    return V2.articulo("Por tareas", V2.tabla(["Tarea", "Subtareas", "Entregables", "Horas", "Importe"], filas || '<tr><td colspan="5">Sin tareas.</td></tr>', pie, "nz-table--compact", true));
   }
 
   function porPeriodo(o, pf) {
@@ -77,15 +77,15 @@
       const hitos = c.periodos.reduce((s, i) => s + E().dePeriodo(o, i).length, 0);
       return V2.fila([
         { html: N().esc(c.etiqueta) + ' <span class="pa-mini">' + c.anio + "</span>" },
-        { html: horas ? horas.toLocaleString("es-ES") : "·", clase: "nz-table__right" },
-        { html: hitos ? '<span class="pa-hito-informe">◆ ' + hitos + "</span>" : "·", clase: "nz-table__right" },
-        { html: conImp ? V2.imp(imp) : "", clase: "nz-table__right pa-importe" }
+        { html: horas ? horas.toLocaleString("es-ES") : "·", clase: "nz-table__right", etiqueta: "Horas" },
+        { html: hitos ? '<span class="pa-hito-informe">◆ ' + hitos + "</span>" : "·", clase: "nz-table__right", etiqueta: "Entregables" },
+        { html: conImp ? V2.imp(imp) : "", clase: "nz-table__right pa-importe", etiqueta: "Importe" }
       ]);
     }).join("");
     const pie = '<tfoot><tr><td>Total</td><td class="nz-table__right">' + C().ofertaHoras(o).toLocaleString("es-ES") +
       '</td><td class="nz-table__right">' + E().porContexto(o).total + '</td><td class="nz-table__right pa-importe">' +
       (conImp ? V2.imp(C().importeOferta(o, pf)) : "") + "</td></tr></tfoot>";
-    return V2.articulo("Esfuerzo y entregas por periodo", V2.tabla(["Periodo", "Horas", "Entregables", "Importe"], filas, pie, "nz-table--compact"));
+    return V2.articulo("Esfuerzo y entregas por periodo", V2.tabla(["Periodo", "Horas", "Entregables", "Importe"], filas, pie, "nz-table--compact", true));
   }
 
   /* ---------- Escenarios y versiones ---------- */
@@ -137,28 +137,28 @@
     const conImp = V2.verImportes();
     const filasEco = cmp.economia.map(l => V2.fila([
       { html: l.texto },
-      { html: conImp ? V2.imp(l.a) : "", clase: "nz-table__right" },
-      { html: conImp ? V2.imp(l.b) : "", clase: "nz-table__right" },
-      { html: Math.abs(l.d) > 0.005 ? V2.delta(l.d) : '<span class="pa-mini">igual</span>', clase: "nz-table__right" }
+      { html: conImp ? V2.imp(l.a) : "", clase: "nz-table__right", etiqueta: N().esc(cmp.etiquetaA) },
+      { html: conImp ? V2.imp(l.b) : "", clase: "nz-table__right", etiqueta: N().esc(cmp.etiquetaB) },
+      { html: Math.abs(l.d) > 0.005 ? V2.delta(l.d) : '<span class="pa-mini">igual</span>', clase: "nz-table__right", etiqueta: "Diferencia" }
     ])).join("");
     const filasEst = cmp.estructura.map(l => V2.fila([
       { html: l.texto },
-      { html: l.clave === "horas" ? V2.hor(l.a) : N().fmtNum(l.a), clase: "nz-table__right" },
-      { html: l.clave === "horas" ? V2.hor(l.b) : N().fmtNum(l.b), clase: "nz-table__right" },
-      { html: Math.abs(l.d) > 0.005 ? V2.delta(l.d, (l.clave === "horas") ? "horas" : "numero") : '<span class="pa-mini">igual</span>', clase: "nz-table__right" }
+      { html: l.clave === "horas" ? V2.hor(l.a) : N().fmtNum(l.a), clase: "nz-table__right", etiqueta: N().esc(cmp.etiquetaA) },
+      { html: l.clave === "horas" ? V2.hor(l.b) : N().fmtNum(l.b), clase: "nz-table__right", etiqueta: N().esc(cmp.etiquetaB) },
+      { html: Math.abs(l.d) > 0.005 ? V2.delta(l.d, (l.clave === "horas") ? "horas" : "numero") : '<span class="pa-mini">igual</span>', clase: "nz-table__right", etiqueta: "Diferencia" }
     ])).join("");
     const filasPerf = cmp.porPerfil.map(x => V2.fila([
       { html: N().esc(x.nombre) },
-      { html: V2.hor(x.a), clase: "nz-table__right" },
-      { html: V2.hor(x.b), clase: "nz-table__right" },
-      { html: Math.abs(x.d) > 0.005 ? V2.delta(x.d, "horas") : '<span class="pa-mini">igual</span>', clase: "nz-table__right" },
-      { html: conImp ? V2.delta(x.importeD) : "", clase: "nz-table__right" }
+      { html: V2.hor(x.a), clase: "nz-table__right", etiqueta: "Antes" },
+      { html: V2.hor(x.b), clase: "nz-table__right", etiqueta: "Ahora" },
+      { html: Math.abs(x.d) > 0.005 ? V2.delta(x.d, "horas") : '<span class="pa-mini">igual</span>', clase: "nz-table__right", etiqueta: "Diferencia" },
+      { html: conImp ? V2.delta(x.importeD) : "", clase: "nz-table__right", etiqueta: "Δ importe" }
     ])).join("");
     const filasMes = cmp.porPeriodo.filter(m => m.a || m.b).map(m => V2.fila([
       { html: N().esc(m.etiqueta) },
-      { html: conImp ? V2.imp(m.a) : "", clase: "nz-table__right" },
-      { html: conImp ? V2.imp(m.b) : "", clase: "nz-table__right" },
-      { html: Math.abs(m.d) > 0.005 ? V2.delta(m.d) : '<span class="pa-mini">igual</span>', clase: "nz-table__right" }
+      { html: conImp ? V2.imp(m.a) : "", clase: "nz-table__right", etiqueta: "Antes" },
+      { html: conImp ? V2.imp(m.b) : "", clase: "nz-table__right", etiqueta: "Ahora" },
+      { html: Math.abs(m.d) > 0.005 ? V2.delta(m.d) : '<span class="pa-mini">igual</span>', clase: "nz-table__right", etiqueta: "Diferencia" }
     ])).join("");
     const cambios = cmp.cambios.length
       ? cmp.cambios.map(c => '<p class="pa-mini">' +
@@ -168,10 +168,10 @@
 
     return '<div class="pa-bloque" style="margin-top:var(--nz-space-3)">' +
       V2.articulo("Diferencias: " + N().esc(cmp.etiquetaA) + " → " + N().esc(cmp.etiquetaB),
-        V2.tabla(["", cmp.etiquetaA, cmp.etiquetaB, "Diferencia"], filasEco) +
-        V2.tabla(["", cmp.etiquetaA, cmp.etiquetaB, "Diferencia"], filasEst, null, "nz-table--compact") +
-        '<h4 class="nz-h4">Esfuerzo por perfil</h4>' + V2.tabla(["Perfil", "Antes", "Ahora", "Diferencia", "Δ importe"], filasPerf, null, "nz-table--compact") +
-        (filasMes ? '<h4 class="nz-h4">Importe por periodo</h4>' + V2.tabla(["Periodo", "Antes", "Ahora", "Diferencia"], filasMes, null, "nz-table--compact") : "") +
+        V2.tabla(["", cmp.etiquetaA, cmp.etiquetaB, "Diferencia"], filasEco, null, null, true) +
+        V2.tabla(["", cmp.etiquetaA, cmp.etiquetaB, "Diferencia"], filasEst, null, "nz-table--compact", true) +
+        '<h4 class="nz-h4">Esfuerzo por perfil</h4>' + V2.tabla(["Perfil", "Antes", "Ahora", "Diferencia", "Δ importe"], filasPerf, null, "nz-table--compact", true) +
+        (filasMes ? '<h4 class="nz-h4">Importe por periodo</h4>' + V2.tabla(["Periodo", "Antes", "Ahora", "Diferencia"], filasMes, null, "nz-table--compact", true) : "") +
         '<h4 class="nz-h4">Qué ha cambiado</h4>' + cambios,
         '<div class="pa-fila" style="margin-bottom:var(--nz-space-2)"><button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="foto-cerrar-comparacion">✕ Cerrar comparación</button></div>') +
       "</div>";

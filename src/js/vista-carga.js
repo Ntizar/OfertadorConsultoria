@@ -74,15 +74,15 @@
         labTotal = N().r2(labTotal + lab);
         const texto = (perfil ? perfil.nombre : "Perfil") + " en " + c.etiqueta + ": " + N().fmtNum(pct, 0) +
           " % · " + V2.hor(horas) + " de " + Math.round(lab) + " h laborables";
-        return '<td class="pa-carga ' + tramo(pct) + '" title="' + N().esc(texto) + '">' +
+        return '<td class="pa-carga ' + tramo(pct) + '" data-etiqueta="' + N().esc(c.etiqueta) + '" title="' + N().esc(texto) + '">' +
           (horas > 0 ? N().fmtNum(pct, 0) + "%" : "") + "</td>";
       }).join("");
       const medio = labTotal > 0 ? N().r2((labTotal - libreTotal) / labTotal * 100) : 0;
       return "<tr>" +
-        "<th scope=\"row\"><span class=\"pa-tono-punto\"></span> " + N().esc(perfil ? perfil.nombre : "Perfil") + "</th>" +
+        '<th scope="row"><span class="pa-tono-punto"></span> ' + N().esc(perfil ? perfil.nombre : "Perfil") + "</th>" +
         celdas +
-        '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(medio, 0) + "%</strong></td>" +
-        '<td class="nz-table__num nz-table__right">' + N().fmtNum(libreTotal, 0) + " h</td></tr>";
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Medio"><strong>' + N().fmtNum(medio, 0) + "%</strong></td>" +
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Libre">' + N().fmtNum(libreTotal, 0) + " h</td></tr>";
     }).join("");
 
     const leyenda = '<p class="pa-mini">' +
@@ -97,7 +97,7 @@
     return V2.articulo("Ocupación por perfil y periodo",
       '<p class="pa-mini">Cada celda dice la dedicación de ese perfil en ese periodo, sumando todo lo que tiene asignado: ' +
       "en verde hay hueco, en ámbar está al límite y en rojo no cabe más.</p>" + leyenda +
-      '<div class="pa-tabla-horas"><table class="nz-table nz-table--compact">' +
+      '<div class="nz-table-wrap nz-table-wrap--apilable"><table class="nz-table nz-table--apilable">' +
       "<thead>" + cabecera + "</thead><tbody>" + filas + "</tbody></table></div>");
   }
 
@@ -116,11 +116,11 @@
       const clase = pct > 100.5 ? "nz-badge--danger" : (pct >= 85 ? "nz-badge--warning" : "nz-badge--neutral");
       return "<tr>" +
         '<td><span class="pa-tono-punto"></span> ' + N().esc(perfil ? perfil.nombre : "Perfil") + "</td>" +
-        '<td class="nz-table__num nz-table__right">' + N().fmtNum(asignadas, 0) + " h</td>" +
-        '<td class="nz-table__num nz-table__right">' + N().fmtNum(lab, 0) + " h</td>" +
-        '<td class="nz-table__num nz-table__right"><span class="nz-badge ' + clase + '">' + N().fmtNum(pct, 0) + " %</span></td>" +
-        '<td class="nz-table__num nz-table__right">' + N().fmtNum(Math.max(0, N().r2(lab - asignadas)), 0) + " h</td>" +
-        "<td>" + (malos ? '<span class="nz-badge nz-badge--danger">' + malos + " periodo(s) pasado(s)</span>" : "") + "</td></tr>";
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Asignadas">' + N().fmtNum(asignadas, 0) + " h</td>" +
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Laborables">' + N().fmtNum(lab, 0) + " h</td>" +
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Dedicación media"><span class="nz-badge ' + clase + '">' + N().fmtNum(pct, 0) + " %</span></td>" +
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Libres">' + N().fmtNum(Math.max(0, N().r2(lab - asignadas)), 0) + " h</td>" +
+        '<td data-etiqueta="Avisos">' + (malos ? '<span class="nz-badge nz-badge--danger">' + malos + " periodo(s) pasado(s)</span>" : "") + "</td></tr>";
     }).join("");
 
     const totalAsignado = usados.reduce((a, id) => N().r2(a + N().suma(mPerfil[id] || [], v => N().num(v))), 0);
@@ -129,11 +129,11 @@
       '<p class="pa-mini">El calendario tiene <strong>' + N().fmtNum(lab, 0) +
       " h laborables por perfil</strong> y hay <strong>" + N().fmtNum(totalAsignado, 0) +
       " h</strong> repartidas. Lo que sobra de cada uno es lo que aún puedes planificar (o personal que no necesitas).</p>" +
-      '<table class="nz-table nz-table--compact"><thead><tr><th>Perfil</th>' +
+      '<div class="nz-table-wrap nz-table-wrap--apilable"><table class="nz-table nz-table--apilable"><thead><tr><th>Perfil</th>' +
       '<th class="nz-table__right">Asignadas</th><th class="nz-table__right">Laborables</th>' +
       '<th class="nz-table__right">Dedicación media</th><th class="nz-table__right">Libres</th><th></th></tr></thead>' +
       "<tbody>" + (filas || '<tr><td colspan="6"><span class="pa-mini">Sin perfiles asignados todavía.</span></td></tr>') +
-      "</tbody></table>" +
+      "</tbody></table></div>" +
       '<p class="pa-mini" style="margin-top:var(--nz-space-2)">Coste del esfuerzo con las tarifas actuales: <strong>' +
       N().fmtNum(C().importeOferta(o, pf)) + " €</strong>.</p>");
   }
@@ -183,20 +183,20 @@
         importe = N().r2(importe + C().lineaImporte(l, pf));
       });
       return '<tr><th scope="row"><span class="pa-mini">' + N().esc(f.tarea) + "</span><br>" + N().esc(f.sub) + "</th>" +
-        cols.map(p => '<td class="nz-table__num nz-table__right">' +
+        cols.map(p => '<td class="nz-table__num nz-table__right" data-etiqueta="' + N().esc(abrevia(p.nombre)) + '">' +
           (suyos[p.id] ? N().fmtNum(suyos[p.id], 0) : "") + "</td>").join("") +
-        '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(f.horas, 0) + "</strong></td>" +
-        '<td class="nz-table__num nz-table__right">' + N().fmtNum(importe) + " €</td></tr>";
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Horas"><strong>' + N().fmtNum(f.horas, 0) + "</strong></td>" +
+        '<td class="nz-table__num nz-table__right" data-etiqueta="Importe">' + N().fmtNum(importe) + " €</td></tr>";
     }).join("");
 
     const pie = '<tr><th scope="row">Total</th>' +
-      cols.map(p => '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(porPerfil[p.id] || 0, 0) + "</strong></td>").join("") +
-      '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(C().ofertaHoras(o), 0) + "</strong></td>" +
-      '<td class="nz-table__num nz-table__right"><strong>' + N().fmtNum(C().importeOferta(o, pf)) + " €</strong></td></tr>";
+      cols.map(p => '<td class="nz-table__num nz-table__right" data-etiqueta="' + N().esc(abrevia(p.nombre)) + '"><strong>' + N().fmtNum(porPerfil[p.id] || 0, 0) + "</strong></td>").join("") +
+      '<td class="nz-table__num nz-table__right" data-etiqueta="Horas"><strong>' + N().fmtNum(C().ofertaHoras(o), 0) + "</strong></td>" +
+      '<td class="nz-table__num nz-table__right" data-etiqueta="Importe"><strong>' + N().fmtNum(C().importeOferta(o, pf)) + " €</strong></td></tr>";
 
     return V2.articulo("Reparto por subtarea y perfil",
       '<p class="pa-mini">Quién hace qué: las horas de cada perfil en cada subtarea.</p>' +
-      '<div class="pa-tabla-horas"><table class="nz-table nz-table--compact">' +
+      '<div class="nz-table-wrap nz-table-wrap--apilable"><table class="nz-table nz-table--apilable">' +
       "<thead>" + cabecera + "</thead><tbody>" + cuerpo + pie + "</tbody></table></div>");
   }
 

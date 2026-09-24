@@ -5,6 +5,10 @@
    de la oferta, entregables con su fecha de entrega y criterio, detalle del
    esfuerzo, gastos, totales, resúmenes y condiciones.
    Sin seguimiento ni facturación.
+
+   Todas las tablas son `--apilable` (objeto de Aurora 7): en el móvil cada fila
+   es una tarjeta con el nombre de su columna delante, así que ninguna tabla se
+   aplasta ni hay que arrastrar el documento de lado.
    ===================================================================== */
 (function (raiz) {
   const PL = (raiz.PL = raiz.PL || {});
@@ -14,6 +18,29 @@
   const E = () => PL.entregables;
   const V = () => PL.vistas;
   const APP = () => PL.app;
+
+  /** Tabla del informe. Apilable: en móvil, tarjetas con la etiqueta de cada
+      columna; desde 640 px, la tabla de siempre. `cabeceras` admite cadenas o
+      `{ texto, num }` para alinear a la derecha. */
+  function tabla(cabeceras, filas, pie) {
+    const th = (cabeceras || []).map(c => {
+      const texto = (typeof c === "string") ? c : c.texto;
+      const num = (typeof c === "object") && c.num;
+      return "<th" + (num ? ' class="pa-num"' : "") + ">" + texto + "</th>";
+    }).join("");
+    return '<div class="nz-table-wrap nz-table-wrap--apilable">' +
+      '<table class="nz-table nz-table--apilable">' +
+      (cabeceras && cabeceras.length ? "<thead><tr>" + th + "</tr></thead>" : "") +
+      "<tbody>" + (filas || "") + "</tbody>" + (pie || "") + "</table></div>";
+  }
+
+  /** Fila de dos columnas: la primera es la clave (no lleva etiqueta), la segunda el valor. */
+  function claveValor(k, v, fuerte) {
+    return V().fila([
+      { html: (fuerte ? "<strong>" : "") + k + (fuerte ? "</strong>" : ""), clase: "pa-informe__clave" },
+      { html: v }
+    ]);
+  }
 
   function cabecera(o, marca) {
     const V2 = V();
@@ -27,21 +54,22 @@
 
   function datosOferta(o) {
     const V2 = V();
-    const linea = (k, v) => '<tr><td style="width:11rem"><strong>' + k + "</strong></td><td>" + v + "</td></tr>";
-    return "<h2>Datos de la oferta</h2><table><tbody>" +
-      linea("Oferta", N().esc(o.nombre)) +
-      (o.cliente.nombre ? linea("Cliente", N().esc(o.cliente.nombre)) : "") +
-      (o.cliente.contacto ? linea("Contacto", N().esc(o.cliente.contacto)) : "") +
-      (o.cliente.ref ? linea("Referencia", N().esc(o.cliente.ref)) : "") +
-      linea("Estado", V2.badgeOferta(o)) +
-      linea("Calendario", N().esc(P().duracionLegible(o.periodos))) +
-      linea("Esfuerzo total", N().fmtHoras(C().ofertaHoras(o))) +
-      (o.descripcion ? linea("Alcance", N().esc(o.descripcion)) : "") +
-      "</tbody></table>";
+    const filas =
+      claveValor("Oferta", N().esc(o.nombre)) +
+      (o.cliente.nombre ? claveValor("Cliente", N().esc(o.cliente.nombre)) : "") +
+      (o.cliente.contacto ? claveValor("Contacto", N().esc(o.cliente.contacto)) : "") +
+      (o.cliente.ref ? claveValor("Referencia", N().esc(o.cliente.ref)) : "") +
+      claveValor("Estado", V2.badgeOferta(o)) +
+      claveValor("Calendario", N().esc(P().duracionLegible(o.periodos))) +
+      claveValor("Esfuerzo total", N().fmtHoras(C().ofertaHoras(o))) +
+      (o.descripcion ? claveValor("Alcance", N().esc(o.descripcion)) : "");
+    return "<h2>Datos de la oferta</h2>" + tabla(null, filas);
   }
 
   /** El calendario dentro del informe: el diagrama completo, con sus barras y sus
-      rombos de entrega. Es la vista que el cliente necesita ver de un vistazo. */
+      rombos de entrega. Es la vista que el cliente necesita ver de un vistazo.
+      Es ancho por naturaleza: aquí sí se desplaza, con la columna del concepto
+      pegada a la izquierda para no perder el hilo. */
   function seccionGantt(o, pf) {
     const P2 = PL.periodos, C2 = PL.calculo;
     return "<h2>Calendario y entregas</h2>" +
@@ -62,14 +90,15 @@
       return V2.fila([
         { html: '<span class="pa-hito-informe">◆</span> ' + N().esc(P().mesCorto(o.periodos, e.periodo)) +
             (e.fecha ? '<br><span class="pa-mini">' + N().esc(N().fechaCorta(e.fecha)) + "</span>" : "") },
-        { html: "<strong>" + N().esc(e.nombre) + "</strong>" + (e.descripcion ? '<br><span class="pa-mini">' + N().esc(e.descripcion) + "</span>" : "") },
-        { html: e._contexto === "oferta" ? "Oferta" : N().esc(e._tareaNombre) },
-        { html: r ? N().esc(r.nombre) : "—", clase: "pa-mini" },
-        { html: N().esc(e.criterio || "—"), clase: "pa-mini" }
+        { html: "<strong>" + N().esc(e.nombre) + "</strong>" + (e.descripcion ? '<br><span class="pa-mini">' + N().esc(e.descripcion) + "</span>" : ""),
+          etiqueta: "Entregable" },
+        { html: e._contexto === "oferta" ? "Oferta" : N().esc(e._tareaNombre), etiqueta: "Origen" },
+        { html: r ? N().esc(r.nombre) : "—", clase: "pa-mini", etiqueta: "Responsable" },
+        { html: N().esc(e.criterio || "—"), clase: "pa-mini", etiqueta: "Criterio de aceptación" }
       ]);
     }).join("");
-    return "<h2>Entregables comprometidos</h2><table><thead><tr><th>Entrega</th><th>Entregable</th><th>Origen</th><th>Responsable</th><th>Criterio de aceptación</th></tr></thead>" +
-      "<tbody>" + filas + "</tbody></table>";
+    return "<h2>Entregables comprometidos</h2>" +
+      tabla(["Entrega", "Entregable", "Origen", "Responsable", "Criterio de aceptación"], filas);
   }
 
   function tablaDetalle(o, pf) {
@@ -77,23 +106,31 @@
     const conImp = V2.verImportes();
     const filas = [];
     N().lista(o.tareas).forEach(t => {
-      filas.push('<tr><td colspan="5" style="background:var(--nz-surface-2,var(--nz-surface));font-weight:800">' + N().esc(t.nombre) + "</td></tr>");
+      filas.push('<tr><td colspan="5" class="pa-detalle__grupo">' + N().esc(t.nombre) + "</td></tr>");
       N().lista(t.subtareas).forEach(s => {
-        filas.push('<tr><td style="padding-left:18px">' + N().esc(s.nombre) + '</td><td class="pa-num pa-importe">' +
-          (conImp ? V2.imp(C().subtareaImporte(s, pf)) : "") + '</td><td class="pa-num">' + N().fmtHoras(C().subtareaHoras(s)) +
-          '</td><td class="pa-num"></td><td></td></tr>');
+        filas.push(V2.fila([
+          { html: "<strong>" + N().esc(s.nombre) + "</strong>" },
+          { html: conImp ? V2.imp(C().subtareaImporte(s, pf)) : "", clase: "pa-num pa-importe", etiqueta: "Importe" },
+          { html: N().fmtHoras(C().subtareaHoras(s)), clase: "pa-num", etiqueta: "Horas" },
+          null,
+          { html: P().duracionLegible(o.periodos).split(" · ")[0], etiqueta: "Periodo" }
+        ]));
         N().lista(s.lineas).forEach(l => {
           const p = C().perfilPorId(pf, l.perfilId);
-          filas.push('<tr><td style="padding-left:36px;color:var(--nz-text-soft)">' + N().esc(p ? p.nombre : "(perfil eliminado)") + "</td>" +
-            '<td class="pa-num pa-importe">' + (conImp ? V2.imp(p ? p.tarifa : 0) : "") + "</td>" +
-            '<td class="pa-num pa-importe">' + (conImp ? V2.imp(C().lineaImporte(l, pf)) : "") + "</td>" +
-            '<td class="pa-num">' + N().fmtHoras(C().lineaHoras(l)) + "</td>" +
-            "<td>" + P().duracionLegible(o.periodos).split(" · ")[0] + "</td></tr>");
+          filas.push(V2.fila([
+            { html: N().esc(p ? p.nombre : "(perfil eliminado)"), clase: "pa-mini" },
+            { html: conImp ? V2.imp(p ? p.tarifa : 0) : "", clase: "pa-num pa-importe", etiqueta: "Tarifa" },
+            { html: conImp ? V2.imp(C().lineaImporte(l, pf)) : "", clase: "pa-num pa-importe", etiqueta: "Importe" },
+            { html: N().fmtHoras(C().lineaHoras(l)), clase: "pa-num", etiqueta: "Horas" },
+            { html: P().duracionLegible(o.periodos).split(" · ")[0], etiqueta: "Periodo" }
+          ]));
         });
       });
     });
-    return "<h2>Detalle de tareas y esfuerzo</h2><table><thead><tr><th>Concepto</th><th class=\"pa-num\">Importe</th><th class=\"pa-num\">Horas</th><th class=\"pa-num\"></th><th>Periodo</th></tr></thead><tbody>" +
-      (filas.join("") || '<tr><td colspan="5">Sin contenido.</td></tr>') + "</tbody></table>";
+    const pie = "";
+    return "<h2>Detalle de tareas y esfuerzo</h2>" +
+      tabla(["Concepto", { texto: "Importe", num: true }, { texto: "Horas", num: true }, "", "Periodo"],
+        filas.join("") || '<tr><td colspan="5">Sin contenido.</td></tr>', pie);
   }
 
   function tablaGastos(o) {
@@ -101,13 +138,14 @@
     const gastos = N().lista(o.gastos);
     if (!gastos.length) return "";
     const conImp = V2.verImportes();
-    return "<h2>Gastos generales</h2><table><thead><tr><th>Concepto</th><th class=\"pa-num\">Unidades</th><th class=\"pa-num\">Precio</th><th class=\"pa-num\">Importe</th></tr></thead><tbody>" +
-      gastos.map(g => V2.fila([
-        { html: N().esc(g.nombre) },
-        { html: N().fmtNum(g.unidades), clase: "pa-num" },
-        { html: conImp ? V2.imp(g.precio) : "", clase: "pa-num pa-importe" },
-        { html: conImp ? V2.imp(C().gastoImporte(g)) : "", clase: "pa-num pa-importe" }
-      ])).join("") + "</tbody></table>";
+    const filas = gastos.map(g => V2.fila([
+      { html: N().esc(g.nombre) },
+      { html: N().fmtNum(g.unidades), clase: "pa-num", etiqueta: "Unidades" },
+      { html: conImp ? V2.imp(g.precio) : "", clase: "pa-num pa-importe", etiqueta: "Precio" },
+      { html: conImp ? V2.imp(C().gastoImporte(g)) : "", clase: "pa-num pa-importe", etiqueta: "Importe" }
+    ])).join("");
+    return "<h2>Gastos generales</h2>" +
+      tabla(["Concepto", { texto: "Unidades", num: true }, { texto: "Precio", num: true }, { texto: "Importe", num: true }], filas);
   }
 
   function tablaTotales(o, pf) {
@@ -124,9 +162,9 @@
       (d.tipo ? linea("Descuento (" + (d.tipo === "%" ? N().fmtNum(d.valor) + " %" : "importe fijo") + ")", -C().descuentoImporte(o, pf)) : "") +
       linea("Base imponible", C().baseImponible(o, pf)) +
       (C().nombreImpuesto(o) ? linea(C().nombreImpuesto(o) + " " + N().fmtNum(t.tasa) + " %" + (t.incluido ? " (incluido en los precios)" : ""), C().impuestoImporte(o, pf)) : "");
-    const pie = '<tfoot><tr><td><strong>TOTAL</strong></td><td class="pa-num pa-importe"><strong>' +
+    const pie = "<tfoot><tr><td><strong>TOTAL</strong></td><td class=\"pa-num pa-importe\"><strong>" +
       (conImp ? V2.imp(C().totalOferta(o, pf)) : "") + "</strong></td></tr></tfoot>";
-    return "<h2>Totales</h2><table><tbody>" + filas + "</tbody>" + pie + "</table>" +
+    return "<h2>Totales</h2>" + tabla(null, filas, pie) +
       (o.condicionesPago ? "<p><strong>Condiciones de pago:</strong> " + N().esc(o.condicionesPago) + "</p>" : "");
   }
 
@@ -136,11 +174,12 @@
     const conImp = V2.verImportes();
     const filas = N().lista(pf).filter(p => N().num(horas[p.id]) > 0).map(p => V2.fila([
       { html: N().esc(p.nombre) + ' <span class="pa-mini">(' + N().esc(p.categoria) + ")</span>" },
-      { html: N().fmtHoras(horas[p.id]), clase: "pa-num" },
-      { html: conImp ? V2.imp(C().importePerfil(o, pf, p.id)) : "", clase: "pa-num pa-importe" }
-    ]));
-    return "<h2>Resumen por perfil</h2><table><thead><tr><th>Perfil</th><th class=\"pa-num\">Horas</th><th class=\"pa-num\">Importe</th></tr></thead><tbody>" +
-      (filas.join("") || '<tr><td colspan="3">—</td></tr>') + "</tbody></table>";
+      { html: N().fmtHoras(horas[p.id]), clase: "pa-num", etiqueta: "Horas" },
+      { html: conImp ? V2.imp(C().importePerfil(o, pf, p.id)) : "", clase: "pa-num pa-importe", etiqueta: "Importe" }
+    ])).join("");
+    return "<h2>Resumen por perfil</h2>" +
+      tabla(["Perfil", { texto: "Horas", num: true }, { texto: "Importe", num: true }],
+        filas || '<tr><td colspan="3">—</td></tr>');
   }
 
   function tablaPeriodos(o, pf) {
@@ -149,15 +188,15 @@
     const conImp = V2.verImportes();
     const filas = cols.map(c => V2.fila([
       { html: N().esc(c.etiqueta) + " " + c.anio },
-      { html: c.periodos.reduce((s, i) => s + C().horasPeriodo(o, i), 0).toLocaleString("es-ES"), clase: "pa-num" },
-      { html: c.periodos.reduce((s, i) => s + E().dePeriodo(o, i).length, 0) || "·", clase: "pa-num" },
-      { html: conImp ? V2.imp(c.periodos.reduce((s, i) => s + C().importePeriodo(o, pf, i), 0)) : "", clase: "pa-num pa-importe" }
+      { html: c.periodos.reduce((s, i) => s + C().horasPeriodo(o, i), 0).toLocaleString("es-ES"), clase: "pa-num", etiqueta: "Horas" },
+      { html: c.periodos.reduce((s, i) => s + E().dePeriodo(o, i).length, 0) || "·", clase: "pa-num", etiqueta: "Entregables" },
+      { html: conImp ? V2.imp(c.periodos.reduce((s, i) => s + C().importePeriodo(o, pf, i), 0)) : "", clase: "pa-num pa-importe", etiqueta: "Importe" }
     ])).join("");
     const pie = '<tfoot><tr><td><strong>Total</strong></td><td class="pa-num"><strong>' + C().ofertaHoras(o).toLocaleString("es-ES") +
       '</strong></td><td class="pa-num"><strong>' + E().porContexto(o).total + '</strong></td><td class="pa-num pa-importe"><strong>' +
       (conImp ? V2.imp(C().importeOferta(o, pf)) : "") + "</strong></td></tr></tfoot>";
-    return "<h2>Esfuerzo y entregas por periodo</h2><table><thead><tr><th>Periodo</th><th class=\"pa-num\">Horas</th><th class=\"pa-num\">Entregables</th><th class=\"pa-num\">Importe</th></tr></thead><tbody>" +
-      filas + "</tbody>" + pie + "</table>";
+    return "<h2>Esfuerzo y entregas por periodo</h2>" +
+      tabla(["Periodo", { texto: "Horas", num: true }, { texto: "Entregables", num: true }, { texto: "Importe", num: true }], filas, pie);
   }
 
   function tablaAnualidades(o, pf) {
@@ -166,10 +205,14 @@
     const claves = Object.keys(an);
     if (claves.length < 2) return "";
     const conImp = V2.verImportes();
-    return "<h2>Anualidades</h2><table><thead><tr><th>Año</th><th class=\"pa-num\">Importe</th></tr></thead><tbody>" +
-      claves.map(y => V2.fila([{ html: y }, { html: conImp ? V2.imp(an[y]) : "", clase: "pa-num pa-importe" }])).join("") +
-      '</tbody><tfoot><tr><td><strong>TOTAL</strong></td><td class="pa-num pa-importe"><strong>' +
-      (conImp ? V2.imp(N().r2(N().suma(claves, y => an[y]))) : "") + "</strong></td></tr></tfoot></table>";
+    const filas = claves.map(y => V2.fila([
+      { html: y },
+      { html: conImp ? V2.imp(an[y]) : "", clase: "pa-num pa-importe", etiqueta: "Importe" }
+    ])).join("");
+    const pie = '<tfoot><tr><td><strong>TOTAL</strong></td><td class="pa-num pa-importe"><strong>' +
+      (conImp ? V2.imp(N().r2(N().suma(claves, y => an[y]))) : "") + "</strong></td></tr></tfoot>";
+    return "<h2>Anualidades</h2>" +
+      tabla(["Año", { texto: "Importe", num: true }], filas, pie);
   }
 
   function render() {

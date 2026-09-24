@@ -149,8 +149,13 @@
     return '<article class="nz-article">' + (titulo ? '<h3 class="nz-h3">' + titulo + "</h3>" : "") + (extra || "") + cuerpo + "</article>";
   }
 
-  function tabla(cabeceras, filas, pie, clase) {
-    return '<div class="nz-table-wrap"><table class="nz-table' + (clase ? " " + clase : "") + '">' +
+  /** Tabla. Con `apilable` en true (objeto `.nz-table--apilable` de Aurora 7),
+      cada fila se convierte en una tarjeta en pantalla estrecha y cada celda
+      lleva delante el nombre de su columna: hay que dar `etiqueta` en `fila`. */
+  function tabla(cabeceras, filas, pie, clase, apilable) {
+    const envoltorio = "nz-table-wrap" + (apilable ? " nz-table-wrap--apilable" : "");
+    const clases = "nz-table" + (apilable ? " nz-table--apilable" : "") + (clase ? " " + clase : "");
+    return '<div class="' + envoltorio + '"><table class="' + clases + '">' +
       (cabeceras && cabeceras.length ? "<thead><tr>" + cabeceras.map(c => '<th class="nz-table__right">' + c + "</th>").join("") + "</tr></thead>" : "") +
       "<tbody>" + (filas || "") + "</tbody>" + (pie || "") + "</table></div>";
   }
@@ -159,7 +164,8 @@
     return "<tr>" + celdas.map(c => {
       if (c === null || c === undefined) return "<td></td>";
       if (typeof c === "string") return "<td>" + c + "</td>";
-      return "<td" + (c.clase ? ' class="' + c.clase + '"' : "") + ">" + (c.html === undefined ? "" : c.html) + "</td>";
+      return "<td" + (c.clase ? ' class="' + c.clase + '"' : "") +
+        (c.etiqueta ? ' data-etiqueta="' + c.etiqueta + '"' : "") + ">" + (c.html === undefined ? "" : c.html) + "</td>";
     }).join("") + "</tr>";
   }
 

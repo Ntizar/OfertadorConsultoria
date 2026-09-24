@@ -149,9 +149,17 @@
 .pa-informe { max-width: 52rem; margin: 0 auto; }
 .pa-informe h1 { font-size: var(--nz-text-xl); margin: var(--nz-space-3) 0 var(--nz-space-1); }
 .pa-informe h2 { font-size: var(--nz-text-md); margin-top: var(--nz-space-4); border-bottom: 2px solid var(--nz-brand); padding-bottom: 2px; }
-.pa-informe table { width: 100%; border-collapse: collapse; font-size: var(--nz-text-xs); margin: var(--nz-space-2) 0; }
-.pa-informe th, .pa-informe td { border: 1px solid var(--nz-border); padding: var(--nz-space-1) var(--nz-space-2); text-align: left; }
-.pa-informe th { background: var(--nz-surface-2, var(--nz-surface)); }
+.pa-informe table:not(.pa-gantt) { width: 100%; border-collapse: collapse; font-size: var(--nz-text-xs); margin: var(--nz-space-2) 0; }
+.pa-informe table:not(.pa-gantt) th, .pa-informe table:not(.pa-gantt) td { padding: var(--nz-space-1) var(--nz-space-2); text-align: left; }
+/* El marco de tabla es de escritorio para arriba: en el móvil las tablas de
+   datos van apiladas en tarjetas (objeto `.nz-table--apilable` de Aurora 7). */
+@media (min-width: 640px) {
+  .pa-informe table:not(.pa-gantt) th, .pa-informe table:not(.pa-gantt) td { border: 1px solid var(--nz-border); }
+  .pa-informe table:not(.pa-gantt) th { background: var(--nz-surface-2, var(--nz-surface)); }
+  .pa-informe__clave { width: 11rem; }
+  .pa-detalle__grupo { background: var(--nz-surface-2, var(--nz-surface)); }
+}
+.pa-detalle__grupo { font-weight: 800; color: var(--nz-text); }
 .pa-informe__cab { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--nz-space-2); align-items: flex-start; border-bottom: 3px solid var(--nz-brand); padding-bottom: var(--nz-space-2); }
 .pa-informe__pie { margin-top: var(--nz-space-5); padding-top: var(--nz-space-2); border-top: 1px solid var(--nz-border); font-size: var(--nz-text-xs); color: var(--nz-text-soft); display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--nz-space-2); }
 .pa-num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -207,26 +215,31 @@ body.pa-sin-importes .pa-importe { display: none; }
 
 /* ---------- Móvil: la tabla de horas se convierte en tarjetas por perfil ----------
    Nada de arrastrar una tabla a lo ancho: cada perfil es una tarjeta y cada mes
-   una fila con su nombre delante y un campo grande (44 px, táctil). */
+   una fila con su nombre delante y un campo grande (44 px, táctil). Nada lleva
+   `nowrap` ni un ancho mínimo: la tarjeta mide lo que mide la pantalla. */
 @media (max-width: 720px) {
+  .pa-tabla-horas { overflow-x: visible; }
   .pa-tabla-horas table, .pa-tabla-horas thead, .pa-tabla-horas tbody,
-  .pa-tabla-horas tr, .pa-tabla-horas th, .pa-tabla-horas td { display: block; width: auto; }
+  .pa-tabla-horas tr, .pa-tabla-horas th, .pa-tabla-horas td { display: block; width: auto; min-width: 0; }
 
   .pa-tabla-horas thead { display: none; }
   .pa-tabla-horas tr {
     border: 1px solid var(--nz-border); border-radius: var(--nz-radius-md);
     padding: var(--nz-space-2); margin-bottom: var(--nz-space-2); background: var(--nz-surface);
   }
-  .pa-tabla-horas td { border: 0; padding: 0.2rem 0; text-align: left; }
+  .pa-tabla-horas th, .pa-tabla-horas td { border: 0; padding: 0.2rem 0; text-align: left; white-space: normal; }
+  /* La primera columna ya no es la columna pegada de la tabla ancha: aquí cada
+     fila es una tarjeta y no hay nada que pegar ni que ensanchar. */
+  .pa-tabla-horas td:first-child, .pa-tabla-horas th:first-child { position: static; min-width: 0; }
   .pa-tabla-horas td[data-etiqueta] { display: flex; align-items: center; justify-content: space-between; gap: var(--nz-space-2); }
   .pa-tabla-horas td[data-etiqueta]::before {
     content: attr(data-etiqueta); flex: 0 0 5.4rem;
     font-size: var(--nz-text-xs); color: var(--nz-text-soft); text-transform: uppercase; letter-spacing: 0.03em;
   }
-  .pa-tabla-horas td[data-etiqueta] > * { flex: 1 1 auto; }
+  .pa-tabla-horas td[data-etiqueta] > * { flex: 1 1 auto; min-width: 0; }
   .pa-tabla-horas td[data-etiqueta="Perfil"]::before { display: none; }
   .pa-tabla-horas td[data-etiqueta="Perfil"] { display: block; }
-  .pa-tabla-horas input[type="number"], .pa-tabla-horas select { min-height: 44px; font-size: var(--nz-text-md); width: 100%; }
+  .pa-tabla-horas input[type="number"], .pa-tabla-horas select { min-height: 44px; font-size: var(--nz-text-md); width: 100%; min-width: 0; }
   .pa-tabla-horas .pa-celda__eq { flex: 0 0 5rem; text-align: right; }
   .pa-tabla-horas td .nz-btn { min-height: 44px; min-width: 44px; }
 }
@@ -370,24 +383,21 @@ span.pa-carga {
 
 
 /* ---------- FULL RESPONSIVE ----------
-   La app se usa en móvil: nada se aplasta, nada se sale. Las tablas anchas hacen su
-   propio scroll (con la columna del concepto pegada) en vez de romper la página. */
-.pa-tabla-horas { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
-.pa-tabla-horas > table { min-width: 100%; }
+   La app se usa en móvil: nada se aplasta y nada se sale de la pantalla.
+   Las tablas de datos se apilan en tarjetas (objeto `.nz-table--apilable` de
+   Aurora 7) y la tabla de horas, que es un editor de campos, se convierte en una
+   tarjeta por perfil. Ninguna tabla obliga a arrastrar de lado. */
 .pa-jornada { display: grid; grid-template-columns: minmax(15rem, 1fr) minmax(18rem, 1.4fr); gap: var(--nz-space-4); align-items: start; }
 .pa-select-pct { min-width: 5.4rem; }
-
-#pa-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+.pa-select-perfil { min-width: 150px; }
+.pa-jornada > div { min-width: 0; }
 
 @media (max-width: 900px) {
   .pa-jornada { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {
-  /* Nada de columnas apretadas: scroll propio y tipografía legible */
-  .pa-tabla-horas > table { min-width: 44rem; }
   .pa-carga { min-width: 2.5rem; font-size: 0.66rem; padding: 0.12rem 0.18rem; }
-  .pa-jornada { display: block; }
   .pa-jornada > div + div { margin-top: var(--nz-space-4); }
   .pa-fila { flex-wrap: wrap; }
   .pa-fila > .nz-input, .pa-fila > .nz-btn, .pa-fila > label { min-height: 44px; }
@@ -396,6 +406,13 @@ span.pa-carga {
   .pa-hito__nombre { flex: 1 1 100%; }
   .pa-select-pct, .pa-input-horas, .pa-input-num { min-height: 44px; font-size: var(--nz-text-md); }
   .pa-select-pct { width: 100%; }
+  .pa-select-perfil { min-width: 0; }
   .pa-calendario .pa-ancho-medio { width: 100%; }
   .nz-table--compact td, .nz-table--compact th { padding: 0.2rem 0.3rem; }
+
+  /* La barra de la app: las acciones bajan a su propia fila, envueltas y a 44 px.
+     Antes se salían de la pantalla y había botones imposibles de pulsar. */
+  .nz-navbar__links { width: 100%; justify-content: flex-start; margin-left: 0; }
+  .nz-navbar .nz-btn, .nz-navbar .nz-input { min-height: 44px; }
+  .nz-navbar #pa-sel-oferta { flex: 1 1 8rem; min-width: 0; }
 }
