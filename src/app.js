@@ -314,7 +314,9 @@ let pestanaActual = "estructura";
 function mostrarPestana(nombre){
   pestanaActual = nombre;
   $$("#pa-tabs .nz-tabs__tab").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === nombre)));
-  $$("main>section").forEach(s => s.hidden = s.id !== "sec-" + nombre);
+  /* Las secciones viven DENTRO de .nz-tabs__panel: son <main> > <div> > <section>,
+     así que "main>section" no encuentra nada. Se localizan por prefijo de id. */
+  $$("main section[id^='sec-']").forEach(s => s.hidden = s.id !== "sec-" + nombre);
   if (nombre === "estructura") renderEstructura();
   if (nombre === "resumen") renderResumen();
   if (nombre === "cronograma") renderCronograma();
@@ -667,8 +669,8 @@ function camposOferta(){
       <label class="nz-field"><span class="nz-field__label">Validez (días)</span><input class="nz-input pa-input-num" type="number" min="0" data-campo="proyecto-validez" value="${num(pr.validezDias)||30}"></label>
       <label class="nz-field"><span class="nz-field__label">Inicio de ejecución</span><input class="nz-input pa-input-fecha" type="month" data-campo="proyecto-inicio" value="${esc(pr.fechaInicio||"")}"></label>
       <label class="nz-field"><span class="nz-field__label">Duración (meses)</span><input class="nz-input pa-input-num" type="number" min="1" max="60" data-campo="proyecto-meses" value="${pr.meses||12}"></label>
-      <label class="nz-field nz-field--wide"><span class="nz-field__label">Condiciones de pago</span><input class="nz-input" data-campo="proyecto-pago" value="${esc(pr.condicionesPago||"")}" placeholder="Ej.: 30% a la firma, 40% a mitad, 30% a la entrega"></label>
-      <label class="nz-field nz-field--wide"><span class="nz-field__label">Descripción / alcance</span><textarea class="nz-input" rows="2" data-campo="proyecto-desc">${esc(pr.descripcion||"")}</textarea></label>
+      <label class="nz-field pa-ancho"><span class="nz-field__label">Condiciones de pago</span><input class="nz-input" data-campo="proyecto-pago" value="${esc(pr.condicionesPago||"")}" placeholder="Ej.: 30% a la firma, 40% a mitad, 30% a la entrega"></label>
+      <label class="nz-field pa-ancho"><span class="nz-field__label">Descripción / alcance</span><textarea class="nz-input" rows="2" data-campo="proyecto-desc">${esc(pr.descripcion||"")}</textarea></label>
       <label class="nz-field"><span class="nz-field__label">Impuesto</span>
         <select class="nz-input" data-campo="proyecto-impuesto-tipo">
           <option value="iva" ${t.tipo==="iva"?"selected":""}>IVA (se añade)</option>

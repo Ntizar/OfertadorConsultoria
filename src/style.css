@@ -174,7 +174,7 @@ body.pa-sin-importes .pa-importe,body.pa-sin-importes .pa-col-importe{display:no
   body{background:#fff}
   .pa-cab,.pa-tabs,footer,#pa-error,#pa-toast{display:none!important}
   main{max-width:none;padding:0;margin:0}
-  main>section:not(#sec-informe){display:none!important}
+  main section[id^="sec-"]:not(#sec-informe){display:none!important}
   #sec-informe .pa-card{border:none;box-shadow:none;padding:0}
   #sec-informe .pa-card+.pa-card{margin-top:0}
   .pa-informe{border:none;border-radius:0;padding:0;max-width:none}

@@ -13,6 +13,8 @@
 .pa-fila--apretada{gap:var(--nz-space-1)}
 .pa-crece{flex:1;min-width:180px}
 .pa-crece2{flex:2;min-width:220px}
+/* Campo que ocupa las 2 columnas del nz-formgrid--2 (Aurora no trae modificador para esto) */
+.pa-ancho{grid-column:1/-1}
 .pa-espacio{flex:1}
 .pa-logo{height:26px;max-width:150px;object-fit:contain;display:block}
 .pa-modo-oculto{display:none}
@@ -42,7 +44,7 @@
 @media print{
   .nz-navbar,.nz-tabs,#pa-error,.pa-no-imprimir{display:none}
   main{padding:0;max-width:none}
-  main>section:not(#sec-informe){display:none}
+  main section[id^="sec-"]:not(#sec-informe){display:none}
   #sec-informe .nz-article{box-shadow:none;border:none;padding:0}
   .pa-informe{max-width:none}
   body{background:var(--nz-surface)}

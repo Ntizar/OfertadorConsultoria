@@ -2588,7 +2588,7 @@ body.pa-sin-importes .pa-importe,body.pa-sin-importes .pa-col-importe{display:no
   body{background:#fff}
   .pa-cab,.pa-tabs,footer,#pa-error,#pa-toast{display:none!important}
   main{max-width:none;padding:0;margin:0}
-  main>section:not(#sec-informe){display:none!important}
+  main section[id^="sec-"]:not(#sec-informe){display:none!important}
   #sec-informe .pa-card{border:none;box-shadow:none;padding:0}
   #sec-informe .pa-card+.pa-card{margin-top:0}
   .pa-informe{border:none;border-radius:0;padding:0;max-width:none}
@@ -2614,6 +2614,8 @@ body.pa-sin-importes .pa-importe,body.pa-sin-importes .pa-col-importe{display:no
 .pa-fila--apretada{gap:var(--nz-space-1)}
 .pa-crece{flex:1;min-width:180px}
 .pa-crece2{flex:2;min-width:220px}
+/* Campo que ocupa las 2 columnas del nz-formgrid--2 (Aurora no trae modificador para esto) */
+.pa-ancho{grid-column:1/-1}
 .pa-espacio{flex:1}
 .pa-logo{height:26px;max-width:150px;object-fit:contain;display:block}
 .pa-modo-oculto{display:none}
@@ -2643,7 +2645,7 @@ body.pa-sin-importes .pa-importe,body.pa-sin-importes .pa-col-importe{display:no
 @media print{
   .nz-navbar,.nz-tabs,#pa-error,.pa-no-imprimir{display:none}
   main{padding:0;max-width:none}
-  main>section:not(#sec-informe){display:none}
+  main section[id^="sec-"]:not(#sec-informe){display:none}
   #sec-informe .nz-article{box-shadow:none;border:none;padding:0}
   .pa-informe{max-width:none}
   body{background:var(--nz-surface)}
@@ -3091,7 +3093,9 @@ let pestanaActual = "estructura";
 function mostrarPestana(nombre){
   pestanaActual = nombre;
   $$("#pa-tabs .nz-tabs__tab").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === nombre)));
-  $$("main>section").forEach(s => s.hidden = s.id !== "sec-" + nombre);
+  /* Las secciones viven DENTRO de .nz-tabs__panel: son <main> > <div> > <section>,
+     así que "main>section" no encuentra nada. Se localizan por prefijo de id. */
+  $$("main section[id^='sec-']").forEach(s => s.hidden = s.id !== "sec-" + nombre);
   if (nombre === "estructura") renderEstructura();
   if (nombre === "resumen") renderResumen();
   if (nombre === "cronograma") renderCronograma();
@@ -3444,8 +3448,8 @@ function camposOferta(){
       <label class="nz-field"><span class="nz-field__label">Validez (días)</span><input class="nz-input pa-input-num" type="number" min="0" data-campo="proyecto-validez" value="${num(pr.validezDias)||30}"></label>
       <label class="nz-field"><span class="nz-field__label">Inicio de ejecución</span><input class="nz-input pa-input-fecha" type="month" data-campo="proyecto-inicio" value="${esc(pr.fechaInicio||"")}"></label>
       <label class="nz-field"><span class="nz-field__label">Duración (meses)</span><input class="nz-input pa-input-num" type="number" min="1" max="60" data-campo="proyecto-meses" value="${pr.meses||12}"></label>
-      <label class="nz-field nz-field--wide"><span class="nz-field__label">Condiciones de pago</span><input class="nz-input" data-campo="proyecto-pago" value="${esc(pr.condicionesPago||"")}" placeholder="Ej.: 30% a la firma, 40% a mitad, 30% a la entrega"></label>
-      <label class="nz-field nz-field--wide"><span class="nz-field__label">Descripción / alcance</span><textarea class="nz-input" rows="2" data-campo="proyecto-desc">${esc(pr.descripcion||"")}</textarea></label>
+      <label class="nz-field pa-ancho"><span class="nz-field__label">Condiciones de pago</span><input class="nz-input" data-campo="proyecto-pago" value="${esc(pr.condicionesPago||"")}" placeholder="Ej.: 30% a la firma, 40% a mitad, 30% a la entrega"></label>
+      <label class="nz-field pa-ancho"><span class="nz-field__label">Descripción / alcance</span><textarea class="nz-input" rows="2" data-campo="proyecto-desc">${esc(pr.descripcion||"")}</textarea></label>
       <label class="nz-field"><span class="nz-field__label">Impuesto</span>
         <select class="nz-input" data-campo="proyecto-impuesto-tipo">
           <option value="iva" ${t.tipo==="iva"?"selected":""}>IVA (se añade)</option>
