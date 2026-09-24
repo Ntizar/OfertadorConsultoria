@@ -7,7 +7,7 @@ Hecho con ❤️ por David Antizar
 ## Uso inmediato
 
 - **Local:** abre `docs/index.html` con doble clic. Funciona offline.
-- **Web (marca blanca):** publica el repo en GitHub Pages (rama `main`, carpeta `/docs`). Cualquiera que la abra parte de datos de ejemplo genéricos y configura su propia marca en *Ajustes*.
+- **Web (marca blanca):** https://ntizar.github.io/OfertadorConsultoria/ (repo público `OfertadorConsultoria`, app en la raíz de `main`). Cualquiera que la abra parte de datos de ejemplo genéricos y configura su propia marca en *Ajustes*.
 
 ## Conceptos
 
