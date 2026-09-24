@@ -314,6 +314,69 @@
     return q;
   }
 
+  /* ---------- Búsquedas en el árbol ---------- */
+
+  function buscarTarea(pr, id) {
+    const l = N().lista(pr && pr.tareas);
+    for (let i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
+    return null;
+  }
+
+  function buscarSub(pr, id) {
+    const tareas = N().lista(pr && pr.tareas);
+    for (let i = 0; i < tareas.length; i++) {
+      const subs = N().lista(tareas[i].subtareas);
+      for (let j = 0; j < subs.length; j++) if (subs[j].id === id) return { tarea: tareas[i], sub: subs[j] };
+    }
+    return null;
+  }
+
+  function buscarLinea(pr, id) {
+    const tareas = N().lista(pr && pr.tareas);
+    for (let i = 0; i < tareas.length; i++) {
+      const subs = N().lista(tareas[i].subtareas);
+      for (let j = 0; j < subs.length; j++) {
+        const lineas = N().lista(subs[j].lineas);
+        for (let k = 0; k < lineas.length; k++) {
+          if (lineas[k].id === id) return { tarea: tareas[i], sub: subs[j], linea: lineas[k] };
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Entregable por id. tareaId === "" o null busca en los de la oferta. */
+  function buscarEntregable(pr, id, tareaId) {
+    if (tareaId) {
+      const t = buscarTarea(pr, tareaId);
+      if (!t) return null;
+      const e = N().lista(t.entregables);
+      for (let i = 0; i < e.length; i++) if (e[i].id === id) return { entregable: e[i], tarea: t, contenedor: t.entregables };
+      return null;
+    }
+    const deOferta = N().lista(pr && pr.entregables);
+    for (let i = 0; i < deOferta.length; i++) if (deOferta[i].id === id) return { entregable: deOferta[i], tarea: null, contenedor: pr.entregables };
+    /* Sin tarea indicada: se busca también en las tareas (por si viene de otra vista). */
+    const tareas = N().lista(pr && pr.tareas);
+    for (let i = 0; i < tareas.length; i++) {
+      const e = N().lista(tareas[i].entregables);
+      for (let j = 0; j < e.length; j++) if (e[j].id === id) return { entregable: e[j], tarea: tareas[i], contenedor: tareas[i].entregables };
+    }
+    return null;
+  }
+
+  /** Crea un entregable y lo cuelga de la tarea indicada (o de la oferta). */
+  function colgarEntregable(pr, nombre, contexto, mes, tareaId) {
+    const e = nuevoEntregable(nombre, contexto, mes);
+    if (contexto === "oferta" || !tareaId) { pr.entregables.push(e); e.baseFacturacion = "oferta"; }
+    else {
+      const t = buscarTarea(pr, tareaId);
+      if (!t) { pr.entregables.push(e); e.baseFacturacion = "oferta"; }
+      else t.entregables.push(e);
+    }
+    return e;
+  }
+
   PL.modelo = {
     VERSION_DATOS: VERSION_DATOS, CLAVE: CLAVE, CLAVES_ANTIGUAS: CLAVES_ANTIGUAS,
     CATEGORIAS_PERFIL: CATEGORIAS_PERFIL, ESTADOS_OFERTA: ESTADOS_OFERTA,
@@ -323,6 +386,8 @@
     nuevaSub: nuevaSub, nuevaLinea: nuevaLinea, nuevoEntregable: nuevoEntregable, lCon: lCon,
     normalizarPerfil: normalizarPerfil, normalizarPlantilla: normalizarPlantilla,
     normalizarEntregable: normalizarEntregable, normalizarProyecto: normalizarProyecto,
-    normalizarEstado: normalizarEstado, migrar: migrar, estadoInicial: estadoInicial
+    normalizarEstado: normalizarEstado, migrar: migrar, estadoInicial: estadoInicial,
+    buscarTarea: buscarTarea, buscarSub: buscarSub, buscarLinea: buscarLinea,
+    buscarEntregable: buscarEntregable, colgarEntregable: colgarEntregable
   };
 })(typeof window !== "undefined" ? window : globalThis);

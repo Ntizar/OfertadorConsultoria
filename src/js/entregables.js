@@ -74,8 +74,12 @@
 
   /** Base sobre la que factura un entregable ya aplanado. */
   function baseDe(pr, pf, e) {
-    if (e._contexto === "oferta" || e.baseFacturacion === "oferta") return C().baseImponible(pr, pf);
-    const t = tareaDe(pr, e._tareaId);
+    /* Acepta los dos formatos aplanados: {_contexto,_tareaId} (de todos()) y
+       {contexto,tareaId} (de planFacturacion()). */
+    const contexto = (e._contexto !== undefined) ? e._contexto : e.contexto;
+    const tareaId = (e._tareaId !== undefined) ? e._tareaId : e.tareaId;
+    if (contexto === "oferta" || e.baseFacturacion === "oferta") return C().baseImponible(pr, pf);
+    const t = tareaDe(pr, tareaId);
     return t ? C().tareaImporte(t, pf) : 0;
   }
 

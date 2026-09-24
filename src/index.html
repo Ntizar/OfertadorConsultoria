@@ -6,57 +6,7 @@
 <title>Planifica — Ofertas y planificación de proyectos</title>
 <!-- Aurora 7 v7.2.0 — packs incrustados por tools/compilar.py (app autocontenida, sin CDN) -->
 <!--PACKS_CSS-->
-<style>
-/* CSS propio de la app: SOLO estructura (flex/anchos). Colores y formas: tokens Aurora var(--nz-*). */
-.pa-fila{display:flex;flex-wrap:wrap;gap:var(--nz-space-2);align-items:center}
-.pa-fila--fin{justify-content:flex-end}
-.pa-fila--apretada{gap:var(--nz-space-1)}
-.pa-crece{flex:1;min-width:180px}
-.pa-crece2{flex:2;min-width:220px}
-/* Campo que ocupa las 2 columnas del nz-formgrid--2 (Aurora no trae modificador para esto) */
-.pa-ancho{grid-column:1/-1}
-.pa-espacio{flex:1}
-.pa-logo{height:26px;max-width:150px;object-fit:contain;display:block}
-.pa-modo-oculto{display:none}
-.pa-input-num{max-width:5.5rem;text-align:right}
-.pa-input-fecha{max-width:11rem}
-.pa-input-ancho{max-width:9rem}
-.pa-tarea{margin-bottom:var(--nz-space-3)}
-.pa-sub{border:1px solid var(--nz-border);border-radius:var(--nz-radius-md);margin-top:var(--nz-space-2);background:var(--nz-surface)}
-.pa-sub__cab{display:flex;flex-wrap:wrap;gap:var(--nz-space-2);align-items:center;padding:var(--nz-space-2)}
-.pa-sub__cuerpo{padding:0 var(--nz-space-2) var(--nz-space-2);overflow-x:auto}
-.pa-tabla-grid{min-width:100%}
-.pa-tabla-grid th,.pa-tabla-grid td{white-space:nowrap}
-.pa-tabla-grid td:first-child,.pa-tabla-grid th:first-child{position:sticky;left:0;background:var(--nz-surface);z-index:1;min-width:13rem}
-.pa-tabla-grid thead th:first-child{background:var(--nz-surface-2,var(--nz-surface))}
-.pa-fila-gasto{display:flex;flex-wrap:wrap;gap:var(--nz-space-2);align-items:center;padding:var(--nz-space-2) 0;border-top:1px dashed var(--nz-border)}
-.pa-fila-perfil{display:flex;flex-wrap:wrap;gap:var(--nz-space-2);align-items:center;padding:var(--nz-space-2) 0;border-top:1px dashed var(--nz-border)}
-.pa-mini{font-size:var(--nz-text-xs);color:var(--nz-text-soft)}
-.pa-informe{max-width:52rem;margin:0 auto}
-.pa-informe h1{font-size:var(--nz-text-xl);margin:var(--nz-space-3) 0 var(--nz-space-1)}
-.pa-informe h2{font-size:var(--nz-text-md);margin-top:var(--nz-space-4);border-bottom:2px solid var(--nz-brand);padding-bottom:2px}
-.pa-informe table{width:100%;border-collapse:collapse;font-size:var(--nz-text-xs);margin:var(--nz-space-2) 0}
-.pa-informe th,.pa-informe td{border:1px solid var(--nz-border);padding:var(--nz-space-1) var(--nz-space-2);text-align:left}
-.pa-informe th{background:var(--nz-surface-2,var(--nz-surface))}
-.pa-num{text-align:right;font-variant-numeric:tabular-nums}
-.pa-informe__cab{display:flex;justify-content:space-between;flex-wrap:wrap;gap:var(--nz-space-2);align-items:flex-start;border-bottom:3px solid var(--nz-brand);padding-bottom:var(--nz-space-2)}
-.pa-informe__pie{margin-top:var(--nz-space-5);padding-top:var(--nz-space-2);border-top:1px solid var(--nz-border);font-size:var(--nz-text-xs);color:var(--nz-text-soft);display:flex;justify-content:space-between;flex-wrap:wrap;gap:var(--nz-space-2)}
-@media print{
-  .nz-navbar,.nz-tabs,#pa-error,.pa-no-imprimir{display:none}
-  main{padding:0;max-width:none}
-  main section[id^="sec-"]:not(#sec-informe){display:none}
-  #sec-informe .nz-article{box-shadow:none;border:none;padding:0}
-  .pa-informe{max-width:none}
-  body{background:var(--nz-surface)}
-  @page{margin:14mm}
-}
-#pa-error{display:none;background:var(--nz-danger-soft,var(--nz-surface));color:var(--nz-danger);border-bottom:1px solid var(--nz-danger);padding:var(--nz-space-2) var(--nz-space-3);font-size:var(--nz-text-xs);white-space:pre-wrap}
-#pa-toast{position:fixed;bottom:3rem;left:50%;transform:translateX(-50%);background:var(--nz-text);color:var(--nz-surface);padding:var(--nz-space-2) var(--nz-space-3);border-radius:var(--nz-radius-md);font-size:var(--nz-text-sm);opacity:0;pointer-events:none;transition:opacity .25s;z-index:99;max-width:90vw;text-align:center}
-#pa-toast.is-visible{opacity:1}
-/* Ocultar importes (modo tiempo): los spans/badges con importe llevan .pa-importe */
-body.pa-modo-oculto .pa-importe{display:none}
-#pa-error.is-visible{display:block}
-</style>
+<!--APP_CSS-->
 </head>
 <body class="nz">
 <div id="pa-error" role="alert"></div>
@@ -64,31 +14,35 @@ body.pa-modo-oculto .pa-importe{display:none}
 <header class="nz-navbar">
   <span class="nz-navbar__brand"><img id="pa-logo" class="pa-logo" alt="" hidden> <span id="pa-marca-nombre">Planifica</span></span>
   <span class="nz-navbar__links">
-    <select id="pa-sel-proyecto" class="nz-input nz-input--sm" aria-label="Proyecto activo" style="max-width:240px"></select>
-    <button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="nuevo-proyecto">＋ Oferta</button>
-    <button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="dup-proyecto" title="Duplicar la oferta activa">⧉</button>
-    <button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-proyecto" title="Eliminar la oferta activa">✕</button>
-    <button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="toggle-importes" id="btn-importes" title="Mostrar u ocultar todos los importes (€)">👁 €</button>
+    <select id="pa-sel-proyecto" class="nz-input nz-input--sm" aria-label="Oferta activa"></select>
+    <button class="nz-btn nz-btn--primary nz-btn--sm" data-acc="nueva-oferta">＋ Oferta</button>
+    <button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="dup-oferta" title="Duplicar la oferta activa">⧉</button>
+    <button class="nz-btn nz-btn--ghost nz-btn--sm" data-acc="elim-oferta" title="Eliminar la oferta activa">✕</button>
+    <button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="toggle-importes" id="btn-importes" title="Mostrar u ocultar todos los importes">👁 €</button>
     <button class="nz-btn nz-btn--soft nz-btn--sm" data-acc="imp-json" title="Importar JSON (oferta, biblioteca o copia completa)">⬆</button>
   </span>
 </header>
 
 <main class="nz-container">
   <div class="pa-fila" style="margin:var(--nz-space-3) 0 var(--nz-space-2)">
-    <input class="nz-input pa-crece" data-campo="proyecto-nombre" id="inp-proy-nombre" value="" placeholder="Nombre de la oferta" style="font-weight:700">
+    <input class="nz-input pa-crece" data-campo="oferta-nombre" id="inp-ofe-nombre" value="" placeholder="Nombre de la oferta" style="font-weight:700">
     <span id="pa-estado-badge"></span>
-    <span class="pa-mini" id="pa-meta-proyecto"></span>
+    <span class="pa-mini" id="pa-meta-oferta"></span>
   </div>
+
+  <div id="pa-herederos"></div>
 
   <div class="nz-dash-grid nz-dash-grid--4" style="margin-bottom:var(--nz-space-3)">
     <div class="nz-kpi nz-kpi--bordered"><span class="nz-kpi__label">Total oferta</span><span class="nz-kpi__value nz-kpi__value--brand" id="kpi-total">—</span><span class="nz-kpi__delta" id="kpi-total-detalle"></span></div>
     <div class="nz-kpi nz-kpi--bordered"><span class="nz-kpi__label">Esfuerzo</span><span class="nz-kpi__value" id="kpi-horas">—</span><span class="nz-kpi__delta" id="kpi-estructura"></span></div>
-    <div class="nz-kpi nz-kpi--bordered"><span class="nz-kpi__label">Media mensual</span><span class="nz-kpi__value" id="kpi-media">—</span><span class="nz-kpi__delta" id="kpi-validez"></span></div>
-    <div class="nz-kpi nz-kpi--bordered"><span class="nz-kpi__label">Cliente</span><span class="nz-kpi__value" id="kpi-cliente" style="font-size:var(--nz-text-md)">—</span><span class="nz-kpi__delta" id="kpi-impuestos"></span></div>
+    <div class="nz-kpi nz-kpi--bordered"><span class="nz-kpi__label">Entregables</span><span class="nz-kpi__value" id="kpi-entregables">—</span><span class="nz-kpi__delta" id="kpi-avance"></span></div>
+    <div class="nz-kpi nz-kpi--bordered"><span class="nz-kpi__label">Facturación</span><span class="nz-kpi__value" id="kpi-facturado">—</span><span class="nz-kpi__delta" id="kpi-cliente"></span></div>
   </div>
 
   <nav class="nz-tabs" id="pa-tabs">
     <button class="nz-tabs__tab" data-tab="estructura" aria-selected="true">Estructura</button>
+    <button class="nz-tabs__tab" data-tab="entregables">Entregables</button>
+    <button class="nz-tabs__tab" data-tab="escenarios">Escenarios</button>
     <button class="nz-tabs__tab" data-tab="resumen">Resumen</button>
     <button class="nz-tabs__tab" data-tab="cronograma">Cronograma</button>
     <button class="nz-tabs__tab" data-tab="gastos">Gastos</button>
@@ -109,22 +63,41 @@ body.pa-modo-oculto .pa-importe{display:none}
       <div id="pa-estructura"></div>
     </section>
 
+    <section id="sec-entregables" hidden>
+      <div id="ent-resumen"></div>
+      <div class="pa-fila" style="margin:var(--nz-space-3) 0 var(--nz-space-2)">
+        <button class="nz-btn nz-btn--primary" data-acc="nuevo-entregable-oferta">＋ Entregable de la oferta</button>
+        <span class="pa-mini">Los entregables de cada tarea se añaden desde <em>Estructura</em>.</span>
+      </div>
+      <div id="ent-avisos"></div>
+      <div id="pa-entregables"></div>
+    </section>
+
+    <section id="sec-escenarios" hidden>
+      <div id="esc-cabecera"></div>
+      <div id="esc-comparacion"></div>
+      <div id="pa-escenarios"></div>
+      <div id="pa-versiones" style="margin-top:var(--nz-space-4)"></div>
+    </section>
+
     <section id="sec-resumen" hidden>
       <div id="res-totales"></div>
       <div class="nz-dash-grid nz-dash-grid--2" style="margin-top:var(--nz-space-3)">
         <div id="res-perfiles"></div>
         <div id="res-tareas"></div>
       </div>
+      <div id="res-facturacion" style="margin-top:var(--nz-space-3)"></div>
     </section>
 
     <section id="sec-cronograma" hidden>
       <div id="cro-barras"></div>
+      <div id="cro-hitos" style="margin-top:var(--nz-space-3)"></div>
       <div id="cro-tabla" style="margin-top:var(--nz-space-3)"></div>
     </section>
 
     <section id="sec-gastos" hidden>
       <div class="pa-fila" style="margin-bottom:var(--nz-space-2)">
-        <button class="nz-btn nz-btn--primary" data-acc="nueva-gasto">＋ Concepto</button>
+        <button class="nz-btn nz-btn--primary" data-acc="nuevo-gasto">＋ Concepto</button>
         <span class="pa-espacio"></span>
         <strong id="gas-total"></strong>
       </div>
@@ -151,14 +124,14 @@ body.pa-modo-oculto .pa-importe{display:none}
 <input type="file" id="pa-fichero" accept=".json,application/json" hidden>
 <input type="file" id="pa-logo-fichero" accept="image/*" hidden>
 
-<!-- Modal de plantillas (checkbox hack Aurora, sin JS para abrir) -->
+<!-- Modal: aplicar plantilla de tareas (checkbox hack de Aurora, sin JS para abrir) -->
 <div class="nz-modal">
   <input type="checkbox" id="pa-modal-plantillas" class="nz-vh">
-  <label class="nz-modal__scrim" for="pa-modal-plantillas" data-acc="cerrar-modal-plantillas"></label>
+  <label class="nz-modal__scrim" for="pa-modal-plantillas"></label>
   <div class="nz-modal__dialog">
     <div class="nz-modal__head">
       <h3 class="nz-modal__title">Aplicar plantilla de tareas</h3>
-      <label class="nz-modal__close" for="pa-modal-plantillas" data-acc="cerrar-modal-plantillas">✕</label>
+      <label class="nz-modal__close" for="pa-modal-plantillas">✕</label>
     </div>
     <div class="nz-modal__body">
       <p class="pa-mini">Elige qué hacer con las tareas actuales de la oferta y luego aplica una plantilla:</p>
@@ -168,9 +141,49 @@ body.pa-modo-oculto .pa-importe{display:none}
   </div>
 </div>
 
+<!-- Modal: guardar escenario (foto de la oferta) -->
+<div class="nz-modal">
+  <input type="checkbox" id="pa-modal-escenario" class="nz-vh">
+  <label class="nz-modal__scrim" for="pa-modal-escenario"></label>
+  <div class="nz-modal__dialog">
+    <div class="nz-modal__head">
+      <h3 class="nz-modal__title">Guardar escenario de la oferta</h3>
+      <label class="nz-modal__close" for="pa-modal-escenario">✕</label>
+    </div>
+    <div class="nz-modal__body">
+      <p class="pa-mini">Guarda una alternativa de esta oferta (base, recortada, ampliada…) para compararla después.</p>
+      <label class="nz-field"><span class="nz-field__label">Nombre del escenario</span><input class="nz-input" id="pa-esc-nombre" placeholder="Recortada sin la fase 2"></label>
+      <label class="nz-field"><span class="nz-field__label">Nota (opcional)</span><input class="nz-input" id="pa-esc-nota" placeholder="Qué cambia respecto a la actual"></label>
+      <div class="pa-fila pa-fila--fin" style="margin-top:var(--nz-space-3)">
+        <button class="nz-btn nz-btn--primary" data-acc="escenario-guardar">Guardar escenario</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: congelar versión de la oferta -->
+<div class="nz-modal">
+  <input type="checkbox" id="pa-modal-version" class="nz-vh">
+  <label class="nz-modal__scrim" for="pa-modal-version"></label>
+  <div class="nz-modal__dialog">
+    <div class="nz-modal__head">
+      <h3 class="nz-modal__title">Congelar versión de la oferta</h3>
+      <label class="nz-modal__close" for="pa-modal-version">✕</label>
+    </div>
+    <div class="nz-modal__body">
+      <p class="pa-mini">Guarda la oferta tal y como está hoy (por ejemplo, antes de enviarla al cliente). Quedará marcada con su importe y podrás ver qué ha cambiado desde entonces.</p>
+      <label class="nz-field"><span class="nz-field__label">Etiqueta</span><input class="nz-input" id="pa-ver-etiqueta" placeholder="v1 enviada al cliente"></label>
+      <label class="nz-field"><span class="nz-field__label">Nota (opcional)</span><input class="nz-input" id="pa-ver-nota" placeholder="Enviada por correo el martes"></label>
+      <div class="pa-fila pa-fila--fin" style="margin-top:var(--nz-space-3)">
+        <button class="nz-btn nz-btn--primary" data-acc="version-guardar">Congelar versión</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="pa-toast" role="status"></div>
 
-<footer class="nz-statusbar" style="position:fixed;bottom:0;left:0;right:0">
+<footer class="nz-statusbar pa-pie">
   <span id="pa-pie-marca">Planifica</span><span class="nz-statusbar__spacer"></span>
   <span>Hecho con ❤️ por David Antizar</span>
 </footer>

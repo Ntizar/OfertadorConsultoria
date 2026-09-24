@@ -1,0 +1,110 @@
+/* =====================================================================
+   Planifica v3 — CSS propio de la app
+   SOLO estructura y disposición (.pa-*). Colores, formas y tipografía
+   vienen de los tokens de Aurora 7 (var(--nz-*)). Ni un color a mano.
+   ===================================================================== */
+
+/* ---------- Filas y anchos ---------- */
+.pa-fila { display: flex; flex-wrap: wrap; gap: var(--nz-space-2); align-items: center; }
+.pa-fila--fin { justify-content: flex-end; }
+.pa-fila--apretada { gap: var(--nz-space-1); }
+.pa-crece { flex: 1; min-width: 180px; }
+.pa-crece2 { flex: 2; min-width: 220px; }
+/* Campo que ocupa las 2 columnas del nz-formgrid--2 (Aurora no trae modificador para esto) */
+.pa-ancho { grid-column: 1 / -1; }
+.pa-espacio { flex: 1; }
+.pa-centrado { text-align: center; }
+.pa-ahora { white-space: nowrap; }
+
+/* ---------- Cabecera ---------- */
+.pa-logo { height: 26px; max-width: 150px; object-fit: contain; display: block; }
+.pa-pie { position: fixed; bottom: 0; left: 0; right: 0; }
+
+/* ---------- Formularios ---------- */
+.pa-input-num { max-width: 5.5rem; text-align: right; }
+.pa-input-fecha { max-width: 11rem; }
+.pa-input-ancho { max-width: 9rem; }
+.pa-input-corto { max-width: 4rem; }
+.pa-mini { font-size: var(--nz-text-xs); color: var(--nz-text-soft); }
+.pa-mini--fuerte { font-weight: 700; }
+
+/* ---------- Árbol de tareas y subtareas ---------- */
+.pa-tarea { margin-bottom: var(--nz-space-3); }
+.pa-sub { border: 1px solid var(--nz-border); border-radius: var(--nz-radius-md); margin-top: var(--nz-space-2); background: var(--nz-surface); }
+.pa-sub__cab { display: flex; flex-wrap: wrap; gap: var(--nz-space-2); align-items: center; padding: var(--nz-space-2); }
+.pa-sub__cuerpo { padding: 0 var(--nz-space-2) var(--nz-space-2); overflow-x: auto; }
+.pa-hitos { padding: var(--nz-space-2); border-top: 1px dashed var(--nz-border); }
+.pa-tabla-grid { min-width: 100%; }
+.pa-tabla-grid th, .pa-tabla-grid td { white-space: nowrap; }
+.pa-tabla-grid td:first-child, .pa-tabla-grid th:first-child {
+  position: sticky; left: 0; background: var(--nz-surface); z-index: 1; min-width: 13rem;
+}
+.pa-tabla-grid thead th:first-child { background: var(--nz-surface-2, var(--nz-surface)); }
+
+/* ---------- Listas de filas (gastos, perfiles, plantillas, hitos) ---------- */
+.pa-fila-dato { display: flex; flex-wrap: wrap; gap: var(--nz-space-2); align-items: center; padding: var(--nz-space-2) 0; border-top: 1px dashed var(--nz-border); }
+.pa-celda-importe { min-width: 7rem; text-align: right; }
+
+/* ---------- Entregables ---------- */
+.pa-hito { display: flex; flex-wrap: wrap; gap: var(--nz-space-2); align-items: center; padding: var(--nz-space-2) 0; border-top: 1px dashed var(--nz-border); }
+.pa-hito__nombre { flex: 2; min-width: 200px; }
+.pa-hito__detalle { flex: 1 1 100%; }
+.pa-punto { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: var(--nz-radius-full); border: 2px solid var(--nz-brand); margin-right: var(--nz-space-1); vertical-align: middle; }
+.pa-punto--aceptado { background: var(--nz-brand); }
+.pa-punto--entregado { background: var(--nz-success, var(--nz-brand)); border-color: var(--nz-success, var(--nz-brand)); }
+.pa-punto--encurso { border-style: dashed; }
+
+/* ---------- Comparador ---------- */
+.pa-delta { font-variant-numeric: tabular-nums; font-weight: 700; }
+.pa-delta--mas::before { content: "+"; }
+.pa-bloque { margin-bottom: var(--nz-space-4); }
+.pa-cambio { padding: var(--nz-space-1) 0; border-top: 1px dashed var(--nz-border); }
+
+/* ---------- Cronograma ---------- */
+.pa-marcadores { display: flex; gap: var(--nz-space-1); align-items: flex-end; min-height: 3.5rem; }
+.pa-marcador { flex: 1; text-align: center; font-size: var(--nz-text-xs); color: var(--nz-text-soft); }
+.pa-marcador__diamante { color: var(--nz-brand); font-size: var(--nz-text-sm); display: block; }
+
+/* ---------- Informe (pantalla e impresión) ---------- */
+.pa-informe { max-width: 52rem; margin: 0 auto; }
+.pa-informe h1 { font-size: var(--nz-text-xl); margin: var(--nz-space-3) 0 var(--nz-space-1); }
+.pa-informe h2 { font-size: var(--nz-text-md); margin-top: var(--nz-space-4); border-bottom: 2px solid var(--nz-brand); padding-bottom: 2px; }
+.pa-informe table { width: 100%; border-collapse: collapse; font-size: var(--nz-text-xs); margin: var(--nz-space-2) 0; }
+.pa-informe th, .pa-informe td { border: 1px solid var(--nz-border); padding: var(--nz-space-1) var(--nz-space-2); text-align: left; }
+.pa-informe th { background: var(--nz-surface-2, var(--nz-surface)); }
+.pa-informe__cab { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--nz-space-2); align-items: flex-start; border-bottom: 3px solid var(--nz-brand); padding-bottom: var(--nz-space-2); }
+.pa-informe__pie { margin-top: var(--nz-space-5); padding-top: var(--nz-space-2); border-top: 1px solid var(--nz-border); font-size: var(--nz-text-xs); color: var(--nz-text-soft); display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--nz-space-2); }
+.pa-num { text-align: right; font-variant-numeric: tabular-nums; }
+.pa-salto { page-break-inside: avoid; }
+
+/* ---------- Aviso de error y confirmación ---------- */
+#pa-error {
+  display: none; background: var(--nz-danger-soft, var(--nz-surface)); color: var(--nz-danger);
+  border-bottom: 1px solid var(--nz-danger); padding: var(--nz-space-2) var(--nz-space-3);
+  font-size: var(--nz-text-xs); white-space: pre-wrap;
+}
+#pa-error.is-visible { display: block; }
+#pa-aviso-herederos { margin-bottom: var(--nz-space-3); }
+
+#pa-toast {
+  position: fixed; bottom: 3rem; left: 50%; transform: translateX(-50%);
+  background: var(--nz-text); color: var(--nz-surface); padding: var(--nz-space-2) var(--nz-space-3);
+  border-radius: var(--nz-radius-md); font-size: var(--nz-text-sm);
+  opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 99; max-width: 90vw; text-align: center;
+}
+#pa-toast.is-visible { opacity: 1; }
+
+/* ---------- Modo "solo tiempos": oculta todos los importes ---------- */
+body.pa-sin-importes .pa-importe { display: none; }
+
+/* ---------- Impresión ---------- */
+@media print {
+  .nz-navbar, .nz-tabs, #pa-error, .pa-no-imprimir { display: none; }
+  main { padding: 0; max-width: none; }
+  /* Se oculta todo menos el informe: las secciones NO cuelgan directamente de <main>. */
+  main section[id^="sec-"]:not(#sec-informe) { display: none !important; }
+  #sec-informe .nz-article { box-shadow: none; border: none; padding: 0; }
+  .pa-informe { max-width: none; }
+  body { background: var(--nz-surface); }
+  @page { margin: 14mm; }
+}
